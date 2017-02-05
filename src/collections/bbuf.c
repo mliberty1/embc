@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include "embc/bbuf.h"
+#include "embc/collections/bbuf.h"
 #include "embc.h"
 #include "embc/cdef.h"
 #include "embc/assert.h"

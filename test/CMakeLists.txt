@@ -37,24 +37,24 @@ set(dependencies
         test_objlib
         cmocka)
 
-function (ADD_CMOCKA_TEST _testName)
+function (ADD_CMOCKA_TEST _testName _path)
     set(TARGET ${_testName})
-    add_executable(${_testName} ${_testName}.c ${objects})
+    add_executable(${_testName} "${_path}/${_testName}.c" ${objects})
     add_dependencies(${TARGET} embc_objlib test_objlib cmocka)
     target_link_libraries(${_testName} cmocka)
     add_test(${_testName} ${CMAKE_CURRENT_BINARY_DIR}/${_testName})
 endfunction (ADD_CMOCKA_TEST)
 
-ADD_CMOCKA_TEST(argchk_test)
-ADD_CMOCKA_TEST(bbuf_test)
-ADD_CMOCKA_TEST(cdef_test)
-ADD_CMOCKA_TEST(cli_test)
-ADD_CMOCKA_TEST(crc_test)
-ADD_CMOCKA_TEST(dbc_test)
-ADD_CMOCKA_TEST(ec_test)
-ADD_CMOCKA_TEST(fsm_test)
-ADD_CMOCKA_TEST(lfsr_test)
-ADD_CMOCKA_TEST(pool_test)
+ADD_CMOCKA_TEST(argchk_test .)
+ADD_CMOCKA_TEST(bbuf_test collections)
+ADD_CMOCKA_TEST(cdef_test .)
+ADD_CMOCKA_TEST(cli_test .)
+ADD_CMOCKA_TEST(crc_test .)
+ADD_CMOCKA_TEST(dbc_test .)
+ADD_CMOCKA_TEST(ec_test .)
+ADD_CMOCKA_TEST(fsm_test .)
+ADD_CMOCKA_TEST(lfsr_test .)
+ADD_CMOCKA_TEST(pool_test memory)
 
 # test static assert compile failures
 # http://stackoverflow.com/questions/30155619/expected-build-failure-tests-in-cmake

@@ -20,7 +20,7 @@
 #include <cmocka.h>
 #include "embc/cli.h"
 #include "embc.h"
-#include "embc/bbuf.h"
+#include "embc/collections/bbuf.h"
 #include <string.h>
 
 

@@ -18,7 +18,7 @@
 #include <stddef.h>
 #include <setjmp.h>
 #include <cmocka.h>
-#include "embc/pool.h"
+#include "embc/memory/pool.h"
 #include "embc.h"
 #include <string.h> // memset
 

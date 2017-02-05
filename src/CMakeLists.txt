@@ -29,14 +29,14 @@ include_directories(../third-party/tinyprintf)
 include_directories(../third-party/uthash/src)
 
 set(SOURCES
-        bbuf.c
+        collections/bbuf.c
         cli.c
         crc.c
         ec.c
         fsm.c
         lfsr.c
         log.c
-        pool.c
+        memory/pool.c
         ${PLATFORM_SRC}
 )
 

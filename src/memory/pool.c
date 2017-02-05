@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include "embc/pool.h"
+#include "embc/memory/pool.h"
 #include "embc/argchk.h"
 #include "embc/assert.h"
 #include "embc/cdef.h"

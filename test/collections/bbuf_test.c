@@ -18,7 +18,7 @@
 #include <stddef.h>
 #include <setjmp.h>
 #include <cmocka.h>
-#include "embc/bbuf.h"
+#include "embc/collections/bbuf.h"
 #include "embc.h"
 
 
