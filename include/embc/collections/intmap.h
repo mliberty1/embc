@@ -1,4 +1,18 @@
-/* Copyright 2015-2016 Jetperch LLC */
+/*
+ * Copyright 2014-2017 Jetperch LLC
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 
 /**
  * \file
@@ -6,15 +20,15 @@
  * \brief Provide a map from integers to void *.
  */
 
-#ifndef INTMAP_H
-#define INTMAP_H
+#ifndef EMBC_INTMAP_H_
+#define EMBC_INTMAP_H_
 
-#include "common/cdef.h"
+#include "embc/cmacro_inc.h"
 #include <stddef.h>
 #include <stdbool.h>
 #include <stdlib.h>
 
-CPP_GUARD_START
+EMBC_CPP_GUARD_START
 
 /**
  * \defgroup intmap intmap
@@ -39,8 +53,9 @@ struct intmap_iterator_s;
 /**
  * @brief Create a new intmap.
  *
- * @return The new instance or 0 on error.  Use intmap_free() when done with
- *      this instance.
+ * @return The new instance.  This function asserts on out of memory, so
+ *      the return value is guaranteed to be valid.  For platforms which
+ *      support free, intmap_free() when done with this instance.
  */
 struct intmap_s * intmap_new();
 
@@ -79,7 +94,7 @@ int intmap_put(struct intmap_s * self, size_t key, void * value, void ** old_val
  * @param[in] self The container.
  * @param[in] key The key for the item.
  * @param[out] value The value for the item.
- * @return 0, JETLEX_ERROR_NOT_FOUND or error code.
+ * @return 0, EMBC_ERROR_NOT_FOUND or error code.
  */
 int intmap_get(struct intmap_s * self, size_t key, void ** value);
 
@@ -90,7 +105,7 @@ int intmap_get(struct intmap_s * self, size_t key, void ** value);
  * @param[in] key The key for the item.
  * @param[out] old_value The existing value for the item.  The caller is
  *      responsible for managing this pointer.
- * @return 0, JETLEX_ERROR_NOT_FOUND or error code.
+ * @return 0, EMBC_ERROR_NOT_FOUND or error code.
  */
 int intmap_remove(struct intmap_s * self, size_t key, void ** old_value);
 
@@ -112,7 +127,7 @@ struct intmap_iterator_s * intmap_iterator_new(struct intmap_s * self);
  * @param[in] self The iterator.
  * @param[out] key The key for the next item.
  * @param[out] value The value for the next item.
- * @return 0, JETLEX_ERROR_NOT_FOUND at end or an error.
+ * @return 0, EMBC_ERROR_NOT_FOUND at end or an error.
  */
 int intmap_iterator_next(struct intmap_iterator_s * self, size_t * key, void ** value);
 
@@ -192,6 +207,6 @@ void intmap_iterator_free(struct intmap_iterator_s * self);
 /** @} */
 
 
-CPP_GUARD_END
+EMBC_CPP_GUARD_END
 
-#endif /* INTMAP_H */
+#endif /* EMBC_INTMAP_H_ */

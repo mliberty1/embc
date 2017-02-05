@@ -30,6 +30,8 @@ include_directories(../third-party/uthash/src)
 
 set(SOURCES
         collections/bbuf.c
+        collections/hashmap.c
+        collections/intmap.c
         cli.c
         crc.c
         ec.c

@@ -1,8 +1,22 @@
-/* Copyright 2016 Jetperch LLC */
+/*
+ * Copyright 2014-2017 Jetperch LLC
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 
-#include "intmap.h"
-#include "common/ec.h"
-#include "common/dbc.h"
+#include "embc/collections/intmap.h"
+#include "embc.h"
+#include "embc/dbc.h"
 #include <stdlib.h>
 #include <string.h>
 #include "utlist.h"
@@ -46,9 +60,7 @@ static void itermap_iterator_next_advance(struct intmap_iterator_s * self);
 
 struct intmap_s * intmap_new() {
     struct intmap_s * intmap = calloc(1, sizeof(struct intmap_s));
-    if (!intmap) {
-        return 0;
-    }
+    EMBC_ASSERT_ALLOC(intmap);
     intmap->hash_mask = 0x7;
     intmap->bins = calloc(intmap->hash_mask + 1, sizeof(struct entry_s *));
     return intmap;
@@ -109,7 +121,7 @@ static void resize(struct intmap_s * self) {
 int intmap_put(struct intmap_s * self, size_t key, void * value, void ** old_value) {
     struct entry_s **previous;
     struct entry_s *item;
-    DBC_ARG_NOT_NULL(self);
+    DBC_NOT_NULL(self);
     if ((!self->iterators) && (self->length >= (2 * self->hash_mask))) {
         resize(self);
     }
@@ -132,7 +144,7 @@ int intmap_put(struct intmap_s * self, size_t key, void * value, void ** old_val
 
     item = calloc(1, sizeof(struct entry_s));
     if (!item) {
-        return JETLEX_ERROR_NOT_ENOUGH_MEMORY;
+        return EMBC_ERROR_NOT_ENOUGH_MEMORY;
     }
     item->key = key;
     item->value = value;
@@ -146,7 +158,7 @@ int intmap_put(struct intmap_s * self, size_t key, void * value, void ** old_val
 
 int intmap_get(struct intmap_s * self, size_t key, void ** value) {
     struct entry_s *item;
-    DBC_ARG_NOT_NULL(self);
+    DBC_NOT_NULL(self);
     item = self->bins[compute_bin(self, key)];
     while (item) {
         if (item->key == key) {
@@ -160,14 +172,14 @@ int intmap_get(struct intmap_s * self, size_t key, void ** value) {
     if (value) {
         *value = 0;
     }
-    return JETLEX_ERROR_NOT_FOUND;
+    return EMBC_ERROR_NOT_FOUND;
 }
 
 int intmap_remove(struct intmap_s * self, size_t key, void ** old_value) {
     struct entry_s **previous;
     struct entry_s *item;
     struct intmap_iterator_s * iter;
-    DBC_ARG_NOT_NULL(self);
+    DBC_NOT_NULL(self);
     previous = &self->bins[compute_bin(self, key)];
     item = *previous;
     while (item) {
@@ -188,7 +200,7 @@ int intmap_remove(struct intmap_s * self, size_t key, void ** old_value) {
         }
         item = item->next;
     }
-    return JETLEX_ERROR_NOT_FOUND;
+    return EMBC_ERROR_NOT_FOUND;
 }
 
 static void itermap_iterator_next_advance(struct intmap_iterator_s * self) {
@@ -211,10 +223,9 @@ static void itermap_iterator_next_advance(struct intmap_iterator_s * self) {
 }
 
 struct intmap_iterator_s * intmap_iterator_new(struct intmap_s * self) {
-    if (!self) {
-        return 0;
-    }
+    DBC_NOT_NULL(self);
     struct intmap_iterator_s * iter = calloc(1, sizeof(struct intmap_iterator_s));
+    EMBC_ASSERT_ALLOC(iter);
     iter->intmap = self;
     iter->next_item = 0;
     DL_APPEND(self->iterators, iter);
@@ -223,11 +234,11 @@ struct intmap_iterator_s * intmap_iterator_new(struct intmap_s * self) {
 }
 
 int intmap_iterator_next(struct intmap_iterator_s * self, size_t * key, void ** value) {
-    DBC_ARG_NOT_NULL(self);
-    DBC_ARG_NOT_NULL(key);
-    DBC_ARG_NOT_NULL(value);
+    DBC_NOT_NULL(self);
+    DBC_NOT_NULL(key);
+    DBC_NOT_NULL(value);
     if (!self->next_item) {
-        return JETLEX_ERROR_NOT_FOUND;
+        return EMBC_ERROR_NOT_FOUND;
     }
     *key = self->next_item->key;
     *value = self->next_item->value;

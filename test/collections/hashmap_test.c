@@ -1,11 +1,26 @@
+/*
+ * Copyright 2014-2017 Jetperch LLC
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 #include <stdarg.h>
 #include <stddef.h>
 #include <setjmp.h>
 #include <cmocka.h>
 #include <stdbool.h>
-#include "runtime/collections/hashmap.h"
-#include "common/log.h"
-#include "common/ec.h"
+#include "embc/collections/hashmap.h"
+#include "embc.h"
 #include <stdio.h>
 
 void app_printf(const char *format, ...)
@@ -37,7 +52,7 @@ static void hashmap_empty(void **state) {
     size_t value = 42;
     struct hashmap_s * h = hashmap_new(myhash, mycompare);
     assert_int_equal(0, hashmap_length(h));
-    assert_int_equal(JETLEX_ERROR_NOT_FOUND, hashmap_get(h, (void *) 10, (void **) &value));
+    assert_int_equal(EMBC_ERROR_NOT_FOUND, hashmap_get(h, (void *) 10, (void **) &value));
     assert_int_equal(0, value);
     hashmap_free(h);
 }

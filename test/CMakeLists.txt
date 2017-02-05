@@ -47,6 +47,8 @@ endfunction (ADD_CMOCKA_TEST)
 
 ADD_CMOCKA_TEST(argchk_test .)
 ADD_CMOCKA_TEST(bbuf_test collections)
+ADD_CMOCKA_TEST(hashmap_test collections)
+ADD_CMOCKA_TEST(intmap_test collections)
 ADD_CMOCKA_TEST(cdef_test .)
 ADD_CMOCKA_TEST(cli_test .)
 ADD_CMOCKA_TEST(crc_test .)

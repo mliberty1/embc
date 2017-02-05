@@ -1,8 +1,22 @@
-/* Copyright 2016 Jetperch LLC */
+/*
+ * Copyright 2014-2017 Jetperch LLC
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 
-#include "hashmap.h"
-#include "common/ec.h"
-#include "common/dbc.h"
+#include "embc/collections/hashmap.h"
+#include "embc/dbc.h"
+#include "embc.h"
 #include <stdlib.h>
 
 struct entry_s {
@@ -69,7 +83,7 @@ int hashmap_put(struct hashmap_s * self, void * key, void * value, void ** old_v
     size_t hash;
     struct entry_s **previous;
     struct entry_s *item;
-    DBC_ARG_NOT_NULL(self);
+    DBC_NOT_NULL(self);
     hash = self->hash(key);
     previous = &self->hashtable[hash & self->hashtable_mask];
     if (*previous) {
@@ -88,9 +102,7 @@ int hashmap_put(struct hashmap_s * self, void * key, void * value, void ** old_v
     }
 
     item = calloc(1, sizeof(struct entry_s));
-    if (!item) {
-        return JETLEX_ERROR_NOT_ENOUGH_MEMORY;
-    }
+    EMBC_ASSERT_ALLOC(item);
     item->hash = hash;
     item->key = key;
     item->value = value;
@@ -105,7 +117,7 @@ int hashmap_put(struct hashmap_s * self, void * key, void * value, void ** old_v
 int hashmap_get(struct hashmap_s * self, void * key, void ** value) {
     size_t hash;
     struct entry_s *item;
-    DBC_ARG_NOT_NULL(self);
+    DBC_NOT_NULL(self);
     hash = self->hash(key);
     item = self->hashtable[hash & self->hashtable_mask];
     while (item) {
@@ -120,7 +132,7 @@ int hashmap_get(struct hashmap_s * self, void * key, void ** value) {
     if (value) {
         *value = 0;
     }
-    return JETLEX_ERROR_NOT_FOUND;
+    return EMBC_ERROR_NOT_FOUND;
 }
 
 #if 0
