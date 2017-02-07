@@ -28,6 +28,8 @@ Operating systems
 
 * [POSIX](http://pubs.opengroup.org/onlinepubs/9699919799/)
 * [NuttX](http://www.nuttx.org/)
+* [polymcu](https://github.com/labapart/polymcu) : CMSIS OS wrappers
+* [FreeRTOS](http://www.freertos.org/)
 
 C standard library implementations
 
