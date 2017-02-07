@@ -15,7 +15,12 @@
  */
 
 #include "embc/ec.h"
+#include "embc/argchk.h"
+#include "embc/cdef.h"
 
+
+EMBC_STATIC_ASSERT(ARGCHK_FAIL_RETURN_CODE_DEFAULT == EMBC_ERROR_PARAMETER_INVALID,
+                   argchk_return_code_mismatch);
 
 #define SWITCH_NAME(NAME, TEXT) case EMBC_ERROR_ ## NAME: return #NAME;
 #define SWITCH_DESCRIPTION(NAME, TEXT) case EMBC_ERROR_ ## NAME: return TEXT;

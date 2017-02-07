@@ -41,12 +41,21 @@ EMBC_CPP_GUARD_START
  */
 
 /**
+ * @brief The default return code.
+ *
+ * This default value is guaranteed to be EMBC_ERROR_PARAMETER_INVALID.
+ */
+#define ARGCHK_FAIL_RETURN_CODE_DEFAULT 5
+
+/**
  * @def ARGCHK_FAIL_RETURN_CODE
  *
  * @brief The return code for argument check failure.
+ *
+ * Defaults to ARGCHK_FAIL_RETURN_CODE_DEFAULT.
  */
 #ifndef ARGCHK_FAIL_RETURN_CODE
-#define ARGCHK_FAIL_RETURN_CODE 5
+#define ARGCHK_FAIL_RETURN_CODE ARGCHK_FAIL_RETURN_CODE_DEFAULT
 #endif
 
 

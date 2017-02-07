@@ -16,17 +16,8 @@ if (UNIX)
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -D__FILENAME__=\"\\\"$(basename $(subst  ${CMAKE_CURRENT_SOURCE_DIR}/,embc/,$(abspath $<)))\\\"\"")
 endif()
 
-if (LINUX)
-    set(PLATFORM_SRC
-            ../incubator/src/platform/linux/queue.c
-    )
-else()
-    set(PLATFORM_SRC "")
-endif()
 
-
-include_directories(../third-party/tinyprintf)
-include_directories(../third-party/uthash/src)
+include_directories(${EMBC_INCLUDE})
 
 set(SOURCES
         collections/bbuf.c
@@ -44,7 +35,12 @@ set(SOURCES
 
 add_library(embc_objlib OBJECT ${SOURCES})
 
-add_library(embc SHARED
+if(${EMBC_TOPLEVEL})
+    set(EMBC_LIBRARY_TYPE SHARED)
+else()
+    set(EMBC_LIBRARY_TYPE "")
+endif()
+add_library(embc ${EMBC_LIBRARY_TYPE}
         $<TARGET_OBJECTS:embc_objlib>
         lib.c
 )
