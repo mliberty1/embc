@@ -13,11 +13,17 @@
 # limitations under the License.
 
 cmake_minimum_required (VERSION 2.8)
+set(PARENT_PROJECT_DIR ${PROJECT_SOURCE_DIR})
 project(EMBC C)
 include(version.cmake)
-
 SET(VERSION_STRING "${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH}")
 SET(VERSION_UNDERSCORE "${VERSION_MAJOR}_${VERSION_MINOR}_${VERSION_PATCH}")
+
+if (NOT PARENT_PROJECT_DIR)
+    set(EMBC_TOPLEVEL 1)
+else()
+    set(EMBC_TOPLEVEL 0)
+endif()
 
 option(EMBC_DOCS "Use Doxygen to create the HTML based Host API documentation" OFF)
 option(EMBC_UNIT_TEST "Build the embc unit tests" ON)
@@ -29,17 +35,28 @@ if (CMAKE_COMPILER_IS_GNUCC)
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=gnu99")
 endif()
 
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
 remove_definitions(-D__cplusplus)
 
+add_subdirectory(third-party)
+
+set(EMBC_INCLUDE
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
+        ${THIRD_PARTY_INCLUDES}
+        CACHE INTERNAL "embc include paths" FORCE
+        )
+
+set(EMBC_LIBS embc ${THIRD_PARTY_LIBS} CACHE INTERNAL "embc libraries" FORCE)
+set(EMBC_DEPENDS embc CACHE INTERNAL "embc dependencies" FORCE)
+
+include_directories(${EMBC_INCLUDE})
 add_subdirectory(src)
 
-if(EMBC_UNIT_TEST)
+if(EMBC_UNIT_TEST AND EMBC_TOPLEVEL AND NOT CMAKE_CROSSCOMPILING)
     enable_testing()
     add_subdirectory(test)
 endif()
 
-if(EMBC_DOCS)
+if(EMBC_DOCS AND EMBC_TOPLEVEL)
     FIND_PACKAGE(Doxygen)
     if (NOT DOXYGEN_FOUND)
         message(FATAL_ERROR 

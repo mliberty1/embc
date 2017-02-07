@@ -14,17 +14,6 @@
 
 #add_definitions(-Wno-format)
 
-SET(cmocka_dir ${CMAKE_CURRENT_SOURCE_DIR}/../third-party/cmocka)
-include(CheckCCompilerFlag)
-include(${cmocka_dir}/ConfigureChecks.cmake)
-configure_file(${cmocka_dir}/config.h.cmake ${CMAKE_CURRENT_BINARY_DIR}/config.h)
-include_directories(${CMAKE_CURRENT_BINARY_DIR})
-include_directories(${cmocka_dir}/include)
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../third-party/uthash/src)
-add_library(cmocka STATIC
-        ${cmocka_dir}/src/cmocka.c)
-target_compile_definitions(cmocka PRIVATE -DHAVE_CONFIG_H=1)
-
 set(TEST_FILES  hal.c)
 add_library(test_objlib OBJECT ${TEST_FILES})
 
@@ -55,6 +44,7 @@ ADD_CMOCKA_TEST(dbc_test)
 ADD_CMOCKA_TEST(ec_test)
 ADD_CMOCKA_TEST(fsm_test)
 ADD_CMOCKA_TEST(lfsr_test)
+ADD_CMOCKA_TEST(time_test)
 
 # test static assert compile failures
 # http://stackoverflow.com/questions/30155619/expected-build-failure-tests-in-cmake
