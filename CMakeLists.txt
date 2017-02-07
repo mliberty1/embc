@@ -12,12 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-cmake_minimum_required (VERSION 2.8)
+cmake_minimum_required (VERSION 3.1)
 set(PARENT_PROJECT_DIR ${PROJECT_SOURCE_DIR})
-project(EMBC C)
-include(version.cmake)
-SET(VERSION_STRING "${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH}")
-SET(VERSION_UNDERSCORE "${VERSION_MAJOR}_${VERSION_MINOR}_${VERSION_PATCH}")
+project(EMBC
+        VERSION 0.1.1
+        LANGUAGES C)
+SET(VERSION_STRING "${PROJECT_VERSION}")
+SET(VERSION_UNDERSCORE "${PROJECT_VERSION_MAJOR}_${PROJECT_VERSION_MINOR}_${PROJECT_VERSION_PATCH}")
 
 if (NOT PARENT_PROJECT_DIR)
     set(EMBC_TOPLEVEL 1)
