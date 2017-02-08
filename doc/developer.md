@@ -37,6 +37,12 @@ C standard library implementations
 * [PDClib](http://pdclib.e43.eu/)
 * [uclibc](http://www.uclibc.org/)
 
+Using clib:
+
+* printf to [ITM](http://blog.atollic.com/cortex-m-debugging-printf-redirection-to-a-debugger-console-using-swv/itm-part-1)
+* printf to [uart](http://www.openstm32.org/forumthread1055)
+
+
 Linux
 
 * [EmbToolkit](https://www.embtoolkit.org/)

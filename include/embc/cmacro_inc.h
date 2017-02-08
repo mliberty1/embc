@@ -73,6 +73,14 @@
 #define EMBC_STRUCT_PACKED __attribute__((packed))
 
 
+#ifdef __GNUC__
+#define EMBC_USED __attribute__((used))
+#define EMBC_FORMAT __attribute__((format))
+#else
+#define EMBC_USED
+#endif
+
+
 /** @} */
 
 #endif /* EMBC_CMACRO_INC_H__ */

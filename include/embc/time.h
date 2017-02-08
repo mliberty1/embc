@@ -133,8 +133,37 @@ EMBC_CPP_GUARD_START
  */
 #define EMBC_F32_TO_TIME(x) ((int64_t) (((double) (x)) * (double) EMBC_TIME_SECOND))
 
+#define _EMBC_TIME_SIGNUM(x) ((0 < (x) ) - ((x) < 0))
 
-#define _EMBC_CVT(x, s) ((((int64_t) (x)) * s + EMBC_TIME_SECOND - 1) >> EMBC_TIME_Q)
+/**
+ * @brief Convert to counter ticks, rounded to nearest.
+ *
+ * @param x The 64-bit signed fixed point time.
+ * @param z The counter frequency in Hz.
+ * @return The 64-bit time in counter ticks.
+ */
+#define EMBC_TIME_TO_COUNTER(x, z) \
+    (( ((int64_t) (x)) * z + \
+       _EMBC_TIME_SIGNUM(z) * EMBC_TIME_SECOND / 2) \
+     >> EMBC_TIME_Q)
+
+/**
+ * @brief Convert to counter ticks, rounded up.
+ *
+ * @param x The 64-bit signed fixed point time.
+ * @param z The counter frequency in Hz.
+ * @return The 64-bit time in counter ticks.
+ */
+#define EMBC_TIME_TO_COUNTER_ROUND_UP(x, z) ((((int64_t) (x)) * z + EMBC_TIME_SECOND - 1) >> EMBC_TIME_Q)
+
+/**
+ * @brief Convert to counter ticks, rounded down
+ *
+ * @param x The 64-bit signed fixed point time.
+ * @param z The counter frequency in Hz.
+ * @return The 64-bit time in counter ticks.
+ */
+#define EMBC_TIME_TO_COUNTER_ROUND_DOWN(x, z) ((((int64_t) (x)) * z) >> EMBC_TIME_Q)
 
 /**
  * @brief Convert to 32-bit unsigned seconds.
@@ -142,7 +171,7 @@ EMBC_CPP_GUARD_START
  * @param x The 64-bit signed fixed point time.
  * @return The 64-bit unsigned time in seconds, rounded up.
  */
-#define EMBC_TIME_TO_SECONDS(x) _EMBC_CVT(x, 1)
+#define EMBC_TIME_TO_SECONDS(x) EMBC_TIME_TO_COUNTER(x, 1)
 
 /**
  * @brief Convert to milliseconds.
@@ -150,7 +179,7 @@ EMBC_CPP_GUARD_START
  * @param x The 64-bit signed fixed point time.
  * @return The 64-bit signed time in milliseconds, rounded up.
  */
-#define EMBC_TIME_TO_MILLISECONDS(x) _EMBC_CVT(x, 1000)
+#define EMBC_TIME_TO_MILLISECONDS(x) EMBC_TIME_TO_COUNTER(x, 1000)
 
 /**
  * @brief Convert to microseconds.
@@ -158,7 +187,7 @@ EMBC_CPP_GUARD_START
  * @param x The 64-bit signed fixed point time.
  * @return The 64-bit signed time in microseconds, rounded up.
  */
-#define EMBC_TIME_TO_MICROSECONDS(x) _EMBC_CVT(x, 1000000)
+#define EMBC_TIME_TO_MICROSECONDS(x) EMBC_TIME_TO_COUNTER(x, 1000000)
 
 /**
  * @brief Convert to nanoseconds.
@@ -166,7 +195,16 @@ EMBC_CPP_GUARD_START
  * @param x The 64-bit signed fixed point time.
  * @return The 64-bit signed time in nanoseconds, rounded up.
  */
-#define EMBC_TIME_TO_NANOSECONDS(x) _EMBC_CVT(x, 1000000000ll)
+#define EMBC_TIME_TO_NANOSECONDS(x) EMBC_TIME_TO_COUNTER(x, 1000000000ll)
+
+/**
+ * @brief Convert to 64-bit signed fixed point time.
+ *
+ * @param x The counter value in ticks.
+ * @param z The counter frequency in Hz.
+ * @return The 64-bit signed fixed point time.
+ */
+#define EMBC_COUNTER_TO_TIME(x, z) ((((int64_t) (x)) << EMBC_TIME_Q) / ((int64_t) (z)))
 
 /**
  * @brief Convert to 64-bit signed fixed point time.
@@ -182,7 +220,7 @@ EMBC_CPP_GUARD_START
  * @param x The 32-bit unsigned time in milliseconds.
  * @return The 64-bit signed fixed point time.
  */
-#define EMBC_MILLISECONDS_TO_TIME(x) ((((int64_t) (x)) << EMBC_TIME_Q) / 1000)
+#define EMBC_MILLISECONDS_TO_TIME(x) EMBC_COUNTER_TO_TIME(x, 1000)
 
 /**
  * @brief Convert to 64-bit signed fixed point time.
@@ -190,7 +228,7 @@ EMBC_CPP_GUARD_START
  * @param x The 32-bit unsigned time in microseconds.
  * @return The 64-bit signed fixed point time.
  */
-#define EMBC_MICROSECONDS_TO_TIME(x) ((((int64_t) (x)) << EMBC_TIME_Q) / 1000000)
+#define EMBC_MICROSECONDS_TO_TIME(x) EMBC_COUNTER_TO_TIME(x, 1000000)
 
 /**
  * @brief Convert to 64-bit signed fixed point time.
@@ -198,7 +236,7 @@ EMBC_CPP_GUARD_START
  * @param x The 32-bit unsigned time in microseconds.
  * @return The 64-bit signed fixed point time.
  */
-#define EMBC_NANOSECONDS_TO_TIME(x) ((((int64_t) (x)) << EMBC_TIME_Q) / (int64_t) 1000000000)
+#define EMBC_NANOSECONDS_TO_TIME(x) EMBC_COUNTER_TO_TIME(x, 1000000000ll)
 
 /**
  * @brief Compute the absolute value of a time.

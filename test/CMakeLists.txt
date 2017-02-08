@@ -25,6 +25,7 @@ set(dependencies
         embc_objlib
         test_objlib
         cmocka)
+include_directories(${CMOCKA_INCLUDE})
 
 function (ADD_CMOCKA_TEST _testName)
     set(TARGET ${_testName})
@@ -44,6 +45,7 @@ ADD_CMOCKA_TEST(dbc_test)
 ADD_CMOCKA_TEST(ec_test)
 ADD_CMOCKA_TEST(fsm_test)
 ADD_CMOCKA_TEST(lfsr_test)
+ADD_CMOCKA_TEST(log_test)
 ADD_CMOCKA_TEST(time_test)
 
 # test static assert compile failures

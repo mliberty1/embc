@@ -15,7 +15,6 @@
  */
 
 #include "embc/log.h"
-#include <stdarg.h>
 #include <stdio.h>
 
 
@@ -42,7 +41,7 @@ void log_printf_default(const char * fmt, ...) {
     (void) fmt;
 }
 
-log_printf log_printf_ = log_printf_default;
+volatile log_printf EMBC_USED log_printf_ = log_printf_default;
 
 int log_initialize(log_printf handler) {
     if (NULL == handler) {

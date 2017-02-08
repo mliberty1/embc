@@ -20,8 +20,8 @@ if (NOT CMAKE_CROSSCOMPILING)
     add_library(cmocka STATIC
             ${cmocka_dir}/src/cmocka.c)
     target_compile_definitions(cmocka PRIVATE -DHAVE_CONFIG_H=1)
-    LIST(APPEND INCLUDES ${CMAKE_CURRENT_SOURCE_DIR}/cmocka/include)
-    LIST(APPEND LIBS cmocka)
+    set(CMOCKA_INCLUDE ${CMAKE_CURRENT_SOURCE_DIR}/cmocka/include CACHE INTERNAL "cmocka include" FORCE)
+    set(CMOCKA_LIBS cmocka CACHE INTERNAL "cmocka lib" FORCE)
 endif()
 
 add_library(tinyprintf tinyprintf/tinyprintf.c)

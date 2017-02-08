@@ -16,6 +16,7 @@
 
 #include "embc/fsm.h"
 #include "embc/dbc.h"
+#include <inttypes.h>
 
 static const char * state_name_(struct embc_fsm_s * self, embc_fsm_state_t state) {
     const char * name = 0;
@@ -79,7 +80,8 @@ void embc_fsm_initialize(struct embc_fsm_s * self) {
     for (int32_t idx = 0; idx < (int32_t) self->states_count; ++idx) {
         int32_t state = (int32_t) self->states[idx].state;
         if (idx != state) {
-            LOGF_CRITICAL("state idx %d has id %d", idx, state);
+            LOGF_CRITICAL("state idx %" PRId32 " has id %" PRId32,
+                          idx, state);
             EMBC_FATAL("invalid state machine");
         }
     }
@@ -132,7 +134,7 @@ static void handle_event(struct embc_fsm_s * self,
         struct embc_fsm_transition_s const *t = self->transitions + idx;
         if ((t->current == self->state) || (t->current == EMBC_STATE_ANY)) {
             if ((t->event == event) || (t->event == EMBC_EVENT_ANY)) {
-                LOGF_INFO("%s.%s transition %d found: %s --> %s on %s",
+                LOGF_INFO("%s.%s transition %" PRId32 " found: %s --> %s on %s",
                           self->name, state_name_(self, self->state), idx,
                           state_name_(self, t->current),
                           state_name_(self, t->next),

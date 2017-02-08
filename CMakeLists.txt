@@ -30,12 +30,11 @@ option(EMBC_DOCS "Use Doxygen to create the HTML based Host API documentation" O
 option(EMBC_UNIT_TEST "Build the embc unit tests" ON)
 option(EMBC_EXAMPLES "Build the embc examples" ON)
 
-if (CMAKE_COMPILER_IS_GNUCC)
+if (EMBC_TOPLEVEL AND CMAKE_COMPILER_IS_GNUCC)
     add_definitions(-Wall -Werror -Wpedantic -Wextra -fPIC)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=gnu99")
 endif()
-
 remove_definitions(-D__cplusplus)
 
 add_subdirectory(third-party)

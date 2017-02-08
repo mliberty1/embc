@@ -52,7 +52,7 @@ static void embc_lib_printf_(const char *format, ...) {
     va_end(arg);
 }
 
-void fatal(char const * file, int line, char const * msg) {
+void embc_fatal(char const * file, int line, char const * msg) {
     if (fatal_fn_) {
         fatal_fn_(fatal_user_data_, file, line, msg);
     } else {

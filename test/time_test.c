@@ -55,6 +55,11 @@ static void test_f32(void **state) {
 static void test_convert_time_to(void **state) {
     (void) state;
     assert_int_equal(1, EMBC_TIME_TO_SECONDS(EMBC_TIME_SECOND));
+    assert_int_equal(1, EMBC_TIME_TO_SECONDS(EMBC_TIME_SECOND + 1));
+    assert_int_equal(1, EMBC_TIME_TO_SECONDS(EMBC_TIME_SECOND - 1));
+    assert_int_equal(2, EMBC_TIME_TO_SECONDS(EMBC_TIME_SECOND + EMBC_TIME_SECOND / 2));
+    assert_int_equal(1, EMBC_TIME_TO_SECONDS(EMBC_TIME_SECOND - EMBC_TIME_SECOND / 2));
+    assert_int_equal(0, EMBC_TIME_TO_SECONDS(EMBC_TIME_SECOND - EMBC_TIME_SECOND / 2 - 1));
     assert_int_equal(1000, EMBC_TIME_TO_MILLISECONDS(EMBC_TIME_SECOND));
     assert_int_equal(1000000, EMBC_TIME_TO_MICROSECONDS(EMBC_TIME_SECOND));
     assert_int_equal(1000000000, EMBC_TIME_TO_NANOSECONDS(EMBC_TIME_SECOND));
