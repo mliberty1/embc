@@ -28,6 +28,7 @@
 
 #include "embc/argchk.h"
 #include "embc/assert.h"
+#include "embc/cdef.h"
 #include "embc/cmacro_inc.h"
 #include "embc/dbc.h"
 #include "embc/log.h"
