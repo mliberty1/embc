@@ -458,18 +458,58 @@ struct bbuf_u8_s {
 };
 
 /**
- * @brief Define a new memory-safe buffer.
+ * @brief Declare a new memory-safe buffer.
+ *
+ * @param name The name for the buffer.
+ * @param size The size of the buffer in bytes.
  *
  * The allocation is static.  If this macro is placed in the outer scope of
  * a .c file, the buffer will be placed into BSS memory.  If this macro is
  * placed into a function, the buffer will be placed onto the stack.
  *
+ * The buffer structure is declared but not initialized.  Use BBUF_INITIALIZE()
+ * to initialize.
+ *
+ */
+#define BBUF_DECLARE(name, size) \
+    uint8_t (name ## _mem_)[size]; \
+    struct bbuf_u8_s name
+
+/**
+ * @brief Initialize (or reinitialize) a bbuf instance.
+ *
+ * @param name The name for the bbuf instance provided to BBUF_DECLARE().
+ *      The name may include a structure prefix.
+ */
+#define BBUF_INITIALIZE(name) \
+    (name).buf_start = (name ## _mem_); \
+    (name).buf_end = (name ## _mem_) + sizeof(name ## _mem_); \
+    (name).cursor = (name ## _mem_); \
+    (name).end = (name ## _mem_)
+
+/**
+ * @brief Define a new memory-safe buffer.
+ *
  * @param name The name for the buffer.
  * @param size The size of the buffer in bytes.
+ *
+ * The allocation is static.  If this macro is placed in the outer scope of
+ * a .c file, the buffer will be placed into BSS memory.  If this macro is
+ * placed into a function, the buffer will be placed onto the stack.  This
+ * macro is equivalent to:
+ *
+ *      BBUF_DECLARE(name, size);
+ *      BBUF_INITIALIZE(name);
  */
 #define BBUF_DEFINE(name, size) \
     uint8_t name ## _mem_ [size]; \
-    struct bbuf_u8_s name = {name ## _mem_, (name ## _mem_) + size, name ## _mem_, (name ## _mem_)}
+    struct bbuf_u8_s name = { \
+        (name ## _mem_), \
+        (name ## _mem_) + sizeof(name ## _mem_), \
+        (name ## _mem_), \
+        (name ## _mem_) \
+    }
+
 
 /**
  * @brief Allocate and initialize a new memory-safe buffer.
