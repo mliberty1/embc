@@ -67,6 +67,8 @@
     X(UNAVAILABLE,              "The requested resource is currently unavailable.") \
     X(IN_USE,                   "The requested resource is currently in use.") \
     X(CLOSED,                   "The requested resource is currently closed.") \
+    X(SEQUENCE,                 "The requested operation was out of sequence.") \
+    X(ABORTED,                  "The requested operation was previously aborted.") \
 
 
 #define EMBC_ERROR_ENUM(NAME, TEXT) EMBC_ERROR_ ## NAME,

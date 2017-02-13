@@ -605,6 +605,25 @@ EMBC_API void bbuf_clear(struct bbuf_u8_s * self);
 EMBC_API void bbuf_clear_and_overwrite(struct bbuf_u8_s * self, uint8_t value);
 
 /**
+ * @brief Copy from another bbuf instance.
+ *
+ * @param[inout] self The buffer instance.
+ * @param other The source buffer instance to copy into self.
+ * @return 0 on success or error code.
+ */
+EMBC_API int bbuf_copy(struct bbuf_u8_s * self, struct bbuf_u8_s const * other);
+
+/**
+ * @brief Copy from another C buffer.
+ *
+ * @param[inout] self The buffer instance.
+ * @param buffer The source buffer to copy into self.
+ * @param length The length of buffer.
+ * @return 0 on success or error code.
+ */
+EMBC_API int bbuf_copy_buffer(struct bbuf_u8_s * self, uint8_t * buffer, size_t length);
+
+/**
  * @brief Seek a position in the buffer.
  *
  * @param[inout] self The buffer instance.

@@ -88,12 +88,26 @@
  * @brief Evaluate and goto function "exit" label on error.
  * @param x The value to evaluate which results in an int32_t.
  *      Any non-zero value is presumed to be an error.
- *
- * On error, cause the calling function to return with the error code.
  */
 #define EMBC_EXIT_ON_ERROR(x) do { \
     int32_t rc__ = (x); \
     if (rc__) { \
+        goto exit; \
+    } \
+} while (0)
+
+/**
+ * @brief Evaluate and goto function "exit" label on error.
+ *
+ * @param var The variable to assign with the error code.
+ * @param x The value to evaluate which results in an int32_t.
+ *      Any non-zero value is presumed to be an error and is
+ *      assigned to var.
+ */
+#define EMBC_EXIT_WITH_ERROR(var, x) do { \
+    int32_t rc__ = (x); \
+    if (rc__) { \
+        var = rc__; \
         goto exit; \
     } \
 } while (0)

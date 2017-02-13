@@ -357,6 +357,31 @@ static void bbuf_define(void **state) {
     assert_int_equal(EMBC_ERROR_FULL, bbuf_encode_u8(&mybuf, 1));
 }
 
+static void bbuf_copy_test(void **state) {
+    (void) state;
+    uint32_t u32;
+    BBUF_DEFINE(b1, 4);
+    BBUF_DEFINE(b2, 4);
+    assert_int_equal(0, bbuf_encode_u32_le(&b1, 0x24252627));
+    bbuf_copy(&b2, &b1);
+    assert_int_equal(4, bbuf_tell(&b2));
+    bbuf_seek(&b2, 0);
+    assert_int_equal(0, bbuf_decode_u32_le(&b2, &u32));
+    assert_int_equal(0x24252627, u32);
+}
+
+static void bbuf_copy_buffer_test(void **state) {
+    (void) state;
+    uint32_t u32;
+    uint8_t buffer[] = {0x27, 0x26, 0x25, 0x24};
+    BBUF_DEFINE(b2, sizeof(buffer));
+    bbuf_copy_buffer(&b2, buffer, sizeof(buffer));
+    assert_int_equal(4, bbuf_tell(&b2));
+    bbuf_seek(&b2, 0);
+    assert_int_equal(0, bbuf_decode_u32_le(&b2, &u32));
+    assert_int_equal(0x24252627, u32);
+}
+
 int main(void) {
     const struct CMUnitTest tests[] = {
 #ifdef BBUF_UNSAFE
@@ -382,6 +407,8 @@ int main(void) {
             cmocka_unit_test(bbuf_declare),
             cmocka_unit_test(bbuf_declare_in_struct),
             cmocka_unit_test(bbuf_define),
+            cmocka_unit_test(bbuf_copy_test),
+            cmocka_unit_test(bbuf_copy_buffer_test),
     };
 
     return cmocka_run_group_tests(tests, NULL, NULL);

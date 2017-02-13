@@ -124,6 +124,23 @@ size_t bbuf_size(struct bbuf_u8_s const * self) {
     return (self->end - self->buf_start);
 }
 
+int bbuf_copy(struct bbuf_u8_s * self, struct bbuf_u8_s const * other) {
+    ARGCHK_NOT_NULL(self);
+    ARGCHK_NOT_NULL(other);
+    size_t sz = (size_t) (other->end - other->buf_start);
+    if ((size_t) (self->buf_end - self->cursor) < sz) {
+        return EMBC_ERROR_TOO_SMALL;
+    }
+    memcpy(self->cursor, other->buf_start, sz);
+    return cursor_write(self, sz);
+}
+
+int bbuf_copy_buffer(struct bbuf_u8_s * self, uint8_t * buffer, size_t length) {
+    CHECK_ENCODE_ARGS(self, length);
+    memcpy(self->cursor, buffer, length);
+    return cursor_write(self, length);
+}
+
 int bbuf_seek(struct bbuf_u8_s * self, size_t pos) {
     DBC_NOT_NULL(self);
     ARGCHK_REQUIRE(pos <= (size_t) (self->end - self->buf_start));
