@@ -12,4 +12,5 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+ADD_CMOCKA_TEST(object_pool_test)
 ADD_CMOCKA_TEST(pool_test)

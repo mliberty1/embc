@@ -19,13 +19,12 @@
 #include <setjmp.h>
 #include <cmocka.h>
 #include "embc/memory/pool.h"
-#include "embc.h"
 #include <string.h> // memset
 
 
 static int setup1(void ** state) {
     struct embc_pool_s * self = test_calloc(1, embc_pool_instance_size(1, 16));
-    assert_int_equal(0, embc_pool_initialize(self, 1, 16, 0, 0));
+    assert_int_equal(0, embc_pool_initialize(self, 1, 16));
     *state = self;
     return 0;
 }
@@ -39,7 +38,7 @@ static int teardown(void ** state) {
 
 static int setup2(void ** state) {
     struct embc_pool_s * self = test_calloc(1, embc_pool_instance_size(2, 16));
-    assert_int_equal(0, embc_pool_initialize(self, 2, 16, 0, 0));
+    assert_int_equal(0, embc_pool_initialize(self, 2, 16));
     *state = self;
     return 0;
 }
@@ -49,42 +48,18 @@ static void create(void **state) {
     uint8_t * d1 = (uint8_t *) embc_pool_alloc(self);
     d1[0] = 'h';
     assert_non_null(d1);
-    assert_true(embc_pool_decr(d1));
+    embc_pool_free(self, d1);
     uint8_t * d2 = (uint8_t *) embc_pool_alloc(self);
     assert_ptr_equal(d1, d2);
-    assert_int_equal(0, d2[0]);  // memory should be zeroed
-    assert_true(embc_pool_decr(d2));
+    embc_pool_free(self, d2);
 }
 
 static void alloc_too_many(void **state) {
     struct embc_pool_s * self = (struct embc_pool_s *) *state;
+    assert_int_equal(0, embc_pool_is_empty(self));
     embc_pool_alloc(self);
+    assert_int_equal(1, embc_pool_is_empty(self));
     expect_assert_failure(embc_pool_alloc(self));
-}
-
-static void incr_decr(void **state) {
-    struct embc_pool_s * self = (struct embc_pool_s *) *state;
-    void * d1 = embc_pool_alloc(self);
-    assert_non_null(d1);
-    embc_pool_incr(d1);
-    assert_false(embc_pool_decr(d1));
-    assert_true(embc_pool_decr(d1));
-}
-
-static void incr_too_much(void **state) {
-    struct embc_pool_s * self = (struct embc_pool_s *) *state;
-    void * d1 = embc_pool_alloc(self);
-    for (int i = 0; i < ((1 << 16) - 2); ++i) {
-        embc_pool_incr(d1);
-    }
-    expect_assert_failure(embc_pool_incr(d1));
-}
-
-static void decr_too_much(void **state) {
-    struct embc_pool_s * self = (struct embc_pool_s *) *state;
-    void * d1 = embc_pool_alloc(self);
-    assert_true(embc_pool_decr(d1));
-    expect_assert_failure(embc_pool_decr(d1));
 }
 
 static void alloc_multiple(void ** state) {
@@ -95,40 +70,16 @@ static void alloc_multiple(void ** state) {
     assert_non_null(d2);
     assert_ptr_not_equal(d1, d2);
     expect_assert_failure(embc_pool_alloc(self));
-    assert_true(embc_pool_decr(d1));
+    embc_pool_free(self, d1);
     uint8_t * d3 = (uint8_t *) embc_pool_alloc(self);
     assert_ptr_equal(d1, d3);
-}
-
-
-static void constructor(void * obj) {
-    check_expected(obj);
-}
-
-static void destructor(void * obj) {
-    check_expected(obj);
-}
-
-static void constructor_destructor(void ** state) {
-    struct embc_pool_s * self = (struct embc_pool_s *) *state;
-    assert_int_equal(0, embc_pool_initialize(self, 1, 16, constructor, destructor));
-    *state = self;
-    expect_any(constructor, obj);
-    uint8_t * d1 = (uint8_t *) embc_pool_alloc(self);
-    expect_any(destructor, obj);
-    embc_pool_decr(d1);
 }
 
 int main(void) {
     const struct CMUnitTest tests[] = {
             cmocka_unit_test_setup_teardown(create, setup1, teardown),
             cmocka_unit_test_setup_teardown(alloc_too_many, setup1, teardown),
-            cmocka_unit_test_setup_teardown(incr_decr, setup1, teardown),
-            cmocka_unit_test_setup_teardown(incr_too_much, setup1, teardown),
-            cmocka_unit_test_setup_teardown(decr_too_much, setup1, teardown),
-            cmocka_unit_test_setup_teardown(decr_too_much, setup1, teardown),
             cmocka_unit_test_setup_teardown(alloc_multiple, setup2, teardown),
-            cmocka_unit_test_setup_teardown(constructor_destructor, setup1, teardown),
     };
 
     return cmocka_run_group_tests(tests, NULL, NULL);
