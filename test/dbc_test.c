@@ -43,6 +43,12 @@ static void test_not_null(void **state) {
     expect_assert_failure(DBC_NOT_NULL(0));
 }
 
+static void test_equal(void **state) {
+    (void) state;
+    DBC_EQUAL(42, 42);
+    expect_assert_failure(DBC_EQUAL(1, 2));
+}
+
 static void test_gte_zero(void **state) {
     (void) state;
     DBC_GTE_ZERO(0);
@@ -84,6 +90,7 @@ int main(void) {
             cmocka_unit_test(test_true),
             cmocka_unit_test(test_false),
             cmocka_unit_test(test_not_null),
+            cmocka_unit_test(test_equal),
             cmocka_unit_test(test_gte_zero),
             cmocka_unit_test(test_gt_zero),
             cmocka_unit_test(test_lte_zero),

@@ -84,6 +84,14 @@
 #define DBC_NOT_NULL(x) DBC_ASSERT((x) != 0, #x " is null")
 
 /**
+ * @brief Assert that two values are strictly equal.
+ *
+ * @param a The first value.
+ * @param b The second value.
+ */
+#define DBC_EQUAL(a, b) DBC_ASSERT((a) == (b), #a " != " #b)
+
+/**
  * @brief Assert that a value is greater than zero.
  *
  * @param x The function argument to check.
