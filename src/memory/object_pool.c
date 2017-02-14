@@ -81,8 +81,8 @@ struct embc_object_pool_size_s {
 
 static struct embc_object_pool_size_s embc_object_pool_size(int32_t obj_count, int32_t obj_size) {
     struct embc_object_pool_size_s sz;
-    sz.obj_hdr = EMBC_ROUND_UP_TO_MULTIPLE(obj_size, EMBC_POOL_ALIGNMENT);
-    sz.obj_data = EMBC_ROUND_UP_TO_MULTIPLE(sizeof(struct embc_object_pool_element_s), EMBC_POOL_ALIGNMENT);
+    sz.obj_hdr = EMBC_ROUND_UP_TO_MULTIPLE(sizeof(struct embc_object_pool_element_s), EMBC_POOL_ALIGNMENT);
+    sz.obj_data = EMBC_ROUND_UP_TO_MULTIPLE(obj_size, EMBC_POOL_ALIGNMENT);
     sz.pool_hdr = EMBC_ROUND_UP_TO_MULTIPLE(sizeof(struct embc_object_pool_s), EMBC_POOL_ALIGNMENT);
     sz.element_sz = sz.obj_hdr + sz.obj_data;
     sz.sz = sz.pool_hdr + sz.element_sz * obj_count;

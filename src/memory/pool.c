@@ -51,8 +51,8 @@ struct embc_pool_size_s {
 
 static struct embc_pool_size_s embc_pool_size(int32_t block_count, int32_t block_size) {
     struct embc_pool_size_s sz;
-    sz.block_hdr = EMBC_ROUND_UP_TO_MULTIPLE(block_size, EMBC_POOL_ALIGNMENT);
-    sz.block_data = EMBC_ROUND_UP_TO_MULTIPLE(sizeof(struct embc_pool_element_s), EMBC_POOL_ALIGNMENT);
+    sz.block_hdr = EMBC_ROUND_UP_TO_MULTIPLE(sizeof(struct embc_pool_element_s), EMBC_POOL_ALIGNMENT);
+    sz.block_data = EMBC_ROUND_UP_TO_MULTIPLE(block_size, EMBC_POOL_ALIGNMENT);
     sz.pool_hdr = EMBC_ROUND_UP_TO_MULTIPLE(sizeof(struct embc_pool_s), EMBC_POOL_ALIGNMENT);
     sz.element_sz = sz.block_hdr + sz.block_data;
     sz.sz = sz.pool_hdr + sz.element_sz * block_count;
