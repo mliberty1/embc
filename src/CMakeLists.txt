@@ -37,11 +37,9 @@ set(SOURCES
 add_library(embc_objlib OBJECT ${SOURCES})
 
 if(${EMBC_TOPLEVEL})
-    set(EMBC_LIBRARY_TYPE SHARED)
+    add_library(embc SHARED $<TARGET_OBJECTS:embc_objlib> lib.c)
 else()
-    set(EMBC_LIBRARY_TYPE "")
+    add_library(embc STATIC $<TARGET_OBJECTS:embc_objlib>)
+    add_library(embc_lib OBJECT lib.c)
 endif()
-add_library(embc ${EMBC_LIBRARY_TYPE}
-        $<TARGET_OBJECTS:embc_objlib>
-        lib.c
-)
+add_dependencies(embc embc_objlib)
