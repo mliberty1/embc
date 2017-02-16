@@ -99,6 +99,21 @@ EMBC_CPP_GUARD_START
 #define EMBC_TIME_DAY (EMBC_TIME_HOUR * 24)
 
 /**
+ * @brief The fixed-point representation for 1 week.
+ */
+#define EMBC_TIME_WEEK (EMBC_TIME_DAY * 7)
+
+/**
+ * @brief The average fixed-point representation for 1 month (365 day year).
+ */
+#define EMBC_TIME_MONTH (EMBC_TIME_YEAR / 12)
+
+/**
+ * @brief The approximate fixed-point representation for 1 year (365 days).
+ */
+#define EMBC_TIME_YEAR (EMBC_TIME_DAY * 365)
+
+/**
  * @brief Convert the 64-bit fixed point time to a double.
  *
  * @param x The 64-bit signed fixed point time.
