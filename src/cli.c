@@ -179,25 +179,18 @@ void cli_initialize(cli_t * self) {
 }
 
 void cli_set_echo(cli_t * self, enum cli_echo_mode_e mode, char ch) {
-    if (NULL == self) {
-        return;
-    }
+    DBC_NOT_NULL(self);
     self->echo_mode = mode;
     self->echo_user_char = ch;
 }
 
 void cli_set_verbose(cli_t * self, enum cli_verbose_mode_e mode) {
-    if (NULL == self) {
-        return;
-    }
+    DBC_NOT_NULL(self);
     self->verbose = mode;
 }
 
 void cli_insert_char(cli_t * self, char ch) {
-    if (NULL == self) {
-        return;
-    }
-
+    DBC_NOT_NULL(self);
     switch (ch) {
         case KEY_BS:   cli_backspace(self); break;
         case KEY_DEL:  cli_backspace(self); break;
