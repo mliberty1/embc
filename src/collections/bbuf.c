@@ -124,6 +124,25 @@ size_t bbuf_size(struct bbuf_u8_s const * self) {
     return (self->end - self->buf_start);
 }
 
+size_t bbuf_available(struct bbuf_u8_s const * self) {
+    if (!self) {
+        return 0;
+    }
+    return self->buf_end - self->end;
+}
+
+int bbuf_resize(struct bbuf_u8_s * self, size_t size) {
+    ARGCHK_NOT_NULL(self);
+    if (size > bbuf_capacity(self)) {
+        return EMBC_ERROR_TOO_SMALL;
+    }
+    self->end = self->buf_start + size;
+    if (self->cursor > self->end) {
+        self->cursor = self->end;
+    }
+    return 0;
+}
+
 int bbuf_copy(struct bbuf_u8_s * self, struct bbuf_u8_s const * other) {
     ARGCHK_NOT_NULL(self);
     ARGCHK_NOT_NULL(other);
@@ -163,7 +182,7 @@ void bbuf_clear_and_overwrite(struct bbuf_u8_s * self, uint8_t value) {
 
 size_t bbuf_tell(struct bbuf_u8_s * self) {
     DBC_NOT_NULL(self);
-    return ((size_t) (self->end - self->buf_start));
+    return ((size_t) (self->cursor - self->buf_start));
 }
 
 int bbuf_encode_u8(struct bbuf_u8_s * self, uint8_t value) {

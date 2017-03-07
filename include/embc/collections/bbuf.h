@@ -413,20 +413,6 @@ static inline uint64_t bbuf_unsafe_decode_u64_le(uint8_t const ** buffer) {
  */
 
 /**
- * @brief The available flag values for bbuf_u8_s.flags.
- */
-enum bbuf_flag_e {
-    /**
-     * @brief Flag indicating that the buffer was allocated using bbuf_alloc()
-     *      and that bbuf_free() is permitted.
-     *
-     * When allocated manually or using BBUF_DEFINE(), this flag should not
-     * be set.
-     */
-    BBUF_FREE = 1
-};
-
-/**
  * @brief A memory-safe mutable buffer instance.
  */
 struct bbuf_u8_s {
@@ -438,7 +424,7 @@ struct bbuf_u8_s {
     /**
      * @brief The end of the allocated buffer memory, exclusive.
      *
-     * The buffer size is buf_end - buf_start.
+     * The available buffer size is buf_end - buf_start.
      */
     uint8_t * buf_end;
 
@@ -453,6 +439,7 @@ struct bbuf_u8_s {
      * @brief The end of the current buffer contents, exclusive.
      *
      * By definition buf_start <= end <= buf_end.
+     * The currently used buffer size is end - buf_start.
      */
     uint8_t * end;
 };
@@ -496,7 +483,7 @@ struct bbuf_u8_s {
  * The allocation is static.  If this macro is placed in the outer scope of
  * a .c file, the buffer will be placed into BSS memory.  If this macro is
  * placed into a function, the buffer will be placed onto the stack.  This
- * macro is equivalent to:
+ * macro is functionally equivalent to:
  *
  *      BBUF_DECLARE(name, size);
  *      BBUF_INITIALIZE(name);
@@ -509,7 +496,6 @@ struct bbuf_u8_s {
         (name ## _mem_), \
         (name ## _mem_) \
     }
-
 
 /**
  * @brief Allocate and initialize a new memory-safe buffer.
@@ -565,6 +551,8 @@ EMBC_API void bbuf_initialize(struct bbuf_u8_s * self, uint8_t * data, size_t si
  * @param[in] data The underlying data for the buffer.  The caller maintains
  *      ownership and the memory must remain valid for the life of the buffer.
  * @param[in] size The size of data and the initialized buffer.
+ *
+ * The cursor position is set to 0.
  */
 EMBC_API void bbuf_enclose(struct bbuf_u8_s * self, uint8_t * data, size_t size);
 
@@ -583,6 +571,27 @@ EMBC_API size_t bbuf_capacity(struct bbuf_u8_s const * self);
  * @return The size of buffer.  If self is not valid, return 0.
  */
 EMBC_API size_t bbuf_size(struct bbuf_u8_s const * self);
+
+/**
+ * @brief The remaining size available in a buffer.
+ *
+ * @param[in] self The buffer.
+ * @return The remaining size of buffer.  If self is not valid, return 0.
+ */
+EMBC_API size_t bbuf_available(struct bbuf_u8_s const * self);
+
+/**
+ * @brief Resize the current data size.
+ *
+ * @param[in] self The buffer.
+ * @param[in] size The new buffer size.
+ * @return 0 or success.
+ *
+ * The cursor position will be unmodified.  However, if the cursor position is
+ * beyond the end of the resized buffer, the cursor position will be moved to
+ * the end of the buffer.
+ */
+EMBC_API int bbuf_resize(struct bbuf_u8_s * self, size_t size);
 
 /**
  * @brief Clear the buffer.

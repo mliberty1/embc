@@ -164,8 +164,25 @@ static void enclose(void **state) {
     struct bbuf_u8_s b;
     bbuf_enclose(&b, data, sizeof(data));
     assert_int_equal(sizeof(data), bbuf_size(&b));
-    assert_int_equal(0xc, bbuf_tell(&b));
+    assert_int_equal(0, bbuf_tell(&b));
     bbuf_seek(&b, 0);
+}
+
+static void resize_larger(void **state) {
+    (void) state;
+    uint8_t expect[] = {'h', 0, 0, 0, 0};
+    uint8_t data[16] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+    struct bbuf_u8_s b;
+    bbuf_initialize(&b, data, sizeof(data));
+    assert_int_equal(16, bbuf_available(&b));
+    assert_int_equal(0, bbuf_size(&b));
+    assert_int_equal(ARGCHK_FAIL_RETURN_CODE, bbuf_seek(&b, 4));
+    assert_int_equal(0, bbuf_resize(&b, 4));
+    assert_int_equal(4, bbuf_size(&b));
+    assert_int_equal(12, bbuf_available(&b));
+    assert_int_equal(0, bbuf_tell(&b));
+    bbuf_encode_u8(&b, 'h');
+    assert_memory_equal(expect, data, sizeof(expect));
 }
 
 static void u8(void **state) {
@@ -396,6 +413,7 @@ int main(void) {
             cmocka_unit_test(buf_s_define),
             cmocka_unit_test(initialize),
             cmocka_unit_test(enclose),
+            cmocka_unit_test(resize_larger),
             cmocka_unit_test(u8),
             cmocka_unit_test(u8a),
             cmocka_unit_test(safe_alloc_free),
