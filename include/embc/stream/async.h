@@ -65,13 +65,69 @@ struct embc_stream_factory_s {
 };
 
 /**
- * @brief The stream status.
+ * @brief The available IOCTL request identifiers.
  */
-struct embc_stream_status_s {
-    /** The number of available bytes currently remaining. */
-    uint32_t available_bytes;
-    /** The number of available write transactions currently remaining. */
-    uint32_t available_transactions;
+enum embc_stream_ioctl_e {
+    /**
+     * @brief An IOCTL request that does nothing.
+     *
+     * This request is provided for debug and testing purposes.  The
+     * associated buffer and length are ignored.  Always returns 0.
+     */
+    EMBC_STREAM_IOCTL_NOOP,
+
+    /**
+     * @brief Transmit any buffered data to the receiver.
+     *
+     * The associated buffer and length are ignored.
+     * Although this method is provided for completeness, individual
+     * implementations have no obligation to implement any buffering.
+     */
+    EMBC_STREAM_IOCTL_FLUSH,
+
+    /**
+     * @brief Get the number of available bytes remaining for write.
+     *
+     * This request provides a simple flow control mechanism for byte-oriented
+     * streams.  Length is ignored, and u32 is modified with the value.
+     */
+    EMBC_STREAM_IOCTL_AVAILABLE_BYTES,
+
+    /**
+     * @brief Get the number available write transactions currently remaining.
+     *
+     * This request provides a simple flow control mechanism for
+     * message-oriented streams.  Length is ignored and u32 is modified with
+     * the value.
+     */
+    EMBC_STREAM_IOCTL_AVAILABLE_TRANSACTIONS,
+
+    /** The first implementation-specific IOCTL value. */
+    EMBC_STREAM_IOCTL_CUSTOM = 256
+};
+
+/**
+ * @brief The IOCTL transaction structure.
+ */
+struct embc_stream_ioctl_s {
+    /** The embc_stream_ioctl_e IOCTL request identifier. */
+    int16_t request;
+
+    /** The length of data.ptr in bytes, if necessary. */
+    uint16_t length;
+
+    /**
+     * The data which may be either IN, OUT or INOUT depending upon the
+     * specific IOCTL request.  Each IOCTL must document the use of data.
+     */
+    union {
+        /** A 32-bit unsigned integer. */
+        uint32_t u32;
+        /** A 32-bit signed integer. */
+        int32_t i32;
+        /** A pointer to a memory structure. */
+        void * ptr;
+    } data;
 };
 
 /**
@@ -102,24 +158,18 @@ struct embc_stream_handle_s {
                   uint8_t const * buffer, uint32_t length);
 
     /**
-     * @brief Get the current stream status.
+     * @brief Exchange arbitrary data with the stream.
      *
      * @param self The stream handle.
-     * @return The current stream status..
+     * @param[INOUT] transaction The ioctl transaction.
+     * @return 0 or error code.
      *
-     * This method provides a simple flow control mechanism.
+     * This method provides a generic mechanism for communicating arbitrary
+     * out-of-band data with the stream implementation.  The default IOCTLs
+     * provide a simple flow control mechanism.
      */
-    struct embc_stream_status_s (*status)(struct embc_stream_handle_s * self);
-
-    /**
-     * @brief Transmit any buffered data to the receiver.
-     *
-     * @param self The stream handle.
-     *
-     * Although this method is provided for completeness, individual
-     * implementations have no obligation to implement any buffering.
-     */
-    void (*flush)(struct embc_stream_handle_s * self);
+    int (*ioctl)(struct embc_stream_handle_s * self,
+                 struct embc_stream_ioctl_s * transaction);
 
     /**
      * @brief Close the stream.
@@ -132,6 +182,37 @@ struct embc_stream_handle_s {
      */
     void (*close)(struct embc_stream_handle_s * self, uint8_t status);
 };
+
+/**
+ * @brief Convenience method to perform stream flush.
+ *
+ * @param self The stream handle.
+ */
+static inline void embc_stream_flush(struct embc_stream_handle_s * self) {
+    struct embc_stream_ioctl_s transaction = {
+            .request = EMBC_STREAM_IOCTL_FLUSH,
+            .length = 0,
+            .data.u32 = 0
+    };
+    self->ioctl(self, &transaction);
+}
+
+/**
+ * @brief Perform an IOCTL that returns a u32 value.
+ *
+ * @param self The stream handle.
+ * @param request The IOCTL request.
+ * @return The 32-bit unsigned integer value.
+ */
+static inline uint32_t embc_stream_ioctl_u32_get(struct embc_stream_handle_s * self, int16_t request) {
+    struct embc_stream_ioctl_s transaction = {
+            .request = request,
+            .length = 0,
+            .data.u32 = 0
+    };
+    self->ioctl(self, &transaction);
+    return transaction.data.u32;
+}
 
 /** @} */
 
