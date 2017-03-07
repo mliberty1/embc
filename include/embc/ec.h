@@ -69,6 +69,7 @@
     X(CLOSED,                   "The requested resource is currently closed.") \
     X(SEQUENCE,                 "The requested operation was out of sequence.") \
     X(ABORTED,                  "The requested operation was previously aborted.") \
+    X(SYNCHRONIZATION,          "The target is not synchronized with the originator.") \
 
 
 #define EMBC_ERROR_ENUM(NAME, TEXT) EMBC_ERROR_ ## NAME,
