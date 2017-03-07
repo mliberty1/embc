@@ -37,6 +37,7 @@ endfunction (ADD_CMOCKA_TEST)
 
 add_subdirectory(collections)
 add_subdirectory(memory)
+add_subdirectory(stream)
 ADD_CMOCKA_TEST(argchk_test)
 ADD_CMOCKA_TEST(cdef_test)
 ADD_CMOCKA_TEST(cli_test)

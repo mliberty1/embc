@@ -31,6 +31,7 @@ set(SOURCES
         log.c
         memory/object_pool.c
         memory/pool.c
+        stream/framer.c
         ${PLATFORM_SRC}
 )
 

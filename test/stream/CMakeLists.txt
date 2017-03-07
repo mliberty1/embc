@@ -13,3 +13,4 @@
 # limitations under the License.
 
 ADD_CMOCKA_TEST(async_test)
+ADD_CMOCKA_TEST(framer_test)
