@@ -16,8 +16,6 @@
 
 #include "embc/collections/intmap.h"
 #include "embc.h"
-#include "embc/dbc.h"
-#include <stdlib.h>
 #include <string.h>
 #include "embc/inttypes.h"
 #include "utlist.h"

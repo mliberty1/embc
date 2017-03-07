@@ -25,6 +25,7 @@
 
 #include "embc/cmacro_inc.h"
 #include <stddef.h>
+#include <stdint.h>
 #include <stdbool.h>
 
 EMBC_CPP_GUARD_START

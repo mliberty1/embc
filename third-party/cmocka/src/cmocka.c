@@ -264,7 +264,7 @@ static void teardown_testing(const char *test_name);
 
 static enum cm_message_output cm_get_output(void);
 
-static int cm_error_message_enabled = 1;
+static int cm_error_message_enabled = 0;
 static CMOCKA_THREAD char *cm_error_message;
 
 void cm_print_error(const char * const format, ...) CMOCKA_PRINTF_ATTRIBUTE(1, 2);
