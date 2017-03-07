@@ -27,7 +27,7 @@ struct test_s {
     struct embc_stream_handle_s handle;
 };
 
-int open(struct embc_stream_factory_s * self,
+static int open(struct embc_stream_factory_s * self,
          void const * meta,
          struct embc_stream_handle_s ** handle) {
     struct test_s * s = (struct test_s *) self;
@@ -36,21 +36,21 @@ int open(struct embc_stream_factory_s * self,
     return mock_type(int);
 }
 
-void write(struct embc_stream_handle_s * self,
+static void write(struct embc_stream_handle_s * self,
            uint8_t const * buffer, uint32_t length) {
     (void) self;
     check_expected(length);
     check_expected_ptr(buffer);
 }
 
-int ioctl(struct embc_stream_handle_s * self,
+static int ioctl(struct embc_stream_handle_s * self,
           struct embc_stream_ioctl_s * transaction) {
     (void) self;
     (void) transaction;
     return mock_type(int);
 }
 
-void close(struct embc_stream_handle_s * self, uint8_t status) {
+static void close(struct embc_stream_handle_s * self, uint8_t status) {
     (void) self;
     check_expected(status);
 }
