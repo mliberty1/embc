@@ -164,6 +164,18 @@
  */
 #define EMBC_ROUND_UP_TO_MULTIPLE(x, m) (( ((x) + ( EMBC_SIGNUM(x) * (m - 1) )) / m) * m)
 
+/**
+ * @brief Find the container instance given a member pointer.
+ *
+ * @param ptr The pointer to an instance member.
+ * @param type The type of the container that has member.
+ * @param member The name of the member targeted by ptr.
+ * @return The pointer to the container.
+ */
+#define EMBC_CONTAINER_OF(ptr, type, member) \
+    ( (type *) ((char *) ptr - offsetof(type, member)) )
+
+
 #ifdef __cplusplus
 
 /**

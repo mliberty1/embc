@@ -105,6 +105,20 @@ static void test_round_up_to_multiple(void **state) {
     assert_int_equal(-10, EMBC_ROUND_UP_TO_MULTIPLE(-10, 5));
 }
 
+struct container_s {
+    int a;
+    int b;
+    int c;
+};
+
+static void test_container_of(void **state) {
+    (void) state;
+    struct container_s c;
+    assert_ptr_equal(&c, EMBC_CONTAINER_OF(&c.a, struct container_s, a));
+    assert_ptr_equal(&c, EMBC_CONTAINER_OF(&c.b, struct container_s, b));
+    assert_ptr_equal(&c, EMBC_CONTAINER_OF(&c.c, struct container_s, c));
+}
+
 int main(void) {
     const struct CMUnitTest tests[] = {
             cmocka_unit_test(test_array_size),
@@ -114,6 +128,7 @@ int main(void) {
             cmocka_unit_test(test_restrict_to_range),
             cmocka_unit_test(test_signum),
             cmocka_unit_test(test_round_up_to_multiple),
+            cmocka_unit_test(test_container_of),
     };
 
     return cmocka_run_group_tests(tests, NULL, NULL);
