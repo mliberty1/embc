@@ -85,13 +85,10 @@ void embc_stream_source_set_consumer(
     self->consumer = consumer;
 }
 
-void embc_stream_source_get_producer(
-        struct embc_stream_source_s * self,
-        struct embc_stream_producer_s ** producer) {
+struct embc_stream_producer_s * embc_stream_source_get_producer(
+        struct embc_stream_source_s * self) {
     DBC_NOT_NULL(self);
-    if (producer) {
-        *producer = &self->producer;
-    }
+    return &self->producer;
 }
 
 void embc_stream_source_configure(

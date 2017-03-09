@@ -46,9 +46,9 @@ static int teardown(void ** state) {
 static void connect(struct test_s * self) {
     struct embc_stream_consumer_s * consumer = 0;
     struct embc_stream_producer_s * producer = 0;
-    embc_stream_sink_get_consumer(&self->sink, &consumer);
+    consumer = embc_stream_sink_get_consumer(&self->sink);
     embc_stream_source_set_consumer(&self->source, consumer);
-    embc_stream_source_get_producer(&self->source, &producer);
+    producer = embc_stream_source_get_producer(&self->source);
     embc_stream_sink_set_producer(&self->sink, producer);
 }
 

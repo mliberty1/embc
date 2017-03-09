@@ -73,9 +73,8 @@ EMBC_API void embc_stream_source_set_consumer(
         struct embc_stream_source_s * self,
         struct embc_stream_consumer_s * consumer);
 
-EMBC_API void embc_stream_source_get_producer(
-        struct embc_stream_source_s * self,
-        struct embc_stream_producer_s ** producer);
+EMBC_API struct embc_stream_producer_s * embc_stream_source_get_producer(
+        struct embc_stream_source_s * self);
 
 EMBC_API void embc_stream_source_configure(
         struct embc_stream_source_s * self,

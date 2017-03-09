@@ -71,7 +71,7 @@ static int teardown(void ** state) {
 
 static void connect(struct test_s * self) {
     embc_stream_source_set_consumer(&self->source, &self->consumer);
-    embc_stream_source_get_producer(&self->source, &self->producer);
+    self->producer = embc_stream_source_get_producer(&self->source);
 }
 
 static void send_hello_world_consumer_buffer(struct test_s * self) {

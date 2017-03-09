@@ -66,9 +66,8 @@ EMBC_API void embc_stream_sink_initialize(
         uint8_t * transaction_buffer,
         uint16_t transaction_length);
 
-EMBC_API void embc_stream_sink_get_consumer(
-        struct embc_stream_sink_s * self,
-        struct embc_stream_consumer_s ** consumer);
+EMBC_API struct embc_stream_consumer_s * embc_stream_sink_get_consumer(
+        struct embc_stream_sink_s * self);
 
 EMBC_API void embc_stream_sink_set_producer(
         struct embc_stream_sink_s * self,

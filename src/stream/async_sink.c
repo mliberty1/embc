@@ -82,12 +82,10 @@ void embc_stream_sink_initialize(
     self->consumer.send = send;
 }
 
-void embc_stream_sink_get_consumer(
-        struct embc_stream_sink_s * self,
-        struct embc_stream_consumer_s ** consumer) {
+struct embc_stream_consumer_s * embc_stream_sink_get_consumer(
+        struct embc_stream_sink_s * self) {
     DBC_NOT_NULL(self);
-    DBC_NOT_NULL(consumer);
-    *consumer = &self->consumer;
+    return &self->consumer;
 }
 
 void embc_stream_sink_set_producer(
