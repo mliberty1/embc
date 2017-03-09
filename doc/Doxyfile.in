@@ -771,6 +771,10 @@ WARN_LOGFILE           =
 INPUT                  = @CMAKE_CURRENT_SOURCE_DIR@/doc \
                          @CMAKE_CURRENT_SOURCE_DIR@/include \
                          @CMAKE_CURRENT_SOURCE_DIR@/include/embc \
+                         @CMAKE_CURRENT_SOURCE_DIR@/include/embc/collections \
+                         @CMAKE_CURRENT_SOURCE_DIR@/include/embc/memory \
+                         @CMAKE_CURRENT_SOURCE_DIR@/include/embc/stream \
+                         @CMAKE_CURRENT_SOURCE_DIR@/include/embc/string \
                          @CMAKE_CURRENT_SOURCE_DIR@/README.md \
                          @CMAKE_CURRENT_SOURCE_DIR@/CHANGELOG.md
 

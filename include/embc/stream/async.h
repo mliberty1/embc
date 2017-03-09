@@ -17,7 +17,7 @@
 /**
  * @file
  *
- * @brief Asynchronous stream.
+ * @brief Asynchronous stream
  */
 
 #ifndef EMBC_STREAM_ASYNC_H_
@@ -30,7 +30,7 @@ EMBC_CPP_GUARD_START
 
 /**
  * @ingroup embc
- * @defgroup embc_stream_async Asynchronous stream.
+ * @defgroup embc_stream_async Asynchronous stream
  *
  * @brief Asynchronous stream API.
  *
@@ -45,8 +45,8 @@ EMBC_CPP_GUARD_START
  * memory allocation, especially in resource-constrained microcontrollers,
  * significantly complicates the design.  See
  * Wikipedia's page on the
- * <a href="https://en.wikipedia.org/wiki/Producer%E2%80%93consumer_problem">"
- * Producer-consumer problem"</a> for additional background.
+ * <a href="https://en.wikipedia.org/wiki/Producer%E2%80%93consumer_problem">
+ * "Producer-consumer problem"</a> for additional background.
  *
  * Streams come in different flavors.  Some streams are fully
  * byte-oriented and accept any size of write transaction, up to a maximum
@@ -57,10 +57,11 @@ EMBC_CPP_GUARD_START
  * consumer to optionally provide the memory buffer to the producer.
  *
  * The transaction types are split into IOCTL and EVENT categories.
- * IOCTLs are initiated by the producer and provided to the consumer's send().
- * The consumer responds to IOCTL requests through producer's send().
- * EVENTs are initiated by the consumer and sent to the producer through
- * the producer's send().  The producer does not directly respond to EVENTs.
+ * IOCTLs are initiated by the producer and are provided to the consumer's
+ * send().  The consumer responds to IOCTL requests through the producer's
+ * send().  EVENTs are initiated by the consumer and sent to the producer
+ * through the producer's send().  The producer does not directly respond
+ * to EVENTs.
  *
  * This API does not define how streams are constructed and connected.  Some
  * streams may choose to implement a factory function that returns the
