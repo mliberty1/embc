@@ -67,7 +67,7 @@ static void send(struct embc_stream_producer_s * self,
     }
 }
 
-EMBC_API void embc_stream_source_initialize(
+void embc_stream_source_initialize(
         struct embc_stream_source_s * self,
         uint8_t * transaction_buffer,
         uint16_t transaction_length) {
@@ -78,14 +78,14 @@ EMBC_API void embc_stream_source_initialize(
     self->producer.send = send;
 }
 
-EMBC_API void embc_stream_source_set_consumer(
+void embc_stream_source_set_consumer(
         struct embc_stream_source_s * self,
         struct embc_stream_consumer_s * consumer) {
     DBC_NOT_NULL(self);
     self->consumer = consumer;
 }
 
-EMBC_API void embc_stream_source_get_producer(
+void embc_stream_source_get_producer(
         struct embc_stream_source_s * self,
         struct embc_stream_producer_s ** producer) {
     DBC_NOT_NULL(self);
@@ -94,7 +94,7 @@ EMBC_API void embc_stream_source_get_producer(
     }
 }
 
-EMBC_API void embc_stream_source_send(
+void embc_stream_source_send(
         struct embc_stream_source_s * self,
         uint8_t const * buffer,
         uint32_t length,
