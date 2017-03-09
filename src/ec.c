@@ -29,13 +29,13 @@ EMBC_STATIC_ASSERT(ARGCHK_FAIL_RETURN_CODE_DEFAULT == EMBC_ERROR_PARAMETER_INVAL
 const char * embc_error_code_name(int ec) {
     switch (ec) {
         EMBC_ERROR_CODES(SWITCH_NAME);
+        default: return "UNKNOWN";
     }
-    return "UNKNOWN";
 }
 
 const char * embc_error_code_description(int ec) {
     switch (ec) {
         EMBC_ERROR_CODES(SWITCH_DESCRIPTION);
+        default: return "Unknown error";
     }
-    return "Unknown error";
 }
