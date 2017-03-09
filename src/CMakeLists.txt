@@ -32,6 +32,8 @@ set(SOURCES
         memory/object_pool.c
         memory/pool.c
         stream/async.c
+        stream/async_sink.c
+        stream/async_source.c
         stream/framer.c
         ${PLATFORM_SRC}
 )

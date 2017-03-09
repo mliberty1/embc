@@ -67,8 +67,9 @@ EMBC_CPP_GUARD_START
  * streams may choose to implement a factory function that returns the
  * consumer instance.  However, streams are often part of a larger instance,
  * and a method call can return the stream.  In general, consumers should
- * have a method that allows the user to connect the producer.  When a new
- * producer is connected, the consumer should send
+ * have a method that allows the user to connect the producer.  Consumers
+ * should not emit any EVENTs until they receive a EMBC_STREAM_IOCTL_OPEN
+ * from the producer.  Once the consumer receives open, it should send
  * EMBC_STREAM_EVENT_WRITE_REQUEST to allow the producer to send data.
  *
  * @{
@@ -90,10 +91,18 @@ enum embc_stream_transaction_type_e {
     /**
      * @brief Open a new file over the stream.
      *
-     * Length is 0 and data is ignored.  Consumers that only support
-     * a byte stream should respond with status=0 with file_id=0.
-     * Consumers that support files should return a non-zero file_id on
-     * success.
+     * By default, the length is 0 and data is ignored.  However,
+     * implementations may define application-specific information for
+     * data.ptr.  Any application-specific arguments defined in data.ptr
+     * must not prevent a producer from working with a default consumer.
+     *
+     * Consumers that only support a byte stream should respond with
+     * status=0 with file_id=0.  Consumers that support files should return
+     * a non-zero file_id on success.
+     *
+     * After the producer opens the consumer, the consumer should send at least
+     * one EMBC_STREAM_EVENT_WRITE_REQUEST indicating that it is ready to
+     * receive data.
      */
     EMBC_STREAM_IOCTL_OPEN,
 
