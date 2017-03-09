@@ -94,7 +94,7 @@ void embc_stream_source_get_producer(
     }
 }
 
-void embc_stream_source_send(
+void embc_stream_source_configure(
         struct embc_stream_source_s * self,
         uint8_t const * buffer,
         uint32_t length,
@@ -109,7 +109,12 @@ void embc_stream_source_send(
     self->done_user_data = done_user_data;
     self->tx_offset = 0;
     self->rx_offset = 0;
+}
 
+void embc_stream_source_open(
+        struct embc_stream_source_s * self) {
+    self->tx_offset = 0;
+    self->rx_offset = 0;
     struct embc_stream_transaction_s transaction;
     memset(&transaction, 0, sizeof(transaction));
     transaction.type = EMBC_STREAM_IOCTL_OPEN;

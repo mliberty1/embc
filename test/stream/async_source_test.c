@@ -76,7 +76,8 @@ static void connect(struct test_s * self) {
 
 static void send_hello_world_consumer_buffer(struct test_s * self) {
     uint8_t b[5];
-    embc_stream_source_send(&self->source, HELLO_WORLD, sizeof(HELLO_WORLD), 0, 0);
+    embc_stream_source_configure(&self->source, HELLO_WORLD, sizeof(HELLO_WORLD), 0, 0);
+    embc_stream_source_open(&self->source);
     assert_int_equal(1, self->is_open);
     while (self->is_open) {
         struct embc_stream_transaction_s transaction;
@@ -91,7 +92,8 @@ static void send_hello_world_consumer_buffer(struct test_s * self) {
 }
 
 static void send_hello_world(struct test_s * self) {
-    embc_stream_source_send(&self->source, HELLO_WORLD, sizeof(HELLO_WORLD), 0, 0);
+    embc_stream_source_configure(&self->source, HELLO_WORLD, sizeof(HELLO_WORLD), 0, 0);
+    embc_stream_source_open(&self->source);
     assert_int_equal(1, self->is_open);
     while (self->is_open) {
         struct embc_stream_transaction_s transaction;

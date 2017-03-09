@@ -77,12 +77,15 @@ EMBC_API void embc_stream_source_get_producer(
         struct embc_stream_source_s * self,
         struct embc_stream_producer_s ** producer);
 
-EMBC_API void embc_stream_source_send(
+EMBC_API void embc_stream_source_configure(
         struct embc_stream_source_s * self,
         uint8_t const * source_buffer,
         uint32_t source_length,
         void (*done_fn)(void *),
         void * done_user_data);
+
+EMBC_API void embc_stream_source_open(
+        struct embc_stream_source_s * self);
 
 /** @} */
 

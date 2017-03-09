@@ -73,8 +73,10 @@ static void consumer_buffer(void ** state) {
     expect_value(dest_done, length, sizeof(HELLO_WORLD));
     expect_memory(dest_done, buffer, HELLO_WORLD, sizeof(HELLO_WORLD));
     expect_any(source_done, user_data);
-    embc_stream_source_send(&self->source, HELLO_WORLD, sizeof(HELLO_WORLD),
-                            source_done, self);
+    embc_stream_source_configure(&self->source,
+                                 HELLO_WORLD, sizeof(HELLO_WORLD),
+                                 source_done, self);
+    embc_stream_source_open(&self->source);
 }
 
 int main(void) {
