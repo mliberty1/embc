@@ -214,18 +214,21 @@ struct embc_stream_transaction_s {
     /**
      * @brief The transaction identifier assigned by the producer (optional).
      *
-     * The transaction initiator may set this value to match requests with
-     * their responses.
+     * The producer may set this value to match IOCTL requests with the
+     * consumer's responses.
      */
     uint8_t producer_transaction_id;
 
     /**
      * @brief The transaction identifier assigned by the consumer (optional).
      *
-     * The transaction initiator may set this value to match write requests
-     * with their responses.  Producers respecting
+     * The consumer may set this value to match EMBC_STREAM_EVENT_WRITE_REQUEST
+     * with the producer's EMBC_STREAM_IOCTL_WRITE.  Producers respecting
      * EMBC_STREAM_EVENT_WRITE_REQUEST must populate the provided value in the
-     * EMBC_STREAM_IOCTL_WRITE transaction.
+     * EMBC_STREAM_IOCTL_WRITE transaction.  Producers that do not respect
+     * the write request must set this value to 0.  Any consumer implementing
+     * block-based buffers should provide a non-zero consumer_transaction_id
+     * to distinguish if the producer has respected the request.
      */
     uint8_t consumer_transaction_id;
 
