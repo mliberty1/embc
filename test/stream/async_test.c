@@ -23,44 +23,27 @@
 
 
 struct test_s {
-    struct embc_stream_factory_s factory;
-    struct embc_stream_handle_s handle;
+    struct embc_stream_producer_s producer;
+    struct embc_stream_consumer_s consumer;
 };
 
-static int open(struct embc_stream_factory_s * self,
-         void const * meta,
-         struct embc_stream_handle_s ** handle) {
-    struct test_s * s = (struct test_s *) self;
-    *handle = &s->handle;
-    check_expected_ptr(meta);
-    return mock_type(int);
+static void consumer_send(struct embc_stream_consumer_s * self,
+                          struct embc_stream_transaction_s * transaction) {
+    (void) self;
+    check_expected_ptr(transaction);
 }
 
-static void write(struct embc_stream_handle_s * self,
-           uint8_t const * buffer, uint32_t length) {
+static void producer_send(struct embc_stream_producer_s * self,
+                          struct embc_stream_transaction_s * transaction) {
     (void) self;
-    check_expected(length);
-    check_expected_ptr(buffer);
+    check_expected_ptr(transaction);
 }
 
-static int ioctl(struct embc_stream_handle_s * self,
-          struct embc_stream_ioctl_s * transaction) {
-    (void) self;
-    (void) transaction;
-    return mock_type(int);
-}
-
-static void close(struct embc_stream_handle_s * self, uint8_t status) {
-    (void) self;
-    check_expected(status);
-}
 
 static int setup(void ** state) {
     struct test_s *self = (struct test_s *) test_calloc(1, sizeof(struct test_s));
-    self->factory.open = open;
-    self->handle.write = write;
-    self->handle.ioctl = ioctl;
-    self->handle.close = close;
+    self->producer.send = producer_send;
+    self->consumer.send = consumer_send;
     *state = self;
     return 0;
 }
@@ -73,20 +56,14 @@ static int teardown(void ** state) {
 
 static void normal_use(void ** state) {
     struct test_s *self = (struct test_s *) *state;
-    struct embc_stream_handle_s * handle = 0;
-    const uint8_t HELLO[] = "hello";
+    struct embc_stream_transaction_s transaction;
+    memset(&transaction, 0, sizeof(transaction));
+    transaction.type = EMBC_STREAM_IOCTL_NOOP;
 
-    expect_any(open, meta);
-    will_return(open, 0);
-    assert_int_equal(0, self->factory.open(&self->factory, 0, &handle));
-    assert_non_null(handle);
-
-    expect_value(write, length, sizeof(HELLO));
-    expect_memory(write, buffer, HELLO, sizeof(HELLO));
-    handle->write(handle, HELLO, sizeof(HELLO));
-
-    expect_value(close, status, 0);
-    handle->close(handle, 0);
+    expect_memory(consumer_send, transaction, &transaction, sizeof(transaction));
+    self->consumer.send(&self->consumer, &transaction);
+    expect_memory(producer_send, transaction, &transaction, sizeof(transaction));
+    self->producer.send(&self->producer, &transaction);
 }
 
 
