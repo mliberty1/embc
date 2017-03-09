@@ -336,17 +336,9 @@ struct embc_stream_consumer_s {
  * @param file_id The file identifier.
  * @param status The close status: 0 for success.
  */
-static inline void embc_stream_close(struct embc_stream_consumer_s * self,
-                                    uint8_t file_id,
-                                    uint8_t status) {
-    struct embc_stream_transaction_s transaction;
-    memset(&transaction, 0, sizeof(transaction));
-    transaction.type = EMBC_STREAM_IOCTL_CLOSE;
-    transaction.file_id = file_id;
-    transaction.status = status;
-    self->send(self, &transaction);
-}
-
+EMBC_API void embc_stream_close(struct embc_stream_consumer_s * self,
+                                uint8_t file_id,
+                                uint8_t status);
 
 /** @} */
 
