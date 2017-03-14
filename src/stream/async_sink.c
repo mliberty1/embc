@@ -18,6 +18,7 @@
 #include "embc.h"
 #include <string.h> // memset
 #include <stddef.h>
+#include <embc/stream/async.h>
 
 
 static void send_write_request(struct embc_stream_sink_s * self) {
@@ -28,7 +29,8 @@ static void send_write_request(struct embc_stream_sink_s * self) {
     if (self->transaction_buffer) {
         t.consumer_transaction_id = 1;
         t.length = self->transaction_length;
-        t.data.ptr = self->transaction_buffer;
+        t.data.event_write_request_consumer_buffer.ptr =
+                self->transaction_buffer;
     } else {
         t.data.u16[0] = 16;
         t.data.u16[1] = 1;
@@ -53,7 +55,7 @@ static void send(struct embc_stream_consumer_s * self,
                     LOGS_WARN("async_sink buffer overflow");
                 } else {
                     memcpy(s->dst_buffer + s->offset,
-                           transaction->data.ptr,
+                           transaction->data.ioctl_write.ptr,
                            transaction->length);
                     s->offset += transaction->length;
                 }

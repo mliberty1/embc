@@ -19,6 +19,7 @@
 #include <setjmp.h>
 #include <cmocka.h>
 #include <string.h>
+#include <embc/stream/async.h>
 #include "embc/stream/async_source.h"
 #include "embc.h"
 
@@ -44,7 +45,7 @@ static void consumer_send(struct embc_stream_consumer_s * self,
             s->producer->send(s->producer, transaction);
             break;
         case EMBC_STREAM_IOCTL_WRITE:
-            memcpy(s->buffer + s->offset, transaction->data.ptr, transaction->length);
+            memcpy(s->buffer + s->offset, transaction->data.ioctl_write.ptr, transaction->length);
             s->offset += transaction->length;
             s->producer->send(s->producer, transaction);
             break;
@@ -85,7 +86,7 @@ static void send_hello_world_consumer_buffer(struct test_s * self) {
         transaction.type = EMBC_STREAM_EVENT_WRITE_REQUEST;
         transaction.consumer_transaction_id = 1;
         transaction.length = sizeof(b);
-        transaction.data.ptr = b;
+        transaction.data.event_write_request_consumer_buffer.ptr = b;
         self->producer->send(self->producer, &transaction);
     }
     assert_memory_equal(self->buffer, HELLO_WORLD, sizeof(HELLO_WORLD));

@@ -72,6 +72,14 @@ EMBC_CPP_GUARD_START
  * from the producer.  Once the consumer receives open, it should send
  * EMBC_STREAM_EVENT_WRITE_REQUEST to allow the producer to send data.
  *
+ * This API does not currently support scatter/gather
+ * <a href="https://en.wikipedia.org/wiki/Vectored_I/O">Vector I/O</a>.
+ * POSIX provides scatter/gather support for POSIX streams using
+ * <a href="http://pubs.opengroup.org/onlinepubs/9699919799/functions/writev.html">writev</a>
+ * and
+ * <a href="http://pubs.opengroup.org/onlinepubs/9699919799/functions/readv.html">readv</a>.
+ *
+ *
  * @{
  */
 
@@ -109,8 +117,8 @@ enum embc_stream_transaction_type_e {
     /**
      * @brief Transmit data from the producer to the consumer.
      *
-     * The associated data.ptr points to the buffer to write, and the
-     * length contains the number of bytes to write.  The buffer must
+     * The associated data.ioctl_write.ptr points to the buffer to write, and
+     * the length contains the number of bytes to write.  The buffer must
      * remain valid until the corresponding response.
      *
      * The stream protocol places no constraints or guarantees on the
@@ -161,22 +169,19 @@ enum embc_stream_transaction_type_e {
      * until allowed through this EMBC_STREAM_EVENT_WRITE_REQUEST.
      *
      * The associated data takes two formats.  For streams that support
-     * variable write sizes, the length is 0.  data.u16[1] contains the
-     * maximum transfer unit (MTU) allowed for write transactions and
-     * data.u16[1] contains the maximum number of total, simultaneous,
-     * outstanding write transactions.  Note that data.u16[1] is the total,
-     * not the remaining, number of transactions to avoid any uncertainty
-     * over messages-in-flight.  The producer is free to allocate and manage
-     * the buffer memory.
+     * variable write sizes with producer-provided buffers, the length is 0.
+     * data.event_write_request_producer_buffer contains the
+     * mtu (maximum transfer unit) and transactions_max.
+     * The producer is free to allocate and manage the buffer memory.
      *
      * For streams that support fixed block sizes, the consumer may choose
      * to provide the buffer in the request.  By providing a buffer, the
      * consumer can minimize memory usage and copying, especially when the
      * consumer must add a header before sending the buffer down a chain of
-     * streams.  In this mode, data.ptr contains the buffer to fill and
-     * length contains the desired number of bytes.  The producer is obligated
-     * to provide length bytes except for the last WRITE transaction in a
-     * file.
+     * streams.  In this mode, data.event_write_request_consumer_buffer.ptr
+     * contains the buffer to fill and length contains the desired number of
+     * bytes.  The producer is obligated to provide length bytes except for
+     * the last WRITE transaction in a file.
      */
     EMBC_STREAM_EVENT_WRITE_REQUEST = 129,
 
@@ -198,6 +203,42 @@ enum embc_stream_transaction_type_e {
     /** The first implementation-specific EVENT value. */
     EMBC_STREAM_EVENT_CUSTOM = 196,
 
+};
+
+/**
+ * EMBC_STREAM_IOCTL_WRITE data structure.
+ */
+struct embc_stream_ioctl_write_s {
+    /** The data to write. */
+    uint8_t const * ptr;
+};
+
+/**
+ * EMBC_STREAM_EVENT_WRITE_REQUEST data structure for length = 0.
+ */
+struct embc_stream_event_write_request_producer_buffer_s {
+    /** The maximum transfer unit (MTU) of the stream. */
+    uint16_t mtu;
+
+    /**
+     * @brief The maximum total number of simultaneously outstanding write
+     * transactions.
+     *
+     * Note that this quantity is the total, not the remaining, number of
+     * transactions to avoid any uncertainty over messages-in-flight.
+     * */
+    uint16_t transactions_max;
+};
+
+/**
+ * EMBC_STREAM_EVENT_WRITE_REQUEST data structure for length != 0.
+ */
+struct embc_stream_event_write_request_consumer_buffer_s {
+    /**
+     * The consumer-provided buffer for the producer to use in a future
+     * EMBC_STREAM_IOCTL_WRITE transaction.
+     */
+    uint8_t * ptr;
 };
 
 /**
@@ -276,6 +317,17 @@ struct embc_stream_transaction_s {
         uint16_t u16[2];
         /** A pointer to a memory structure. */
         void * ptr;
+
+        /** Provide write data from the producer to the consumer. */
+        struct embc_stream_ioctl_write_s ioctl_write;
+
+        /** Write request with producer-provided buffer. */
+        struct embc_stream_event_write_request_producer_buffer_s
+                event_write_request_producer_buffer;
+
+        /** Write request with consumer-provided buffer. */
+        struct embc_stream_event_write_request_consumer_buffer_s
+                event_write_request_consumer_buffer;
     } data;
 
 };

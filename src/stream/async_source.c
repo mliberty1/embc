@@ -18,6 +18,7 @@
 #include "embc.h"
 #include <string.h> // memset
 #include <stddef.h>
+#include <embc/stream/async.h>
 
 static void send(struct embc_stream_producer_s * self,
                  struct embc_stream_transaction_s * transaction) {
@@ -43,20 +44,24 @@ static void send(struct embc_stream_producer_s * self,
             }
             uint16_t sz = transaction->length;
             uint32_t remaining = s->source_length - s->tx_offset;
+            uint8_t * buffer;
             if (!sz) {
                 if (s->transaction_length) {
                     sz = s->transaction_length;
-                    transaction->data.ptr = s->transaction_buffer;
+                    buffer = s->transaction_buffer;
                 } else {  // use transaction buffer ptr as the buffer!
                     sz = sizeof(s->transaction_buffer);
-                    transaction->data.ptr = (uint8_t *) &s->transaction_buffer;
+                    buffer = (uint8_t *) &s->transaction_buffer;
                 }
+            } else {
+                buffer = transaction->data.event_write_request_consumer_buffer.ptr;
             }
             if (remaining < sz) {
                 sz = remaining;
             }
             transaction->type = EMBC_STREAM_IOCTL_WRITE;
-            memcpy(transaction->data.ptr, s->source_buffer + s->tx_offset, sz);
+            memcpy(buffer, s->source_buffer + s->tx_offset, sz);
+            transaction->data.ioctl_write.ptr = buffer;
             transaction->length = sz;
             s->tx_offset += sz;
             s->consumer->send(s->consumer, transaction);
