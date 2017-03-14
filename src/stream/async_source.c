@@ -115,10 +115,19 @@ void embc_stream_source_configure(
 
 void embc_stream_source_open(
         struct embc_stream_source_s * self) {
+    embc_stream_source_open_ex(self, 0, 0);
+}
+
+EMBC_API void embc_stream_source_open_ex(
+        struct embc_stream_source_s * self,
+        void * ptr,
+        uint16_t length) {
     self->tx_offset = 0;
     self->rx_offset = 0;
     struct embc_stream_transaction_s transaction;
     memset(&transaction, 0, sizeof(transaction));
     transaction.type = EMBC_STREAM_IOCTL_OPEN;
+    transaction.length = length;
+    transaction.data.ptr = ptr;
     self->consumer->send(self->consumer, &transaction);
 }

@@ -86,6 +86,11 @@ EMBC_API void embc_stream_source_configure(
 EMBC_API void embc_stream_source_open(
         struct embc_stream_source_s * self);
 
+EMBC_API void embc_stream_source_open_ex(
+        struct embc_stream_source_s * self,
+        void * ptr,
+        uint16_t length);
+
 /** @} */
 
 EMBC_CPP_GUARD_END

@@ -32,8 +32,8 @@ static void send_write_request(struct embc_stream_sink_s * self) {
         t.data.event_write_request_consumer_buffer.ptr =
                 self->transaction_buffer;
     } else {
-        t.data.u16[0] = 16;
-        t.data.u16[1] = 1;
+        t.data.event_write_request_producer_buffer.mtu = 16;
+        t.data.event_write_request_producer_buffer.transactions_max = 1;
     }
     self->producer->send(self->producer, &t);
 }
@@ -67,6 +67,7 @@ static void send(struct embc_stream_consumer_s * self,
             if (s->done_fn) {
                 s->done_fn(s->done_user_data, s->dst_buffer, s->offset);
             }
+            s->producer->send(s->producer, transaction);
             break;
         default:
             break;
