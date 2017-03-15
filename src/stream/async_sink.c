@@ -67,7 +67,9 @@ static void send(struct embc_stream_consumer_s * self,
             if (s->done_fn) {
                 s->done_fn(s->done_user_data, s->dst_buffer, s->offset);
             }
-            s->producer->send(s->producer, transaction);
+            if (s->producer) {
+                s->producer->send(s->producer, transaction);
+            }
             break;
         default:
             break;

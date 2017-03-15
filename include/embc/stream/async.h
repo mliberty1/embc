@@ -137,7 +137,7 @@ enum embc_stream_transaction_type_e {
      * The associated data and length are ignored.  The consumer must
      * flush any queued data before closing the stream.  The producer
      * may set "status" if the close is due to an error.  The consumer
-     * does NOT provide a response.
+     * must provide a response.
      */
     EMBC_STREAM_IOCTL_CLOSE,
 
@@ -199,10 +199,8 @@ enum embc_stream_transaction_type_e {
      */
     EMBC_STREAM_EVENT_DISCONNECT = 131,
 
-
     /** The first implementation-specific EVENT value. */
     EMBC_STREAM_EVENT_CUSTOM = 196,
-
 };
 
 /**
@@ -396,6 +394,8 @@ struct embc_stream_consumer_s {
  * @param self The stream consumer.
  * @param file_id The file identifier.
  * @param status The close status: 0 for success.
+ *
+ * The consumer will respond with a matching transaction.
  */
 EMBC_API void embc_stream_close(struct embc_stream_consumer_s * self,
                                 uint8_t file_id,
