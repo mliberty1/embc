@@ -45,6 +45,7 @@ static void send(struct embc_stream_consumer_s * self,
     switch (transaction->type) {
         case EMBC_STREAM_IOCTL_OPEN: {
             transaction->file_id = 1;
+            s->offset = 0;
             s->producer->send(s->producer, transaction);
             send_write_request(s);
             break;
