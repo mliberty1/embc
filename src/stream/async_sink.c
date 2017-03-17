@@ -35,7 +35,18 @@ static void send_write_request(struct embc_stream_sink_s * self) {
         t.data.event_write_request_producer_buffer.mtu = 16;
         t.data.event_write_request_producer_buffer.transactions_max = 1;
     }
-    self->producer->send(self->producer, &t);
+    if (self->producer) {
+        self->producer->send(self->producer, &t);
+    }
+}
+
+static void send_event(struct embc_stream_sink_s * self, uint8_t ev) {
+    struct embc_stream_transaction_s t;
+    memset(&t, 0, sizeof(t));
+    t.type = ev;
+    if (self->producer) {
+        self->producer->send(self->producer, &t);
+    }
 }
 
 static void send(struct embc_stream_consumer_s * self,
@@ -45,9 +56,14 @@ static void send(struct embc_stream_consumer_s * self,
     switch (transaction->type) {
         case EMBC_STREAM_IOCTL_OPEN: {
             transaction->file_id = 1;
+            s->mode = 1;
             s->offset = 0;
             s->producer->send(s->producer, transaction);
-            send_write_request(s);
+            if (s->dst_buffer) {
+                send_write_request(s);
+            } else {
+                send_event(s, EMBC_STREAM_EVENT_DISCONNECT);
+            }
             break;
         }
         case EMBC_STREAM_IOCTL_WRITE:
@@ -65,6 +81,7 @@ static void send(struct embc_stream_consumer_s * self,
             send_write_request(s);
             break;
         case EMBC_STREAM_IOCTL_CLOSE:
+            s->mode = 1;
             if (s->done_fn) {
                 s->done_fn(s->done_user_data, s->dst_buffer, s->offset);
             }
@@ -108,8 +125,16 @@ void embc_stream_sink_receive(
         void (*done_fn)(void *, uint8_t *, uint32_t),
         void * done_user_data) {
     DBC_NOT_NULL(self);
+    if (self->dst_buffer && !dst_buffer) {
+        send_event(self, EMBC_STREAM_EVENT_DISCONNECT);
+    }
+    uint8_t send_connect = (!self->dst_buffer && dst_buffer);
     self->dst_buffer = dst_buffer;
     self->dst_length = dst_length;
     self->done_fn = done_fn;
     self->done_user_data = done_user_data;
+    if (send_connect && self->mode) {
+        send_event(self, EMBC_STREAM_EVENT_CONNECT);
+        send_write_request(self);
+    }
 }

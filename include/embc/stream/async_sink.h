@@ -46,6 +46,7 @@ struct embc_stream_sink_s {
     struct embc_stream_producer_s * producer;
     uint8_t * transaction_buffer;
     uint16_t transaction_length;
+    uint8_t mode;
     uint8_t * dst_buffer;
     uint32_t dst_length;
     uint32_t offset;
