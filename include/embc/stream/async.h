@@ -199,6 +199,14 @@ enum embc_stream_transaction_type_e {
      */
     EMBC_STREAM_EVENT_DISCONNECT = 131,
 
+    /**
+     * @brief Request an abort of the current stream operation.
+     *
+     * Length is 0 and data is ignored.  The upstream should normally issue
+     * an EMBC_STREAM_IOCTL_CLOSE with status EMBC_ERROR_ABORT.
+     */
+    EMBC_STREAM_EVENT_ABORT = 132,
+
     /** The first implementation-specific EVENT value. */
     EMBC_STREAM_EVENT_CUSTOM = 196,
 };
