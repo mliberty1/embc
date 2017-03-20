@@ -67,6 +67,9 @@ static void send(struct embc_stream_consumer_s * self,
             break;
         }
         case EMBC_STREAM_IOCTL_WRITE:
+            if (s->write_fn) {
+                s->write_fn(s->write_user_data, transaction->data.ioctl_write.ptr, transaction->length);
+            }
             if (s->dst_buffer) {
                 if (s->dst_length < (s->offset + transaction->length)) {
                     LOGS_WARN("async_sink buffer overflow");
@@ -118,11 +121,20 @@ void embc_stream_sink_set_producer(
     self->producer = producer;
 }
 
+void embc_stream_sink_set_write_fn(
+        struct embc_stream_sink_s * self,
+        embc_stream_sink_data_fn fn,
+        void * user_data) {
+    DBC_NOT_NULL(self);
+    self->write_fn = fn;
+    self->write_user_data = user_data;
+}
+
 void embc_stream_sink_receive(
         struct embc_stream_sink_s * self,
         uint8_t * dst_buffer,
         uint32_t dst_length,
-        void (*done_fn)(void *, uint8_t *, uint32_t),
+        embc_stream_sink_data_fn done_fn,
         void * done_user_data) {
     DBC_NOT_NULL(self);
     if (self->dst_buffer && !dst_buffer) {

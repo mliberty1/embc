@@ -56,7 +56,7 @@ static void source_done(void * user_data) {
     check_expected_ptr(user_data);
 }
 
-static void dest_done(void * user_data, uint8_t * buffer, uint32_t length) {
+static void dest_done(void * user_data, uint8_t const * buffer, uint32_t length) {
     (void) user_data;
     check_expected(length);
     check_expected_ptr(buffer);

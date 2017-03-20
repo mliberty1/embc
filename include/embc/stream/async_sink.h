@@ -39,6 +39,18 @@ EMBC_CPP_GUARD_START
  */
 
 /**
+ * @brief Function called for stream data.
+ *
+ * @param user_data The arbitrary user data.
+ * @param buffer The completed buffer.
+ * @param length The length of buffer in bytes.
+ */
+typedef void (*embc_stream_sink_data_fn)(
+        void * user_data,
+        uint8_t const * buffer,
+        uint32_t length);
+
+/**
  * @brief The stream sink instance.
  */
 struct embc_stream_sink_s {
@@ -50,7 +62,9 @@ struct embc_stream_sink_s {
     uint8_t * dst_buffer;
     uint32_t dst_length;
     uint32_t offset;
-    void (*done_fn)(void * user_data, uint8_t * buffer, uint32_t length);
+    embc_stream_sink_data_fn write_fn;
+    void * write_user_data;
+    embc_stream_sink_data_fn done_fn;
     void * done_user_data;
 };
 
@@ -74,11 +88,24 @@ EMBC_API void embc_stream_sink_set_producer(
         struct embc_stream_sink_s * self,
         struct embc_stream_producer_s * producer);
 
+/**
+ * @brief Set the optional function called for each write.
+ *
+ * @param self The stream sink instance.
+ * @param fn The function to call on each write transaction.
+ *      Provide 0 to unset the callback.
+ * @param user_data The data to provide to fn.
+ */
+EMBC_API void embc_stream_sink_set_write_fn(
+        struct embc_stream_sink_s * self,
+        embc_stream_sink_data_fn fn,
+        void * user_data);
+
 EMBC_API void embc_stream_sink_receive(
         struct embc_stream_sink_s * self,
         uint8_t * dst_buffer,
         uint32_t dst_length,
-        void (*done_fn)(void * user_data, uint8_t * buffer, uint32_t length),
+        embc_stream_sink_data_fn done_fn,
         void * done_user_data);
 
 /** @} */
