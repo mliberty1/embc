@@ -67,6 +67,11 @@ static void send(struct embc_stream_producer_s * self,
             s->consumer->send(s->consumer, transaction);
             break;
         }
+        case EMBC_STREAM_EVENT_ABORT:
+            transaction->type = EMBC_STREAM_IOCTL_CLOSE;
+            transaction->status = EMBC_ERROR_ABORTED;
+            s->consumer->send(s->consumer, transaction);
+            break;
         default:
             break;
     }
