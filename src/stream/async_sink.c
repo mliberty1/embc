@@ -145,6 +145,7 @@ void embc_stream_sink_receive(
     self->dst_length = dst_length;
     self->done_fn = done_fn;
     self->done_user_data = done_user_data;
+    self->offset = 0;
     if (send_connect && self->mode) {
         send_event(self, EMBC_STREAM_EVENT_CONNECT);
         send_write_request(self);
