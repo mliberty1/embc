@@ -52,7 +52,7 @@ struct embc_stream_source_s {
     uint32_t source_length;
     uint32_t tx_offset;
     uint32_t rx_offset;
-    void (*done_fn)(void * user_data);
+    void (*done_fn)(void * user_data, uint8_t status);
     void * done_user_data;
 };
 
@@ -80,7 +80,7 @@ EMBC_API void embc_stream_source_configure(
         struct embc_stream_source_s * self,
         uint8_t const * source_buffer,
         uint32_t source_length,
-        void (*done_fn)(void *),
+        void (*done_fn)(void *, uint8_t),
         void * done_user_data);
 
 EMBC_API void embc_stream_source_open(

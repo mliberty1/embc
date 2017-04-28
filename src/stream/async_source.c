@@ -27,15 +27,17 @@ static void send(struct embc_stream_producer_s * self,
     switch (transaction->type) {
         case EMBC_STREAM_IOCTL_OPEN:
             break;
+        case EMBC_STREAM_IOCTL_CLOSE:
+            if (s->done_fn) {
+                s->done_fn(s->done_user_data, transaction->status);
+            }
+            break;
         case EMBC_STREAM_IOCTL_WRITE:
             s->rx_offset += transaction->length;
             if (s->rx_offset >= s->source_length) {
                 memset(transaction, 0, sizeof(*transaction));
                 transaction->type = EMBC_STREAM_IOCTL_CLOSE;
                 s->consumer->send(s->consumer, transaction);
-                if (s->done_fn) {
-                    s->done_fn(s->done_user_data);
-                }
             }
             break;
         case EMBC_STREAM_EVENT_WRITE_REQUEST: {
@@ -105,7 +107,7 @@ void embc_stream_source_configure(
         struct embc_stream_source_s * self,
         uint8_t const * buffer,
         uint32_t length,
-        void (*done_fn)(void *),
+        void (*done_fn)(void *, uint8_t),
         void * done_user_data) {
     DBC_NOT_NULL(self);
     DBC_NOT_NULL(buffer);
