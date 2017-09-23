@@ -52,7 +52,8 @@ static void connect(struct test_s * self) {
     embc_stream_sink_set_producer(&self->sink, producer);
 }
 
-static void source_done(void * user_data) {
+static void source_done(void * user_data, uint8_t v) {
+    (void) v;
     check_expected_ptr(user_data);
 }
 

@@ -101,7 +101,7 @@ static void resize(struct intmap_s * self) {
     size_t length = (self->hash_mask + 1) << 2;
     self->bins = calloc(length, sizeof(struct entry_s *));
     self->hash_mask = length - 1;
-    LOGF_DEBUG("intmap.resize -> %" PRIuS, length);
+    LOGF_DEBUG("intmap.resize -> %d", (int) length);
     for (idx = 0; idx <= mask_old; ++idx) {
         next = bins_old[idx];
         while (next) {
