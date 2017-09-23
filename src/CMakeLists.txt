@@ -29,6 +29,7 @@ set(SOURCES
         fsm.c
         lfsr.c
         log.c
+        memory/block.c
         memory/object_pool.c
         memory/pool.c
         stream/async.c
