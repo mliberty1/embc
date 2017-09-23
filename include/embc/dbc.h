@@ -92,39 +92,79 @@
 #define DBC_EQUAL(a, b) DBC_ASSERT((a) == (b), #a " != " #b)
 
 /**
+ * @brief Assert that a first value is greater than a second value.
+ *
+ * @param x The first value.
+ * @param y The second value.
+ */
+#define DBC_GT(x, y) DBC_ASSERT((x) > (y), #x " !> " #y)
+
+/**
+ * @brief Assert that a first value is greater than or equal to a second value.
+ *
+ * @param x The first value.
+ * @param y The second value.
+ */
+#define DBC_GTE(x, y) DBC_ASSERT((x) >= (y), #x " !>= " #y)
+
+/**
+ * @brief Assert that two values are not equal.
+ *
+ * @param x The first value.
+ * @param y The second value.
+ */
+#define DBC_NE(x, y) DBC_ASSERT((x) != (y), #x " != " #y)
+
+/**
+ * @brief Assert that a first value is less than a second value.
+ *
+ * @param x The first value.
+ * @param y The second value.
+ */
+#define DBC_LT(x, y) DBC_ASSERT((x) < (y), #x " !< " #y)
+
+/**
+ * @brief Assert that a first value is less than or equal to a second value.
+ *
+ * @param x The first value.
+ * @param y The second value.
+ */
+#define DBC_LTE(x, y) DBC_ASSERT((x) <= (y), #x " !<= " #y)
+
+/**
  * @brief Assert that a value is greater than zero.
  *
  * @param x The function argument to check.
  */
-#define DBC_GT_ZERO(x) DBC_ASSERT((x) > 0, #x " <= 0")
+#define DBC_GT_ZERO(x) DBC_GT(x, 0)
 
 /**
  * @brief Assert that a value is greater than or equal to zero.
  *
  * @param x The function argument to check.
  */
-#define DBC_GTE_ZERO(x) DBC_ASSERT((x) >= 0, #x " < 0")
+#define DBC_GTE_ZERO(x) DBC_GTE(x, 0)
 
 /**
  * @brief Assert that a value is not equal to zero.
  *
  * @param x The function argument to check.
  */
-#define DBC_NE_ZERO(x) DBC_ASSERT((x) != 0, #x " != 0")
+#define DBC_NE_ZERO(x) DBC_NE(x, 0)
 
 /**
  * @brief Assert that a value is less than zero.
  *
  * @param x The function argument to check.
  */
-#define DBC_LT_ZERO(x) DBC_ASSERT((x) < 0, #x " >= 0")
+#define DBC_LT_ZERO(x) DBC_LT(x, 0)
 
 /**
  * @brief Assert that a value is less than or equal to zero.
  *
  * @param x The function argument to check.
  */
-#define DBC_LTE_ZERO(x) DBC_ASSERT((x) <= 0, #x " > 0")
+#define DBC_LTE_ZERO(x) DBC_LTE(x, 0)
 
 /**
  * @brief Assert that a value is less than or equal to zero.
