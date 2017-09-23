@@ -104,6 +104,16 @@ void * embc_pool_alloc(struct embc_pool_s * self) {
     return ((void *) (hdr + 1));
 }
 
+void * embc_pool_alloc_unsafe(struct embc_pool_s * self) {
+    DBC_NOT_NULL(self);
+    if (!self->free_head) {
+        return 0;
+    }
+    struct embc_pool_element_s * hdr = self->free_head;
+    LL_DELETE(self->free_head, hdr);
+    return ((void *) (hdr + 1));
+}
+
 void embc_pool_free(struct embc_pool_s * self, void * block) {
     DBC_NOT_NULL(self);
     DBC_NOT_NULL(block);

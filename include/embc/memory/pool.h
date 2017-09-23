@@ -109,6 +109,14 @@ EMBC_API int embc_pool_is_empty(struct embc_pool_s * self);
 EMBC_API void * embc_pool_alloc(struct embc_pool_s * self);
 
 /**
+ * @brief Allocate a new block from the pool.
+ *
+ * @param self The memory pool instance.
+ * @return The new block from the pool or 0.
+ */
+EMBC_API void * embc_pool_alloc_unsafe(struct embc_pool_s * self);
+
+/**
  * @brief Free a block previous allocated from the pool.
  *
  * @param block The block returned by embc_pool_alloc().

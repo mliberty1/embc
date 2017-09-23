@@ -62,6 +62,14 @@ static void alloc_too_many(void **state) {
     expect_assert_failure(embc_pool_alloc(self));
 }
 
+static void alloc_too_many_unsafe(void **state) {
+    struct embc_pool_s * self = (struct embc_pool_s *) *state;
+    assert_int_equal(0, embc_pool_is_empty(self));
+    embc_pool_alloc(self);
+    assert_int_equal(1, embc_pool_is_empty(self));
+    assert_null(embc_pool_alloc_unsafe(self));
+}
+
 static void alloc_multiple(void ** state) {
     struct embc_pool_s * self = (struct embc_pool_s *) *state;
     uint8_t * d1 = (uint8_t *) embc_pool_alloc(self);
@@ -79,6 +87,7 @@ int main(void) {
     const struct CMUnitTest tests[] = {
             cmocka_unit_test_setup_teardown(create, setup1, teardown),
             cmocka_unit_test_setup_teardown(alloc_too_many, setup1, teardown),
+            cmocka_unit_test_setup_teardown(alloc_too_many_unsafe, setup1, teardown),
             cmocka_unit_test_setup_teardown(alloc_multiple, setup2, teardown),
     };
 
