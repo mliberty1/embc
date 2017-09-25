@@ -16,7 +16,8 @@ int32_t embc_mblock_instance_size(int32_t mem_size, int32_t block_size) {
     DBC_GT_ZERO(mem_size);
     DBC_GT_ZERO(block_size);
     int32_t blocks_count = mem_size / block_size;
-    int32_t bitmap_size = EMBC_ROUND_UP_TO_MULTIPLE(4, (blocks_count + 7) / 8);
+    int32_t bytes_count = (blocks_count + 7) / 8;
+    int32_t bitmap_size = EMBC_ROUND_UP_TO_MULTIPLE(bytes_count, 4);
     if (bitmap_size >= 4) {
         bitmap_size -= 4;
     }

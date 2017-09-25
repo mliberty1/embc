@@ -159,7 +159,7 @@
  *     ROUND_UP_TO_MULTIPLE(129, 128) => 256
  *     ROUND_UP_TO_MULTIPLE(-1, 128) => -128
  *
- * WARNING: The values for x and v must not have any side effects
+ * WARNING: The values for x and m MUST NOT have any side effects
  * as the parameters occur multiple times in the macro!
  */
 #define EMBC_ROUND_UP_TO_MULTIPLE(x, m) (( ((x) + ( EMBC_SIGNUM(x) * (m - 1) )) / m) * m)
