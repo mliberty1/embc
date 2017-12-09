@@ -242,3 +242,15 @@ void embc_pattern_32a_rx_next(
     }
     ++self->receive_count;
 }
+
+void embc_pattern_32a_rx_buffer(
+        struct embc_pattern_32a_rx_s * self,
+        uint32_t const * buffer,
+        uint32_t size) {
+    DBC_NOT_NULL(self);
+    DBC_NOT_NULL(buffer);
+    uint32_t sz = size / 4;
+    for (uint32_t i = 0; i < sz; ++i) {
+        embc_pattern_32a_rx_next(self, buffer[i]);
+    }
+}

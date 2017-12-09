@@ -93,6 +93,7 @@ static void test_rx_next_start_from_shift(void **state) {
     assert_int_equal(EMBC_ARRAY_SIZE(PATTERN), rx1.receive_count);
     assert_int_equal(0, rx1.resync_count);
     assert_int_equal(0, rx1.missing_count);
+    assert_int_equal(0, rx1.duplicate_count);
     assert_int_equal(0, rx1.error_count);
 }
 
@@ -104,6 +105,7 @@ static void test_rx_next_start_from_counter(void **state) {
     assert_int_equal(EMBC_ARRAY_SIZE(PATTERN) - 1, rx1.receive_count);
     assert_int_equal(0, rx1.resync_count);
     assert_int_equal(0, rx1.missing_count);
+    assert_int_equal(0, rx1.duplicate_count);
     assert_int_equal(0, rx1.error_count);
 }
 
@@ -129,6 +131,7 @@ static void skip_case(int offset, int before, int skip, int after) {
     assert_int_equal(before + after, rx1.receive_count);
     assert_int_equal(1, rx1.resync_count);
     assert_int_equal(skip, rx1.missing_count);
+    assert_int_equal(0, rx1.duplicate_count);
     assert_int_equal(1, rx1.error_count);
 }
 
@@ -213,6 +216,20 @@ static void test_rx_duplicate_cases(void **state) {
     range_case(0, 1027, 5, 10);
 }
 
+static void test_rx_buffer(void **state) {
+    (void) state;
+    uint32_t buffer[1024];
+    embc_pattern_32a_tx_buffer(&tx1, buffer, sizeof(buffer));
+    embc_pattern_32a_rx_buffer(&rx1, buffer, 100);
+    embc_pattern_32a_rx_buffer(&rx1, buffer + 50, 100);
+    embc_pattern_32a_rx_buffer(&rx1, buffer + 70, 100);
+    assert_int_equal(75, rx1.receive_count);
+    assert_int_equal(2, rx1.resync_count);
+    assert_int_equal(25, rx1.missing_count);
+    assert_int_equal(5, rx1.duplicate_count);
+    assert_int_equal(2, rx1.error_count);
+}
+
 int main(void) {
     const struct CMUnitTest tests[] = {
             cmocka_unit_test_setup(test_tx_next, setup),
@@ -223,6 +240,7 @@ int main(void) {
             cmocka_unit_test_setup(test_rx_next_start_from_counter, setup),
             cmocka_unit_test_setup(test_rx_skip_cases, setup),
             cmocka_unit_test_setup(test_rx_duplicate_cases, setup),
+            cmocka_unit_test_setup(test_rx_buffer, setup),
     };
 
     return cmocka_run_group_tests(tests, NULL, NULL);
