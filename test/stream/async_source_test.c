@@ -24,7 +24,7 @@
 #include "embc.h"
 
 
-static const uint8_t const HELLO_WORLD[] = "hello world!";
+static const uint8_t HELLO_WORLD[] = "hello world!";
 
 struct test_s {
     struct embc_stream_consumer_s consumer;
