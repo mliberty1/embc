@@ -370,7 +370,10 @@ void tfp_format(void *putp, putcf putf, const char *fmt, va_list va)
                 putchw(putp, putf, &p);
                 break;
 #ifdef SIZEOF_POINTER
+
+#if defined(__GNUC__) && (__GNUC__ > 6)
 #pragma GCC diagnostic ignored "-Wimplicit-fallthrough"
+#endif
             case 'p':
                 p.alt = 1;
 # if defined(SIZEOF_INT) && SIZEOF_POINTER <= SIZEOF_INT
@@ -383,7 +386,9 @@ void tfp_format(void *putp, putcf putf, const char *fmt, va_list va)
 #endif
             case 'x':
             case 'X':
+#if defined(__GNUC__) && (__GNUC__ > 6)
 #pragma GCC diagnostic pop
+#endif
                 p.base = 16;
                 p.uc = (ch == 'X')?1:0;
 #ifdef PRINTF_LONG_SUPPORT
