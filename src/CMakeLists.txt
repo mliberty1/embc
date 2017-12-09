@@ -29,6 +29,7 @@ set(SOURCES
         fsm.c
         lfsr.c
         log.c
+        pattern_32a.c
         memory/block.c
         memory/object_pool.c
         memory/pool.c
