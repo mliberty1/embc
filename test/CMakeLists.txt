@@ -47,7 +47,7 @@ ADD_CMOCKA_TEST(ec_test)
 ADD_CMOCKA_TEST(fsm_test)
 ADD_CMOCKA_TEST(lfsr_test)
 ADD_CMOCKA_TEST(log_test)
-ADD_CMOCKA_TEST(pattern_32a)
+ADD_CMOCKA_TEST(pattern_32a_test)
 ADD_CMOCKA_TEST(time_test)
 
 # test static assert compile failures

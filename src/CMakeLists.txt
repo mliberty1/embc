@@ -23,6 +23,7 @@ set(SOURCES
         collections/bbuf.c
         collections/hashmap.c
         collections/intmap.c
+        collections/list.c
         cli.c
         crc.c
         ec.c
