@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-ADD_CMOCKA_TEST(bbuf_test)
 ADD_CMOCKA_TEST(hashmap_test)
 ADD_CMOCKA_TEST(intmap_test)
 ADD_CMOCKA_TEST(list_test)

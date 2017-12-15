@@ -17,7 +17,7 @@
 #include "embc/stream/framer.h"
 #include "embc/stream/framer_util.h"
 #include "embc/collections/list.h"
-#include "embc/collections/bbuf.h"
+#include "embc/bbuf.h"
 #include "embc.h"
 #include "embc/crc.h"
 
@@ -185,7 +185,7 @@ int32_t embc_framer_validate(uint8_t const * buffer,
         return EMBC_ERROR_TOO_SMALL;
     }
     uint8_t const * crc_value = &buffer[sz - 5];
-    uint32_t crc_rx = BBUF_DECODE_U32_LE(crc_value);
+    uint32_t crc_rx = EMBC_BBUF_DECODE_U32_LE(crc_value);
     uint32_t crc_calc = crc32(0, buffer, sz - FOOTER_SIZE);
     if (crc_rx != crc_calc) {
         return EMBC_ERROR_MESSAGE_INTEGRITY;

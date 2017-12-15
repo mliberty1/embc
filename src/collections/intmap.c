@@ -58,7 +58,6 @@ static void itermap_iterator_next_advance(struct intmap_iterator_s * self);
 
 struct intmap_s * intmap_new() {
     struct intmap_s * intmap = embc_alloc_clr(sizeof(struct intmap_s));
-    EMBC_ASSERT_ALLOC(intmap);
     intmap->hash_mask = 0x7;
     embc_size_t sz = (intmap->hash_mask + 1) * sizeof(struct entry_s *);
     intmap->bins = embc_alloc_clr(sz);
@@ -142,9 +141,6 @@ int intmap_put(struct intmap_s * self, embc_size_t key, void * value, void ** ol
     }
 
     item = embc_alloc_clr(sizeof(struct entry_s));
-    if (!item) {
-        return EMBC_ERROR_NOT_ENOUGH_MEMORY;
-    }
     item->key = key;
     item->value = value;
     *previous = item;
@@ -224,7 +220,6 @@ static void itermap_iterator_next_advance(struct intmap_iterator_s * self) {
 struct intmap_iterator_s * intmap_iterator_new(struct intmap_s * self) {
     DBC_NOT_NULL(self);
     struct intmap_iterator_s * iter = embc_alloc_clr(sizeof(struct intmap_iterator_s));
-    EMBC_ASSERT_ALLOC(iter);
     iter->intmap = self;
     iter->next_item = 0;
     DL_APPEND(self->iterators, iter);

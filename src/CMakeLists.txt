@@ -26,7 +26,6 @@ configure_file(${CMAKE_CURRENT_SOURCE_DIR}/config.h.in
         ${CMAKE_CURRENT_BINARY_DIR}/include/embc/config.h)
 
 set(SOURCES
-        collections/bbuf.c
         collections/hashmap.c
         collections/intmap.c
         collections/list.c
@@ -39,6 +38,7 @@ set(SOURCES
         pattern_32a.c
         platform.c
         memory/block.c
+        memory/buffer.c
         memory/object_pool.c
         memory/pool.c
         stream/async.c

@@ -53,9 +53,6 @@ struct hashmap_s * hashmap_new(hashmap_hash hash, hashmap_equiv equiv) {
         return 0;
     }
     struct hashmap_s * hashmap = embc_alloc_clr(sizeof(struct hashmap_s));
-    if (!hashmap) {
-        return 0;
-    }
     hashmap->hash = hash;
     hashmap->equiv = equiv;
     hashmap->hashtable_mask = 0x7;
@@ -102,7 +99,6 @@ int hashmap_put(struct hashmap_s * self, void * key, void * value, void ** old_v
     }
 
     item = embc_alloc_clr(sizeof(struct entry_s));
-    EMBC_ASSERT_ALLOC(item);
     item->hash = hash;
     item->key = key;
     item->value = value;

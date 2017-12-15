@@ -27,6 +27,15 @@
 #include <stdio.h>
 #include <unistd.h>
 
+
+static void * hal_alloc(embc_size_t size_bytes) {
+    return test_malloc((size_t) size_bytes);
+}
+
+static void hal_free(void * ptr) {
+    test_free(ptr);
+}
+
 void app_log_printf_(const char *format, ...) {
     va_list arg;
     va_start(arg, format);
@@ -35,7 +44,7 @@ void app_log_printf_(const char *format, ...) {
 }
 
 void hal_test_initialize() {
-    embc_allocator_set((embc_alloc_fn) malloc, free);
+    embc_allocator_set(hal_alloc, hal_free);
     log_initialize(app_log_printf_);
 }
 

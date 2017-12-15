@@ -20,17 +20,17 @@
 #include <cmocka.h>
 #include "embc/cli.h"
 #include "embc.h"
-#include "embc/collections/bbuf.h"
+#include "embc/memory/buffer.h"
 #include <string.h>
 
 
 cli_t cli;
-BBUF_DEFINE(myprint_str, 256);
+EMBC_BUFFER_STATIC_DEFINE(myprint_str, 256);
 
 
 static void myprint(void * cookie, const char * s) {
     (void) cookie;
-    bbuf_encode_u8a(&myprint_str, (const uint8_t *) s, strlen(s));
+    embc_buffer_write(&myprint_str, s, strlen(s));
 }
 
 static int myexec(void * cookie, const char * cmdline) {
@@ -63,9 +63,9 @@ int setup(void ** state) {
     cli.execute_line = myexec;
     cli.response_success = "OK\n";
     cli.response_error = "ERROR\n";
-    bbuf_clear_and_overwrite(&myprint_str, 0);
+    embc_buffer_clear(&myprint_str);
     cli_initialize(&cli);
-    bbuf_clear_and_overwrite(&myprint_str, 0);
+    embc_buffer_clear(&myprint_str);
     return 0;
 }
 
@@ -89,7 +89,7 @@ void execute_single_char(void ** state) {
     expect_string(myexec, cmdline, "h");
     will_return(myexec, CLI_SUCCESS);
     cli_insert_char(&cli, '\r');
-    assert_string_equal("\nOK\n", myprint_str.buf_start);
+    assert_string_equal("\nOK\n", myprint_str.data);
 }
 
 void execute_CLI_SUCCESS(void ** state) {
@@ -97,7 +97,7 @@ void execute_CLI_SUCCESS(void ** state) {
     expect_string(myexec, cmdline, "hello world!");
     will_return(myexec, CLI_SUCCESS);
     insert_str("hello world!\r");
-    assert_string_equal("\nOK\n", myprint_str.buf_start);
+    assert_string_equal("\nOK\n", myprint_str.data);
 }
 
 void execute_backspace(void ** state) {
@@ -105,7 +105,7 @@ void execute_backspace(void ** state) {
     expect_string(myexec, cmdline, "hello world");
     will_return(myexec, CLI_SUCCESS);
     insert_str("hello world!\b\r");
-    assert_string_equal("\nOK\n", myprint_str.buf_start);
+    assert_string_equal("\nOK\n", myprint_str.data);
 }
 
 void execute_echo_on(void ** state) {
@@ -114,7 +114,7 @@ void execute_echo_on(void ** state) {
     expect_string(myexec, cmdline, "hello world!");
     will_return(myexec, CLI_SUCCESS);
     insert_str("hello world!\r");
-    assert_string_equal("hello world!\nOK\n", myprint_str.buf_start);
+    assert_string_equal("hello world!\nOK\n", myprint_str.data);
 }
 
 void execute_CLI_SUCCESS_with_prompt_and_echo(void ** state) {
@@ -124,7 +124,7 @@ void execute_CLI_SUCCESS_with_prompt_and_echo(void ** state) {
     expect_string(myexec, cmdline, "hello world!");
     will_return(myexec, CLI_SUCCESS);
     insert_str("hello world!\r");
-    assert_string_equal("hello world!\nOK\nPROMPT> ", myprint_str.buf_start);
+    assert_string_equal("hello world!\nOK\nPROMPT> ", myprint_str.data);
 }
 
 void execute_echo_user_char(void ** state) {
@@ -133,7 +133,7 @@ void execute_echo_user_char(void ** state) {
     expect_string(myexec, cmdline, "hello world!");
     will_return(myexec, CLI_SUCCESS);
     insert_str("hello world!\r");
-    assert_string_equal("************\nOK\n", myprint_str.buf_start);
+    assert_string_equal("************\nOK\n", myprint_str.data);
 }
 
 void execute_error(void ** state) {
@@ -141,7 +141,7 @@ void execute_error(void ** state) {
     expect_string(myexec, cmdline, "hello world!");
     will_return(myexec, CLI_ERROR_PARAMETER_VALUE);
     insert_str("hello world!\r");
-    assert_string_equal("\nERROR\n", myprint_str.buf_start);
+    assert_string_equal("\nERROR\n", myprint_str.data);
 }
 
 void execute_whitespace(void ** state) {
@@ -149,7 +149,7 @@ void execute_whitespace(void ** state) {
     expect_string(myexec, cmdline, "hello world!");
     will_return(myexec, CLI_SUCCESS);
     insert_str("    hello    \t world!   \r");
-    assert_string_equal("\nOK\n", myprint_str.buf_start);
+    assert_string_equal("\nOK\n", myprint_str.data);
 }
 
 void execute_whitespace_verbose(void ** state) {
@@ -158,7 +158,7 @@ void execute_whitespace_verbose(void ** state) {
     expect_string(myexec, cmdline, "hello world!");
     will_return(myexec, CLI_SUCCESS);
     insert_str("    hello    \t world!   \r");
-    assert_string_equal("\nhello world!\nOK\n", myprint_str.buf_start);
+    assert_string_equal("\nhello world!\nOK\n", myprint_str.data);
 }
 
 void comment(void ** state) {
@@ -166,21 +166,21 @@ void comment(void ** state) {
     cli.prompt[0] = '>';
     cli_set_verbose(&cli, CLI_VERBOSE_FULL);
     insert_str("  #  hello    \t world!   \r");
-    assert_string_equal("\n>", myprint_str.buf_start);
+    assert_string_equal("\n>", myprint_str.data);
 }
 
 void comment_too_long(void ** state) {
     (void) state;
     cli.prompt[0] = '>';
     insert_str(" # this is a very long comment which exceeds the maximum line length for commands\r");
-    assert_string_equal("\n>", myprint_str.buf_start);
+    assert_string_equal("\n>", myprint_str.data);
 }
 
 void command_too_long(void ** state) {
     (void) state;
     cli.prompt[0] = '>';
     insert_str("this is a very long command which exceeds the maximum line length for commands\r");
-    assert_string_equal("\nMaximum command line length reached\n>", myprint_str.buf_start);
+    assert_string_equal("\nMaximum command line length reached\n>", myprint_str.data);
 }
 
 void two_commands(void ** state) {
@@ -191,7 +191,7 @@ void two_commands(void ** state) {
     expect_string(myexec, cmdline, "world");
     will_return(myexec, CLI_SUCCESS);
     insert_str("hello\rworld\r");
-    assert_string_equal("\nOK\n>\nOK\n>", myprint_str.buf_start);
+    assert_string_equal("\nOK\n>\nOK\n>", myprint_str.data);
 }
 
 void line_parser_empty(void ** state) {

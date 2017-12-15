@@ -38,10 +38,13 @@ void embc_allocator_set(embc_alloc_fn alloc, embc_free_fn free) {
 }
 
 void * embc_alloc(embc_size_t size_bytes) {
-    return alloc_(size_bytes);
+    void * ptr = alloc_(size_bytes);
+    EMBC_ASSERT_ALLOC(ptr);
+    return ptr;
 }
 
 void embc_free(void * ptr) {
+    EMBC_ASSERT(0 != ptr);
     free_(ptr);
 }
 
