@@ -36,9 +36,9 @@
  * Framing multi-byte messages over a byte-oriented interface is a common
  * problem for UART and TCP communications.  In addition to framing and
  * deframing messages, this module also provides confirmed delivery with
- * support for up to 256 byte payloads.  All implementations must support
- * the full 256 payload as the maximum transmission unit (MTU).
- * Larger messages may be segmented over multiple frames and then reassembled.
+ * support for up to 240 byte payloads, which allows the entire frame to
+ * fit within 256 bytes.  Larger messages may be segmented over multiple
+ * frames and then reassembled.
  *
  * The features of this framer include:
  *
@@ -57,7 +57,10 @@
  *  <tr><th>7</td><th>6</td><th>5</td><th>4</td>
  *      <th>3</td><th>2</td><th>1</td><th>0</td></tr>
  *  <tr><td colspan="8">SOF</td></tr>
- *  <tr><td colspan="8">frame_id</td></tr>
+ *  <tr>
+ *      <td colspan="4">reserved</td>
+ *      <td colspan="4">frame_id</td>
+ *  </tr>
  *  <tr><td colspan="8">port</td></tr>
  *  <tr><td colspan="8">message_id</td></tr>
  *  <tr><td colspan="8">length[7:0]</td></tr>
@@ -83,13 +86,12 @@
  * - "port" contains an application-specific payload format identifier.
  *   This field is used to multiplex multiple message types onto a single
  *   byte stream, similar to a TCP port.  Port 0 is reserved for
- *   CONFIRM (acknowledgements).  Port 1 is reserved for link management.
+ *   CONFIRM (acknowledgements) and link management.
  * - "message_id" contains an identifier that is assigned by the application.
  *   Normally, message_id values are unique within each port.
- * - "length" is the payload length (not full frame length) in bytes.  A
- *   value of 0 is 256, and zero length messages are not allowed.  Since the
- *   frame overhead is 13 bytes, the actual frame length ranges from 14 to
- *   269 bytes.
+ * - "length" is the payload length (not full frame length) in bytes.
+ *   Since the frame overhead is 13 bytes, the actual frame length ranges
+ *   from 13 to 253 bytes.
  * - "port_def" may contain arbitrary data that is defined by the specific
  *   port and application.
  * - "header_crc" contains the CRC computed over the SOF and six header bytes
@@ -116,14 +118,25 @@
  * If the 32-bit frame CRC check fails, then the receiver should send a
  * CONFIRM frame with status EMBC_ERROR_MESSAGE_INTEGRITY that also contains
  * the id.  If the frame is received successfully, then the receiver should
- * provide the frame to the next higher level.  Most implementations should
- * send a CONFIRM (port = 0) frame with the same id.
+ * provide the frame to the next higher level.
  *
- * This framer contains no built-in mechanism for backpressure.  The framer
- * is intended to be used with a higher level protocol that supports a
- * maximum number of outstanding frames along with acknowledgements to
- * implement appropriate backpressure and avoid data overflow conditions.
- * The framer implementation is free to drop data on overflow.
+ * Port 0 is is reserved for acknowledgements, error notifications and link
+ * management.  For every received frame received successfully or with a
+ * detectable error, the receiver sends a CONFIRM messages back to the
+ * transmitter.  CONFIRM messages have zero length.  The fields are:
+ * - frame_id = the originating frame_id
+ * - message_id = 0 (all other values are not CONFIRM frames)
+ * - port_def[7:0] = status code which is 0 on success or an
+ *   error code on failure.
+ * - port_def[15:8] = the originating port.
+ *
+ * This framer contains support for backpressure by providing notifications
+ * when a frame transmission completes, either successfully or with error.
+ * The higher level should only allow a limited number of transmissions to
+ * be pending.  The application can determine the desired number of pending
+ * transmissions based upon memory availability and application complexity.
+ * The framer uses embc_buffer_s to allocate memory.  Any out of memory
+ * condition will result in an assert.
  *
  * ## References
  *
@@ -145,7 +158,7 @@ EMBC_CPP_GUARD_START
 /// The framer header size in bytes.
 #define EMBC_FRAMER_HEADER_SIZE (8)
 /// The maximum payload size in bytes.
-#define EMBC_FRAMER_PAYLOAD_MAX_SIZE (256)
+#define EMBC_FRAMER_PAYLOAD_MAX_SIZE (240)
 /// The framer footer size in bytes.
 #define EMBC_FRAMER_FOOTER_SIZE (5)
 /// The framer total maximum size in bytes
@@ -162,13 +175,15 @@ EMBC_CPP_GUARD_START
     EMBC_FRAMER_HEADER_SIZE + \
     EMBC_FRAMER_ACK_PAYLOAD_SIZE + \
     EMBC_FRAMER_FOOTER_SIZE)
+/// The maximum number of ports supported by implementations
+#define EMBC_FRAMER_PORTS (16)
 
 /**
  * @brief The frame header.
  */
 struct embc_framer_header_s {
     uint8_t sof;
-    uint8_t frame_id;
+    uint8_t frame_id;  // upper nibble reserved
     uint8_t port;
     uint8_t message_id;
     uint8_t length;
@@ -182,8 +197,16 @@ struct embc_framer_header_s {
  */
 struct embc_framer_s;
 
+// forward declaration from embc/memory/buffer.h
+struct embc_buffer_s;
+struct embc_buffer_allocator_s;
 
-struct embc_framer_event_callbacks_s {
+//
+
+/**
+ * @brief The framer port callbacks, registered for each port.
+ */
+struct embc_framer_port_callbacks_s {
     /**
      * @brief Function called after a frame is received.
      *
@@ -191,14 +214,15 @@ struct embc_framer_event_callbacks_s {
      * @param port The port (payload type).
      * @param message_id The application-defined message identifier.
      * @param port_def The application-defined frame-associated data.
-     * @param buffer The buffer containing the received data.  The buffer
-     *      only remains valid for the duration of the callback.
-     * @param length The length buffer in bytes.
+     * @param buffer The buffer containing the frame payload.
+     *      The function takes ownership of buffer and must call
+     *      embc_buffer_free() when done.
+     *      The buffer.buffer_id contains the message_id and
+     *      buffer.flags contains the port_def data.
      */
-    void (*rx_fn)(
-            void *user_data,
-            uint8_t port, uint8_t message_id, uint16_t port_def,
-            uint8_t const * buffer, uint16_t length);
+    void (*rx_fn)(void *user_data,
+                  uint8_t port, uint8_t message_id, uint16_t port_def,
+                  struct embc_buffer_s * buffer);
 
     void * rx_user_data;
 
@@ -224,16 +248,16 @@ struct embc_framer_hal_callbacks_s {
      * @brief Function called to transmit bytes out the byte stream.
      *
      * @param user_data The user data.
-     * @param buffer The buffer containing the transmit data.  The
+     * @param buffer The buffer containing the transmit data.  The function
+     *      takes ownership of buffer and must call embc_buffer_free() when
+     *      done.
      *      buffer will remain valid until an acknowledgement is received
      *      or a timeout occurs.  In either case, the HAL may safely use
      *      this buffer directly during data transmission without needing
      *      to copy.
      * @param length The length of buffer in bytes.
      */
-    void (*tx_fn)(
-            void * user_data,
-            uint8_t const *buffer, uint16_t length);
+    void (*tx_fn)(void * user_data, struct embc_buffer_s * buffer);
 
     void * tx_user_data;
 
@@ -282,6 +306,7 @@ EMBC_API uint32_t embc_framer_instance_size(void);
  *
  * @param self The instance which must be at least embc_framer_instance_size()
  *      bytes in size.
+ * @param buffer_allocator The buffer allocator for use by embc_framer_alloc().
  * @param callbacks The hardware abstraction layer callbacks.
  * @return 0 or error code.
  *
@@ -291,21 +316,24 @@ EMBC_API uint32_t embc_framer_instance_size(void);
  */
 EMBC_API void embc_framer_initialize(
         struct embc_framer_s * self,
+        struct embc_buffer_allocator_s * buffer_allocator,
         struct embc_framer_hal_callbacks_s * callbacks);
 
 /**
- * @brief Set the event callbacks.
+ * @brief Register the callbacks for a port.
  *
  * @param self The framer instance.
+ * @param port The port to register.
  * @param callbacks The event callbacks.
  * @return 0 or error code.
  *
  * The event callbacks must remain valid until another call to
- * embc_framer_event_callbacks() or embc_framer_finalize().
+ * embc_framer_register_port_callbacks() or embc_framer_finalize().
  */
-EMBC_API void embc_framer_event_callbacks(
+EMBC_API void embc_framer_register_port_callbacks(
         struct embc_framer_s * self,
-        struct embc_framer_event_callbacks_s * callbacks);
+        uint8_t port,
+        struct embc_framer_port_callbacks_s * callbacks);
 
 /**
  * @brief Finalize a framer instance.
@@ -320,7 +348,7 @@ EMBC_API void embc_framer_finalize(struct embc_framer_s * self);
  * @param self The instance.
  * @param byte The next received byte.
  */
-EMBC_API void embc_framer_rx_byte(struct embc_framer_s * self, uint8_t byte);
+EMBC_API void embc_framer_hal_rx_byte(struct embc_framer_s * self, uint8_t byte);
 
 /**
  * @brief Handle the next bytes in the incoming receive byte stream.
@@ -332,7 +360,7 @@ EMBC_API void embc_framer_rx_byte(struct embc_framer_s * self, uint8_t byte);
  * This function is functionally equivalent to calling embc_framer_rx_byte()
  * on each byte in buffer.
  */
-EMBC_API void embc_framer_rx_buffer(
+EMBC_API void embc_framer_hal_rx_buffer(
         struct embc_framer_s * self,
         uint8_t const * buffer, uint32_t length);
 
@@ -340,19 +368,26 @@ EMBC_API void embc_framer_rx_buffer(
  * @brief Send a frame.
  *
  * @param self The instance.
- * @param id The frame identifier.
  * @param port The port (payload type).
  * @param message_id The application-defined message identifier.
  * @param port_def The application-defined frame-associated data.
- * @param buffer The buffer containing the transmit payload.  This data only
- *      needs to remain valid for the duration of the function call.  The
- *      framer will copy this data to support retransmission as needed.
- * @param length The length of buffer in bytes.
+ * @param buffer The buffer containing the transmit payload.  This function
+ *      takes ownership.
  */
 EMBC_API void embc_framer_send(
         struct embc_framer_s * self,
         uint8_t port, uint8_t message_id, uint16_t port_def,
-        uint8_t const * buffer, uint32_t length);
+        struct embc_buffer_s * buffer);
+
+/**
+ * @brief Allocate a buffer for frame payload.
+ *
+ * @param self The instance.
+ * @return The buffer which has the cursor and reserve set for zero-copy
+ *      operations.  The caller takes ownership.
+ */
+EMBC_API struct embc_buffer_s * embc_framer_alloc(
+        struct embc_framer_s * self);
 
 
 EMBC_CPP_GUARD_END

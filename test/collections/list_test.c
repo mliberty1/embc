@@ -41,6 +41,7 @@ static int setup(void ** state) {
     embc_list_initialize(&state_.list);
     for (uint32_t i = 0; i < EMBC_ARRAY_SIZE(state_.elements); ++i) {
         state_.elements[i].value = i;
+        embc_list_initialize(&state_.elements[i].item);
     }
     *state = &state_;
     return 0;
@@ -171,6 +172,20 @@ static void list_remove_and_insert_while_iterating(void **state) {
     assert_ptr_equal(embc_list_index(&s->list, 4), 0);
 }
 
+static void list_remove_when_not_in_list(void **state) {
+    struct state_s *s = (struct state_s *) *state;
+    embc_list_remove(&s->elements[0].item);
+    embc_list_remove(&s->elements[0].item);
+    embc_list_remove_head(&s->elements[0].item);
+    embc_list_remove_tail(&s->elements[0].item);
+    embc_list_remove(&s->elements[0].item);
+
+    // and make sure it still works
+    embc_list_add_tail(&s->list, &s->elements[0].item);
+    assert_int_equal(1, embc_list_length(&s->list));
+    assert_ptr_equal(embc_list_index(&s->list, 0), &s->elements[0].item);
+}
+
 static void list_index(void **state) {
     struct state_s *s = (struct state_s *) *state;
     embc_list_add_tail(&s->list, &s->elements[0].item);
@@ -198,6 +213,7 @@ int main(void) {
             cmocka_unit_test_setup(list_foreach_reverse, setup),
             cmocka_unit_test_setup(list_remove, setup),
             cmocka_unit_test_setup(list_remove_and_insert_while_iterating, setup),
+            cmocka_unit_test_setup(list_remove_when_not_in_list, setup),
             cmocka_unit_test_setup(list_index, setup),
     };
 

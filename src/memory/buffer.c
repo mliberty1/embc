@@ -19,46 +19,50 @@
 #include "embc/platform.h"
 #include "embc/bbuf.h"
 
-// Calculate the size to allocate for each structure, respecting platform
-// alignment concerns
-#define ALIGN (8)
-#define MGR_SZ EMBC_ROUND_UP_TO_MULTIPLE((embc_size_t) sizeof(struct mgr_s), ALIGN)
-#define POOL_SZ EMBC_ROUND_UP_TO_MULTIPLE((embc_size_t) sizeof(struct pool_s), ALIGN)
-#define HDR_SZ EMBC_ROUND_UP_TO_MULTIPLE((embc_size_t) sizeof(struct embc_buffer_s), ALIGN)
-EMBC_STATIC_ASSERT((sizeof(intptr_t) == 4) ? (24 == HDR_SZ) : (40 == HDR_SZ), header_size);
-
-struct pool_s {
-    embc_size_t payload_size;
-    embc_size_t alloc_current;
-    embc_size_t alloc_max;
-    struct embc_list_s buffers;
-};
-
-struct mgr_s {
+struct embc_buffer_allocator_s {
     embc_size_t size_max;
 };
 
-static uint8_t * self_ = 0;
+struct pool_s {
+    uint32_t magic;
+    embc_size_t payload_size;
+    embc_size_t alloc_current;
+    embc_size_t alloc_max;
+    uint8_t * memory_start;
+    uint8_t * memory_end;
+    uint16_t memory_incr;
+    struct embc_list_s buffers;
+};
+
+struct embc_buffer_container_s {
+    struct embc_buffer_s buffer;
+    struct pool_s * pool;
+};
+
+// Calculate the size to allocate for each structure, respecting platform
+// alignment concerns
+#define ALIGN (8)
+#define MGR_SZ EMBC_ROUND_UP_TO_MULTIPLE((embc_size_t) sizeof(struct embc_buffer_allocator_s), ALIGN)
+#define POOL_SZ EMBC_ROUND_UP_TO_MULTIPLE((embc_size_t) sizeof(struct pool_s), ALIGN)
+#define HDR_SZ EMBC_ROUND_UP_TO_MULTIPLE((embc_size_t) sizeof(struct embc_buffer_container_s), ALIGN)
+EMBC_STATIC_ASSERT((sizeof(intptr_t) == 4) ? (32 == HDR_SZ) : (48 == HDR_SZ), header_size);
+#define EMBC_BUFFER_MAGIC (0xb8392f19)
 
 
-static inline struct mgr_s * mgr_get() {
-    return (struct mgr_s *) self_;
-}
-
-static inline struct pool_s * pool_get(embc_size_t index) {
-    return (struct pool_s *) (self_ + MGR_SZ + (POOL_SZ * index));
+static inline struct pool_s * pool_get(struct embc_buffer_allocator_s * self, embc_size_t index) {
+    return (struct pool_s *) (((uint8_t *) self) + MGR_SZ + (POOL_SZ * index));
 }
 
 static inline void buffer_init(struct embc_buffer_s * b) {
     b->cursor = 0;
     b->length = 0;
+    b->reserve = 0;
     b->buffer_id = 0;
     b->flags = 0;
 }
 
-void embc_buffer_initialize(embc_size_t const * sizes, embc_size_t length) {
+struct embc_buffer_allocator_s * embc_buffer_initialize(embc_size_t const * sizes, embc_size_t length) {
     DBC_NOT_NULL(sizes);
-    EMBC_ASSERT(self_ == 0);
     embc_size_t total_size = 0;
     total_size = MGR_SZ + POOL_SZ * length;
     embc_size_t header_size = total_size;
@@ -67,39 +71,44 @@ void embc_buffer_initialize(embc_size_t const * sizes, embc_size_t length) {
         buffer_sz = (32 << i);
         total_size += sizes[i] * (HDR_SZ + buffer_sz);
     }
-    self_ = embc_alloc_clr(total_size);
-
-    struct mgr_s * mgr = mgr_get();
-    mgr->size_max = buffer_sz; // largest buffer
-
-    uint8_t * buffers_ptr = self_ + header_size;
+    uint8_t * memory = embc_alloc_clr(total_size);
+    struct embc_buffer_allocator_s * self = (struct embc_buffer_allocator_s *) memory;
+    self->size_max = buffer_sz; // largest buffer
+    uint8_t * buffers_ptr = memory + header_size;
 
     for (embc_size_t i = 0; i < length; ++i) {
-        struct pool_s * pool = pool_get(i);
+        struct pool_s * pool = pool_get(self, i);
+        pool->magic = EMBC_BUFFER_MAGIC;
         pool->payload_size = (32 << i);
         pool->alloc_current = 0;
         pool->alloc_max = 0;
         embc_list_initialize(&pool->buffers);
+        pool->memory_start = buffers_ptr;
+        pool->memory_incr = (uint16_t) pool->payload_size + HDR_SZ;
         for (embc_size_t k = 0; k < sizes[i]; ++k) {
-            struct embc_buffer_s * b = (struct embc_buffer_s *) buffers_ptr;
+            struct embc_buffer_container_s * c = (struct embc_buffer_container_s *) buffers_ptr;
+            c->pool = pool;
+            struct embc_buffer_s * b = &c->buffer;
             uint8_t ** d = (uint8_t **) &b->data;
             *d = buffers_ptr + HDR_SZ;
-            uint16_t * c = (uint16_t *) &b->capacity;
-            *c = pool->payload_size;
+            uint16_t * capacity = (uint16_t *) &b->capacity;
+            *capacity = pool->payload_size;
+            buffer_init(b);
             embc_list_initialize(&b->item);
             embc_list_add_tail(&pool->buffers, &b->item);
-            buffers_ptr += pool->payload_size + HDR_SZ;
+            buffers_ptr += pool->memory_incr;
         }
+        pool->memory_end = buffers_ptr;
     }
+    return self;
 }
 
-void embc_buffer_finalize() {
-    embc_free(self_);
-    self_ = 0;
+void embc_buffer_finalize(struct embc_buffer_allocator_s * self) {
+    embc_free(self);
 }
 
-static embc_size_t size_to_index_(embc_size_t size) {
-    EMBC_ASSERT((size > 0) && (size <= mgr_get()->size_max));
+static embc_size_t size_to_index_(struct embc_buffer_allocator_s * self, embc_size_t size) {
+    EMBC_ASSERT((size > 0) && (size <= self->size_max));
     embc_size_t index = 32 - embc_clz((uint32_t) (size - 1));
     if (index < 5) {
         index = 0; // 32 bytes is smallest
@@ -109,9 +118,10 @@ static embc_size_t size_to_index_(embc_size_t size) {
     return index;
 }
 
-struct embc_buffer_s * embc_buffer_alloc(embc_size_t size) {
-    embc_size_t index = size_to_index_(size);
-    struct pool_s * p = pool_get(index);
+struct embc_buffer_s * embc_buffer_alloc(
+        struct embc_buffer_allocator_s * self, embc_size_t size) {
+    embc_size_t index = size_to_index_(self, size);
+    struct pool_s * p = pool_get(self, index);
     struct embc_list_s * item = embc_list_remove_head(&p->buffers);
     EMBC_ASSERT_ALLOC(item);
     struct embc_buffer_s * buffer = embc_list_entry(item, struct embc_buffer_s, item);
@@ -119,14 +129,19 @@ struct embc_buffer_s * embc_buffer_alloc(embc_size_t size) {
     if (p->alloc_current > p->alloc_max) {
         p->alloc_max = p->alloc_current;
     }
+    buffer_init(buffer);
     return buffer;
 }
 
 void embc_buffer_free(struct embc_buffer_s * buffer) {
-    embc_size_t size = embc_buffer_capacity(buffer);
-    embc_size_t index = size_to_index_(size);
-    struct pool_s * p = pool_get(index);
+    DBC_NOT_NULL(buffer);
+    struct embc_buffer_container_s * b = (struct embc_buffer_container_s *) buffer;
+    struct pool_s * p = b->pool;
+    EMBC_ASSERT((0 != p) && (p->magic == EMBC_BUFFER_MAGIC));
+    uint8_t * b_ptr = (uint8_t *) buffer;
+    EMBC_ASSERT((b_ptr >= p->memory_start) && (b_ptr < p->memory_end));
     embc_list_add_tail(&p->buffers, &buffer->item);
+    --p->alloc_current;
 }
 
 static inline void write_update_length(struct embc_buffer_s * buffer) {
@@ -149,11 +164,28 @@ void embc_buffer_write(struct embc_buffer_s * buffer,
     }
 }
 
+void embc_buffer_copy(struct embc_buffer_s * destination,
+                      struct embc_buffer_s * source,
+                      embc_size_t size) {
+    DBC_NOT_NULL(destination);
+    DBC_NOT_NULL(source);
+    EMBC_ASSERT(size <= embc_buffer_read_remaining(source));
+    EMBC_ASSERT(size <= embc_buffer_write_remaining(destination));
+    if (size > 0) {
+        uint8_t *dst = destination->data + destination->cursor;
+        uint8_t *src = source->data + source->cursor;
+        embc_memcpy(dst, src, size);
+        destination->cursor += size;
+        write_update_length(destination);
+    }
+}
+
 static inline bool write_str_(struct embc_buffer_s * buffer,
                               char const * str) {
     DBC_NOT_NULL(buffer);
     DBC_NOT_NULL(str);
-    while (buffer->cursor < buffer->capacity) {
+    uint16_t capacity = buffer->capacity - buffer->reserve;
+    while (buffer->cursor < capacity) {
         if (*str == 0) {
             write_update_length(buffer);
             return true;
@@ -162,7 +194,7 @@ static inline bool write_str_(struct embc_buffer_s * buffer,
         ++str;
         ++buffer->cursor;
     }
-    buffer->length = buffer->capacity;
+    buffer->length = capacity;
     return false;
 }
 
@@ -260,4 +292,25 @@ uint32_t embc_buffer_read_u32_be(struct embc_buffer_s * buffer) {
 
 uint64_t embc_buffer_read_u64_be(struct embc_buffer_s * buffer) {
     READ(buffer, uint64_t, U64_BE);
+}
+
+void embc_buffer_erase(struct embc_buffer_s * buffer,
+                       embc_size_t start,
+                       embc_size_t end) {
+    DBC_NOT_NULL(buffer);
+    DBC_RANGE_INT(start, 0, buffer->length - 1);
+    DBC_RANGE_INT(end, 0, buffer->length);
+    embc_size_t length = end - start;
+    if (length > 0) {
+        for (embc_size_t k = start; k < (buffer->length - length); ++k) {
+            buffer->data[k] = buffer->data[k + length];
+        }
+        if (buffer->cursor >= end) {
+            buffer->cursor -= length;
+        } else if (buffer->cursor > start) {
+            buffer->cursor = start;
+        }
+        buffer->length -= length;
+
+    }
 }

@@ -58,6 +58,14 @@ EMBC_CPP_GUARD_START
  *    - entry: The struct containing meaningful data and one or more
  *      item structs which can participate in a list.
  *
+ * Although this list implementation is a circular list, the list item is
+ * really a sentry that does not participate in the list.  Item deletion is
+ * the main reason for having a circular list.  With a circular list, an item
+ * may be safely removed from a list any knowledge of which list it is in.
+ * Items may be safely passed to embc_list_remove() at any time, even when they
+ * are not in a list, as long as they were previously in a list or initialized
+ * with embc_list_initialize(item).
+ *
  * @{
  */
 

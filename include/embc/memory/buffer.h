@@ -42,8 +42,13 @@
 EMBC_CPP_GUARD_START
 
 /**
- * @brief A memory safe buffer with support for dynamic allocation and
- *      dynamic modification.
+ * @brief Opaque memory allocator.
+ */
+struct embc_buffer_allocator_s;
+
+/**
+ * @brief A memory safe buffer with support for safe mutable operations
+ *      and fast dynamic allocation / deallocation.
  *
  * This module defines a buffer structure along with a fast memory manager
  * that performs constant-time allocation and deallocation.  The memory
@@ -53,15 +58,24 @@ EMBC_CPP_GUARD_START
  * of blocks of each size are specified at initialization, and the system
  * memory manager only allocates once.
  *
- * This buffer structure itself provides a memory safe implementation.
- * The buffer implementation performs full bounds checking on both write and
- * read operations.
+ * Each buffer structure provides a memory safe implementation for writing
+ * and reading the buffer.  The functions perform full bounds checking on
+ * all operations.
  *
  * These buffers are normally used to hold dynamic data that needs to
- * pass through the system.  Buffers can easily be sent between tasks
- * or through networking stacks.  Each buffer adds 32 bytes of overhead.
- * For single words of data, standard RTOS message queues are much more
+ * passed through the system.  Buffers can easily be sent between tasks
+ * or through networking stacks.  Each buffer adds 32 bytes of overhead
+ * on most 32-bit architectures.  The buffer includes a linked list item
+ * so that it can easily participate in queues and scatter/gather lists.
+ * For single words of data, standard RTOS message queues are usually more
  * efficient.
+ *
+ * Ownership of memory is critical for networking stacks and data processing.
+ * This implementation allows the consumer to take ownership of the buffer
+ * and then free it without further communication with the producer.  However,
+ * the consumer can also pass the buffer back to the producer so that the
+ * producer can free it.  The later approach can save memory when
+ * retransmissions may be required.
  */
 struct embc_buffer_s {
     /**
@@ -102,6 +116,20 @@ struct embc_buffer_s {
     uint16_t length;
 
     /**
+     * @brief The length to reserve at the end of the buffer in bytes.
+     *
+     * This field allows safe reservation of space at the end of the buffer.
+     * A common use is for networking stacks.  The stack can allocate the
+     * buffer, set cursor to the header length and reserve the footer.  The
+     * upper level can then fill in whatever data it would like into the
+     * buffer and pass the buffer back to the networking stack.  The stack
+     * can then add the header and footer in place without copying.
+     *
+     * By definition 0 <= reserve <= capacity.
+     */
+    uint16_t reserve;
+
+    /**
      * @brief The buffer identifier.
      *
      * In many use cases, a producer allocates a buffer and then sends it
@@ -117,7 +145,7 @@ struct embc_buffer_s {
      *
      * Applications are free to define and use this field in any way.
      */
-    uint32_t flags;
+    uint16_t flags;
 
     /**
      * @brief The list item pointers.
@@ -130,13 +158,14 @@ struct embc_buffer_s {
 };
 
 /**
- * @brief Initialize the buffer module and allocate memory from the heap.
+ * @brief Initialize the buffer allocator.
  *
  * @param sizes The length 8 array of sizes to allocate to each
  *      buffer size.  sizes[0] (minimum size) determines
  *      how many 32 byte buffers to allocate.  See the table below
  *      for details on sizes and the overhead for each size.
  * @param length The number of entries in sizes.
+ * @return The buffer allocator instance which gets memory from embc_alloc().
  *
  * The overhead for each index in size are:
  *
@@ -152,19 +181,22 @@ struct embc_buffer_s {
  *  <tr><td>7</td><td>4096</td><td>4128</td><td>0.8%</td></tr>
  * </table>
  */
-void embc_buffer_initialize(embc_size_t const * sizes, embc_size_t length);
+struct embc_buffer_allocator_s * embc_buffer_initialize(embc_size_t const * sizes, embc_size_t length);
 
 /**
  * @brief Finalize the buffer module and return all memory to the heap.
  *
+ * @param self The instance to finalize.
+ *
  * WARNING: all instances of all buffers must be returned first, or use after
  * free will be likely!
  */
-void embc_buffer_finalize();
+void embc_buffer_finalize(struct embc_buffer_allocator_s * self);
 
 /**
  * @brief Allocate a buffer.
  *
+ * @param self The allocator instance for the buffer.
  * @param size The desired size for the buffer.
  * @return The new buffer whose total storage capacity is at least size.
  *      The caller takes ownership of the buffer.
@@ -175,7 +207,7 @@ void embc_buffer_finalize();
  * This function is not thread-safe and must be protected by critical sections
  * if it is to be used from multiple tasks or ISRs.
  */
-struct embc_buffer_s * embc_buffer_alloc(embc_size_t size);
+struct embc_buffer_s * embc_buffer_alloc(struct embc_buffer_allocator_s * self, embc_size_t size);
 
 /**
  * @brief Free the buffer and return ownership to the allocator.
@@ -184,6 +216,9 @@ struct embc_buffer_s * embc_buffer_alloc(embc_size_t size);
  *
  * This function is not thread-safe and must be protected by critical sections
  * if it is to be used from multiple tasks or ISRs.
+ *
+ * Note that the buffer knows what allocator it came from.  The allocator
+ * information is stored opaquely in adjacent memory.
  */
 void embc_buffer_free(struct embc_buffer_s * buffer);
 
@@ -214,7 +249,7 @@ static inline embc_size_t embc_buffer_length(struct embc_buffer_s * buffer) {
  * @return The amount of additional data that buffer can hold in bytes.
  */
 static inline embc_size_t embc_buffer_write_remaining(struct embc_buffer_s * buffer) {
-    return (embc_size_t) (buffer->capacity - buffer->cursor);
+    return (embc_size_t) (buffer->capacity - buffer->cursor - buffer->reserve);
 }
 
 /**
@@ -287,6 +322,19 @@ static inline void embc_buffer_clear(struct embc_buffer_s * buffer) {
  */
 EMBC_API void embc_buffer_write(struct embc_buffer_s * buffer,
                                 void const * data,
+                                embc_size_t size);
+
+/**
+ * Copy data from another buffer.
+ *
+ * @param[inout] destination The destination buffer instance.
+ * @param[in] source The source buffer instance.  Data will be copied starting
+ *      from the cursor.
+ * @param[in] size The number of bytes to copy.
+ * @warning This function asserts if buffer capacity is exceeded.
+ */
+EMBC_API void embc_buffer_copy(struct embc_buffer_s * destination,
+                                struct embc_buffer_s * source,
                                 embc_size_t size);
 
 /**
@@ -465,6 +513,32 @@ EMBC_API uint64_t embc_buffer_read_u64_be(struct embc_buffer_s * buffer);
 
 /**
  * @ingroup embc
+ * @defgroup embc_buffer_modify Modify the buffer.
+ *
+ * @brief Modify the buffer.
+ *
+ * @{
+ */
+
+/**
+ * @brief Erase buffer contents.
+ *
+ * @param buffer The buffer instance to modify.
+ * @param start The starting index which is the first byte to remove from the
+ *      buffer.  0 <= start < buffer->length
+ * @param end The ending index (exclusive) which is the first byte after start
+ *      that is in the modified buffer.  0 <= start <= buffer->length.
+ *      If end < start, then no erase is performed.
+ * @warning This function asserts if start or end are out of range.
+ */
+EMBC_API void embc_buffer_erase(struct embc_buffer_s * buffer,
+                                embc_size_t start,
+                                embc_size_t end);
+
+/** @} */
+
+/**
+ * @ingroup embc
  * @defgroup embc_buffer_static Statically allocate buffers.
  *
  * @brief Statically allocate buffers.
@@ -491,7 +565,6 @@ EMBC_API uint64_t embc_buffer_read_u64_be(struct embc_buffer_s * buffer);
  *
  * The buffer structure is declared but not initialized.  Use BBUF_INITIALIZE()
  * to initialize.
- *
  */
 #define EMBC_BUFFER_STATIC_DECLARE(name, size) \
     uint8_t (name ## _mem_)[size]; \
