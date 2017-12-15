@@ -34,7 +34,8 @@ void app_log_printf_(const char *format, ...) {
     va_end(arg);
 }
 
-void hal_test_enable_logging() {
+void hal_test_initialize() {
+    embc_allocator_set((embc_alloc_fn) malloc, free);
     log_initialize(app_log_printf_);
 }
 

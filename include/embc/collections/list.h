@@ -25,10 +25,7 @@
 
 #include "embc/cmacro_inc.h"
 #include "embc/cdef.h"
-#include <stddef.h>
-#include <stdint.h>
-#include <stdbool.h>
-#include <stdlib.h>
+#include "embc/platform.h"
 
 EMBC_CPP_GUARD_START
 
@@ -63,27 +60,6 @@ EMBC_CPP_GUARD_START
  *
  * @{
  */
-
-/**
- * @brief The type used to index lists and store the number of items in lists.
- *
- * The use of signed and unsigned types for lengths/sizes, which are in the
- * domain of positive integers, is a debated topic.  Here are some references:
- * - http://www.soundsoftware.ac.uk/c-pitfall-unsigned
- * - http://blog.robertelder.org/signed-or-unsigned/
- * - https://embeddedgurus.com/stack-overflow/2009/08/a-tutorial-on-signed-and-unsigned-integers/
- *
- * In the opinion of the EMBC authors, signed integers should be used except
- * for bit operations (~ & | ^ << >>) and applications using modulo arithmetic,
- * such as cryptography.  Unfortunately, C does not perform saturation
- * arithmetic by default which opens up a whole class of potential errors.
- * With both signed and unsigned operations, the application is responsible
- * for checking overflows and underflows.  C's automatic promotion from signed
- * to unsigned is a problem, but you are using
- * "-Wall -Werror -Wpedantic -Wextra", right?
- */
-typedef int32_t embc_list_length_t;
-// todo Define a common embc_length_t type.
 
 /**
  * @brief A linked list or linked list item.
@@ -337,8 +313,8 @@ static inline void embc_list_insert_after(
  * @return The number of items in the list.
  *
  */
-static inline embc_list_length_t embc_list_length(struct embc_list_s * list) {
-    embc_list_length_t sz = 0;
+static inline embc_size_t embc_list_length(struct embc_list_s * list) {
+    embc_size_t sz = 0;
     struct embc_list_s * item;
     embc_list_foreach_unsafe(list, item) {
         ++sz;
@@ -357,7 +333,7 @@ static inline embc_list_length_t embc_list_length(struct embc_list_s * list) {
  * This function is O(n), so iterating using this function is O(n^2)!
  */
 EMBC_API struct embc_list_s * embc_list_index(struct embc_list_s * list,
-                                              embc_list_length_t index);
+                                              embc_size_t index);
 
 /**
  * @brief Get the index of the item.
@@ -369,7 +345,7 @@ EMBC_API struct embc_list_s * embc_list_index(struct embc_list_s * list,
  *
  * This operation is O(n).
  */
-EMBC_API embc_list_length_t embc_list_index_of(struct embc_list_s * list,
+EMBC_API embc_size_t embc_list_index_of(struct embc_list_s * list,
                                              struct embc_list_s * item);
 
 /**

@@ -77,6 +77,8 @@ uint16_t crc_ccitt_16(uint16_t crc, uint8_t const * data, uint32_t length);
  * @param data The data for the CRC computation.
  * @param length The number of bytes in data.
  * @return The computed CRC-32.
+ *
+ * @see http://create.stephan-brumme.com/crc32/
  */
 uint32_t crc32(uint32_t crc, uint8_t const * data, uint32_t length);
 

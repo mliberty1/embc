@@ -26,6 +26,7 @@ set(dependencies
         test_objlib
         cmocka)
 include_directories(${CMOCKA_INCLUDE})
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
 
 function (ADD_CMOCKA_TEST _testName)
     set(TARGET ${_testName})

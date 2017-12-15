@@ -277,7 +277,7 @@ static void reentrant(void **state) {
 }
 
 int main(void) {
-    hal_test_enable_logging();
+    hal_test_initialize();
     const struct CMUnitTest tests[] = {
             cmocka_unit_test_setup_teardown(empty, setup, teardown),
             cmocka_unit_test_setup_teardown(initialization, setup, teardown),

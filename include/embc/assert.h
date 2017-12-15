@@ -24,6 +24,7 @@
 #define EMBC_ASSERT_H_
 
 #include "embc/cmacro_inc.h"
+#include "embc/platform.h"
 
 /**
  * @ingroup embc
@@ -63,19 +64,6 @@
  */
 #define EMBC_FATAL(msg) embc_fatal(__FILE__, __LINE__, msg)
 
-/**
- * \brief Function which handles a fatal event.
- *
- * \param[in] file The file name.
- * \param[in] line The line numbers.
- * \param[in] msg The message to display.
- *
- * This function, embc_fatal(), is not implemented inside of EMBC.  The
- * software using EMBC must define this function, and it should take the
- * appropriate actions to handle an unrecoverable error.  The recommendation
- * for most embedded systems is to log the error if possible and then reset.
- */
-EMBC_API void embc_fatal(char const * file, int line, char const * msg);
 
 /* @} */
 

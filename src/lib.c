@@ -19,7 +19,6 @@
 #include "embc/lib.h"
 #include <stdarg.h>
 #include <stdio.h>
-#include <stdlib.h>
 
 static embc_lib_fatal_fn fatal_fn_ = 0;
 static void * fatal_user_data_ = 0;
@@ -60,12 +59,12 @@ void embc_fatal(char const * file, int line, char const * msg) {
     }
 }
 
-EMBC_API void * embc_lib_alloc(size_t sz) {
-    return calloc(1, sz);
+EMBC_API void * embc_lib_alloc(embc_size_t sz) {
+    return embc_alloc_clr(sz);
 }
 
 EMBC_API void embc_lib_free(void * ptr) {
     if (ptr) {
-        free(ptr);
+        embc_free(ptr);
     }
 }

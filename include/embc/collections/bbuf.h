@@ -23,9 +23,8 @@
 #ifndef BBUF_H_
 #define BBUF_H_
 
-#include <stddef.h>
-#include <stdint.h>
 #include "embc/cmacro_inc.h"
+#include "embc/platform.h"
 
 EMBC_CPP_GUARD_START
 
@@ -506,7 +505,7 @@ struct bbuf_u8_s {
  * Call bbuf_free() when done with the buffer.  This function will assert
  * on out of memory.
  */
-EMBC_API struct bbuf_u8_s * bbuf_alloc(size_t size);
+EMBC_API struct bbuf_u8_s * bbuf_alloc(embc_size_t size);
 
 /**
  * @brief Allocate and initialize a new memory-safe buffer from a string.
@@ -527,7 +526,7 @@ EMBC_API struct bbuf_u8_s * bbuf_alloc_from_string(char const * str);
  *
  * Call bbuf_free() when done with the buffer.
  */
-EMBC_API struct bbuf_u8_s * bbuf_alloc_from_buffer(uint8_t const * buffer, size_t size);
+EMBC_API struct bbuf_u8_s * bbuf_alloc_from_buffer(uint8_t const * buffer, embc_size_t size);
 
 /**
  * @brief Free a memory-safe buffer.
@@ -542,7 +541,7 @@ EMBC_API void bbuf_free(struct bbuf_u8_s * self);
  * @param[in] data The underlying data for the buffer.  This memory must
  *      remain valid for the life of the buffer.
  */
-EMBC_API void bbuf_initialize(struct bbuf_u8_s * self, uint8_t * data, size_t size);
+EMBC_API void bbuf_initialize(struct bbuf_u8_s * self, uint8_t * data, embc_size_t size);
 
 /**
  * @brief Initialize a memory-safe buffer.
@@ -554,7 +553,7 @@ EMBC_API void bbuf_initialize(struct bbuf_u8_s * self, uint8_t * data, size_t si
  *
  * The cursor position is set to 0.
  */
-EMBC_API void bbuf_enclose(struct bbuf_u8_s * self, uint8_t * data, size_t size);
+EMBC_API void bbuf_enclose(struct bbuf_u8_s * self, uint8_t * data, embc_size_t size);
 
 /**
  * @brief The maximum capacity of a buffer.
@@ -562,7 +561,7 @@ EMBC_API void bbuf_enclose(struct bbuf_u8_s * self, uint8_t * data, size_t size)
  * @param[in] self The buffer.
  * @return The maximum capacity of buffer.  If self is not valid, return 0.
  */
-EMBC_API size_t bbuf_capacity(struct bbuf_u8_s const * self);
+EMBC_API embc_size_t bbuf_capacity(struct bbuf_u8_s const * self);
 
 /**
  * @brief The current size of the data in a buffer.
@@ -570,7 +569,7 @@ EMBC_API size_t bbuf_capacity(struct bbuf_u8_s const * self);
  * @param[in] self The buffer.
  * @return The size of buffer.  If self is not valid, return 0.
  */
-EMBC_API size_t bbuf_size(struct bbuf_u8_s const * self);
+EMBC_API embc_size_t bbuf_size(struct bbuf_u8_s const * self);
 
 /**
  * @brief The remaining size available in a buffer.
@@ -578,7 +577,7 @@ EMBC_API size_t bbuf_size(struct bbuf_u8_s const * self);
  * @param[in] self The buffer.
  * @return The remaining size of buffer.  If self is not valid, return 0.
  */
-EMBC_API size_t bbuf_available(struct bbuf_u8_s const * self);
+EMBC_API embc_size_t bbuf_available(struct bbuf_u8_s const * self);
 
 /**
  * @brief Resize the current data size.
@@ -591,7 +590,7 @@ EMBC_API size_t bbuf_available(struct bbuf_u8_s const * self);
  * beyond the end of the resized buffer, the cursor position will be moved to
  * the end of the buffer.
  */
-EMBC_API int bbuf_resize(struct bbuf_u8_s * self, size_t size);
+EMBC_API int bbuf_resize(struct bbuf_u8_s * self, embc_size_t size);
 
 /**
  * @brief Clear the buffer.
@@ -630,7 +629,7 @@ EMBC_API int bbuf_copy(struct bbuf_u8_s * self, struct bbuf_u8_s const * other);
  * @param length The length of buffer.
  * @return 0 on success or error code.
  */
-EMBC_API int bbuf_copy_buffer(struct bbuf_u8_s * self, uint8_t * buffer, size_t length);
+EMBC_API int bbuf_copy_buffer(struct bbuf_u8_s * self, uint8_t * buffer, embc_size_t length);
 
 /**
  * @brief Seek a position in the buffer.
@@ -639,7 +638,7 @@ EMBC_API int bbuf_copy_buffer(struct bbuf_u8_s * self, uint8_t * buffer, size_t 
  * @param[in] pos The buffer position.
  * @return 0 on success or error code.
  */
-EMBC_API int bbuf_seek(struct bbuf_u8_s * self, size_t pos);
+EMBC_API int bbuf_seek(struct bbuf_u8_s * self, embc_size_t pos);
 
 /**
  * @brief Get the current buffer position.
@@ -647,7 +646,7 @@ EMBC_API int bbuf_seek(struct bbuf_u8_s * self, size_t pos);
  * @param[inout] self The buffer instance.
  * @return The buffer position.
  */
-EMBC_API size_t bbuf_tell(struct bbuf_u8_s * self);
+EMBC_API embc_size_t bbuf_tell(struct bbuf_u8_s * self);
 
 /**
  * @brief Encode a uint8 to the buffer.
@@ -667,7 +666,7 @@ EMBC_API int bbuf_encode_u8(struct bbuf_u8_s * self, uint8_t value);
  * @return 0 on success or error code.
  */
 EMBC_API int bbuf_encode_u8a(struct bbuf_u8_s * self,
-                             uint8_t const * value, size_t size);
+                             uint8_t const * value, embc_size_t size);
 
 /**
  * @brief Encode a uint16 to the buffer in big-endian order.
@@ -742,7 +741,7 @@ EMBC_API int bbuf_decode_u8(struct bbuf_u8_s * self, uint8_t * value);
  * @return 0 on success or error code.
  */
 EMBC_API int bbuf_decode_u8a(struct bbuf_u8_s * self,
-                             size_t size, uint8_t * value);
+                             embc_size_t size, uint8_t * value);
 
 /**
  * @brief Decode a uint16 from the buffer in big-endian order.

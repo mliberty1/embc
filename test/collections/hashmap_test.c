@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+#include "../hal_test_impl.h"
 #include <stdarg.h>
 #include <stddef.h>
 #include <setjmp.h>
@@ -37,8 +38,8 @@ void dbc_assert(char const *file, unsigned line, const char * msg) {
     (void) msg;
 }
 
-size_t myhash(void * value) {
-    return (size_t) (value);
+embc_size_t myhash(void * value) {
+    return (embc_size_t) (value);
 }
 
 bool mycompare(void * self, void * other) {
@@ -49,7 +50,7 @@ bool mycompare(void * self, void * other) {
 /* A test case that does nothing and succeeds. */
 static void hashmap_empty(void **state) {
     (void) state; /* unused */
-    size_t value = 42;
+    embc_size_t value = 42;
     struct hashmap_s * h = hashmap_new(myhash, mycompare);
     assert_int_equal(0, hashmap_length(h));
     assert_int_equal(EMBC_ERROR_NOT_FOUND, hashmap_get(h, (void *) 10, (void **) &value));
@@ -59,7 +60,7 @@ static void hashmap_empty(void **state) {
 
 static void hashmap_put_get_remove_get(void **state) {
     (void) state; /* unused */
-    size_t value;
+    embc_size_t value;
     struct hashmap_s * h = hashmap_new(myhash, mycompare);
     assert_int_equal(0, hashmap_put(h, (void *) 10, (void *) 20, (void **) &value));
     assert_int_equal(1, hashmap_length(h));
@@ -71,6 +72,7 @@ static void hashmap_put_get_remove_get(void **state) {
 }
 
 int main(void) {
+    embc_allocator_set((embc_alloc_fn) malloc, free);
     const struct CMUnitTest tests[] = {
         cmocka_unit_test(hashmap_empty),
         cmocka_unit_test(hashmap_put_get_remove_get),

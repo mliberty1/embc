@@ -16,9 +16,9 @@
 
 #include "embc/collections/list.h"
 
-struct embc_list_s * embc_list_index(struct embc_list_s * list, embc_list_length_t index) {
+struct embc_list_s * embc_list_index(struct embc_list_s * list, embc_size_t index) {
     struct embc_list_s * item = list->next;
-    embc_list_length_t idx = 0;
+    embc_size_t idx = 0;
     while (item != list) {
         if (idx == index) {
             return item;
@@ -29,9 +29,9 @@ struct embc_list_s * embc_list_index(struct embc_list_s * list, embc_list_length
     return 0;
 }
 
-embc_list_length_t embc_list_index_of(struct embc_list_s * list, struct embc_list_s * item) {
+embc_size_t embc_list_index_of(struct embc_list_s * list, struct embc_list_s * item) {
     struct embc_list_s * i = list->next;
-    embc_list_length_t idx = 0;
+    embc_size_t idx = 0;
     while (i != list) {
         if (i == item) {
             return idx;

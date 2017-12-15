@@ -19,6 +19,7 @@
 #include <setjmp.h>
 #include <cmocka.h>
 #include "embc/collections/bbuf.h"
+#include "../hal_test_impl.h"
 #include "embc.h"
 
 
@@ -258,7 +259,7 @@ static void safe_alloc_buffer_free(void **state) {
     struct bbuf_u8_s * b = bbuf_alloc_from_buffer((uint8_t const *) str, sizeof(str));
     assert_true(b);
     assert_int_equal(sizeof(str), bbuf_size(b));
-    for (size_t i = 0; i < sizeof(str); ++i) {
+    for (embc_size_t i = 0; i < embc_sizeof(str); ++i) {
         assert_int_equal(0, bbuf_decode_u8(b, &p));
         assert_int_equal(str[i], (char) p);
     }
@@ -400,6 +401,7 @@ static void bbuf_copy_buffer_test(void **state) {
 }
 
 int main(void) {
+    embc_allocator_set((embc_alloc_fn) malloc, free);
     const struct CMUnitTest tests[] = {
 #ifdef BBUF_UNSAFE
             cmocka_unit_test(u8_unsafe),

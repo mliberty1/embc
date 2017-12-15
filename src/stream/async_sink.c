@@ -16,14 +16,11 @@
 
 #include "embc/stream/async_sink.h"
 #include "embc.h"
-#include <string.h> // memset
-#include <stddef.h>
-#include <embc/stream/async.h>
 
 
 static void send_write_request(struct embc_stream_sink_s * self) {
     struct embc_stream_transaction_s t;
-    memset(&t, 0, sizeof(t));
+    EMBC_STRUCT_INIT(t);
     t.type = EMBC_STREAM_EVENT_WRITE_REQUEST;
     t.file_id = 1;
     if (self->transaction_buffer) {
@@ -42,7 +39,7 @@ static void send_write_request(struct embc_stream_sink_s * self) {
 
 static void send_event(struct embc_stream_sink_s * self, uint8_t ev) {
     struct embc_stream_transaction_s t;
-    memset(&t, 0, sizeof(t));
+    EMBC_STRUCT_INIT(t);
     t.type = ev;
     if (self->producer) {
         self->producer->send(self->producer, &t);
@@ -74,7 +71,7 @@ static void send(struct embc_stream_consumer_s * self,
                 if (s->dst_length < (s->offset + transaction->length)) {
                     LOGS_WARN("async_sink buffer overflow");
                 } else {
-                    memcpy(s->dst_buffer + s->offset,
+                    embc_memcpy(s->dst_buffer + s->offset,
                            transaction->data.ioctl_write.ptr,
                            transaction->length);
                     s->offset += transaction->length;
@@ -102,7 +99,7 @@ void embc_stream_sink_initialize(
         uint8_t * transaction_buffer,
         uint16_t transaction_length) {
     DBC_NOT_NULL(self);
-    memset(self, 0, sizeof(*self));
+    EMBC_STRUCT_PTR_INIT(self);
     self->transaction_buffer = transaction_buffer;
     self->transaction_length = transaction_length;
     self->consumer.send = send;

@@ -23,8 +23,8 @@
 #ifndef EMBC_CLI_H_
 #define EMBC_CLI_H_
 
-#include <stddef.h>
 #include "embc/cmacro_inc.h"
+#include "embc/platform.h"
 
 EMBC_CPP_GUARD_START
 
@@ -138,7 +138,7 @@ typedef struct cli_s {
     /**
      * @brief The current size of cmdline in bytes.
      */
-    size_t cmdlen;
+    embc_size_t cmdlen;
 
     /**
      * @brief The command to execute for each line.

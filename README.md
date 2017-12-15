@@ -35,7 +35,8 @@ Since EMBC is a library primarily targeted at embedded microcontrollers, you
 will likely want to include the EMBC source code in your project.  Projects
 using CMake can use ExternalProject_Add to include EMBC.  Other build systems
 will likely need to include the source files directly.  Consider using
-git subtrees or git submodules.
+git subtrees or git submodules.  If not using cmake, you will need to
+manually create the embc/config.h file.
 
 
 ### Ubuntu

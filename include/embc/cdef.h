@@ -23,6 +23,8 @@
 #ifndef EMBC_CDEF_H_
 #define EMBC_CDEF_H_
 
+#include "platform.h"
+
 /**
  * @ingroup embc
  * @defgroup embc_cdef Common C utilities
@@ -47,7 +49,21 @@
  * @param x The array (NOT a pointer).
  * @return The number of elements in the array.
  */
-#define EMBC_ARRAY_SIZE(x) ( sizeof(x) / sizeof((x)[0]) )
+#define EMBC_ARRAY_SIZE(x) ((embc_size_t) ( sizeof(x) / sizeof((x)[0]) ))
+
+/**
+ * @brief Initialize a structure to zero.
+ *
+ * @param s The structure to clear.
+ */
+#define EMBC_STRUCT_INIT(s) (embc_memset(&s, 0, embc_sizeof(s)))
+
+/**
+ * @brief Initialize a structure to zero given a pointer.
+ *
+ * @param s_ptr The pointer to the structure to clear.
+ */
+#define EMBC_STRUCT_PTR_INIT(s_ptr) (embc_memset(s_ptr, 0, embc_sizeof(*s_ptr)))
 
 /**
  * @brief Evaluate and return on error.

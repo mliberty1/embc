@@ -16,8 +16,14 @@ if (EMBC_TOPLEVEL AND CMAKE_HOST_UNIX)
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -D__FILENAME__=\"\\\"$(basename $(subst  ${CMAKE_CURRENT_SOURCE_DIR}/,embc/,$(abspath $<)))\\\"\"")
 endif()
 
+if ((${CMAKE_SYSTEM_PROCESSOR} MATCHES "arm") AND ${CMAKE_CROSSCOMPILING})
+    SET(EMBC_PLATFORM "ARM")
+else()
+    SET(EMBC_PLATFORM "STDLIB")
+endif()
 
-include_directories(${EMBC_INCLUDE})
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/config.h.in
+        ${CMAKE_CURRENT_BINARY_DIR}/include/embc/config.h)
 
 set(SOURCES
         collections/bbuf.c
@@ -31,6 +37,7 @@ set(SOURCES
         lfsr.c
         log.c
         pattern_32a.c
+        platform.c
         memory/block.c
         memory/object_pool.c
         memory/pool.c

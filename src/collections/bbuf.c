@@ -16,10 +16,6 @@
 
 #include "embc/collections/bbuf.h"
 #include "embc.h"
-#include "embc/cdef.h"
-#include "embc/assert.h"
-#include <string.h>  // memset
-#include <stdlib.h>
 
 #define CHECK_ENCODE_ARGS(self, size) \
     DBC_NOT_NULL(self); \
@@ -34,7 +30,7 @@
         return EMBC_ERROR_EMPTY; \
     }
 
-static inline int cursor_write(struct bbuf_u8_s * self, size_t count) {
+static inline int cursor_write(struct bbuf_u8_s * self, embc_size_t count) {
     uint8_t * p = self->cursor + count;
     if (p > self->buf_end) {
         LOGS_INFO("cursor_write but buffer full");
@@ -49,7 +45,7 @@ static inline int cursor_write(struct bbuf_u8_s * self, size_t count) {
     return EMBC_SUCCESS;
 }
 
-static inline int cursor_advance(struct bbuf_u8_s * self, size_t count) {
+static inline int cursor_advance(struct bbuf_u8_s * self, embc_size_t count) {
     uint8_t * p = self->cursor + count;
     if (p > self->buf_end) {
         LOGS_INFO("cursor_write but buffer full");
@@ -59,9 +55,9 @@ static inline int cursor_advance(struct bbuf_u8_s * self, size_t count) {
     return EMBC_SUCCESS;
 }
 
-struct bbuf_u8_s * bbuf_alloc(size_t size) {
+struct bbuf_u8_s * bbuf_alloc(embc_size_t size) {
     uint8_t * start;
-    struct bbuf_u8_s * buf = calloc(1, size + sizeof(struct bbuf_u8_s));
+    struct bbuf_u8_s * buf = embc_alloc_clr(size + sizeof(struct bbuf_u8_s));
     EMBC_ASSERT_ALLOC(buf);
     start = ((uint8_t *) buf) + sizeof(struct bbuf_u8_s);
     buf->buf_start = start;
@@ -72,16 +68,16 @@ struct bbuf_u8_s * bbuf_alloc(size_t size) {
 }
 
 struct bbuf_u8_s * bbuf_alloc_from_string(char const * str) {
-    size_t sz = strlen(str);
+    embc_size_t sz = strlen(str);
     struct bbuf_u8_s * self = bbuf_alloc(sz);
-    memcpy(self->buf_start, str, sz);
+    embc_memcpy(self->buf_start, str, sz);
     self->end = self->buf_end;
     return self;
 }
 
-struct bbuf_u8_s * bbuf_alloc_from_buffer(uint8_t const * buffer, size_t size) {
+struct bbuf_u8_s * bbuf_alloc_from_buffer(uint8_t const * buffer, embc_size_t size) {
     struct bbuf_u8_s * self = bbuf_alloc(size);
-    memcpy(self->buf_start, buffer, size);
+    embc_memcpy(self->buf_start, buffer, size);
     self->end = self->buf_end;
     return self;
 }
@@ -92,11 +88,11 @@ void bbuf_free(struct bbuf_u8_s * self) {
         self->buf_end = 0;
         self->cursor = 0;
         self->end = 0;
-        free(self);
+        embc_free(self);
     }
 }
 
-void bbuf_initialize(struct bbuf_u8_s * self, uint8_t * data, size_t size) {
+void bbuf_initialize(struct bbuf_u8_s * self, uint8_t * data, embc_size_t size) {
     DBC_NOT_NULL(self);
     DBC_NOT_NULL(data);
     self->buf_start = data;
@@ -105,33 +101,33 @@ void bbuf_initialize(struct bbuf_u8_s * self, uint8_t * data, size_t size) {
     self->end = data;
 }
 
-void bbuf_enclose(struct bbuf_u8_s * self, uint8_t * data, size_t size) {
+void bbuf_enclose(struct bbuf_u8_s * self, uint8_t * data, embc_size_t size) {
     bbuf_initialize(self, data, size);
     self->end = self->buf_end;
 }
 
-size_t bbuf_capacity(struct bbuf_u8_s const * self) {
+embc_size_t bbuf_capacity(struct bbuf_u8_s const * self) {
     if (!self) {
         return 0;
     }
     return (self->buf_end - self->buf_start);
 }
 
-size_t bbuf_size(struct bbuf_u8_s const * self) {
+embc_size_t bbuf_size(struct bbuf_u8_s const * self) {
     if (!self) {
         return 0;
     }
     return (self->end - self->buf_start);
 }
 
-size_t bbuf_available(struct bbuf_u8_s const * self) {
+embc_size_t bbuf_available(struct bbuf_u8_s const * self) {
     if (!self) {
         return 0;
     }
     return self->buf_end - self->end;
 }
 
-int bbuf_resize(struct bbuf_u8_s * self, size_t size) {
+int bbuf_resize(struct bbuf_u8_s * self, embc_size_t size) {
     ARGCHK_NOT_NULL(self);
     if (size > bbuf_capacity(self)) {
         return EMBC_ERROR_TOO_SMALL;
@@ -146,23 +142,23 @@ int bbuf_resize(struct bbuf_u8_s * self, size_t size) {
 int bbuf_copy(struct bbuf_u8_s * self, struct bbuf_u8_s const * other) {
     ARGCHK_NOT_NULL(self);
     ARGCHK_NOT_NULL(other);
-    size_t sz = (size_t) (other->end - other->buf_start);
-    if ((size_t) (self->buf_end - self->cursor) < sz) {
+    embc_size_t sz = (embc_size_t) (other->end - other->buf_start);
+    if ((embc_size_t) (self->buf_end - self->cursor) < sz) {
         return EMBC_ERROR_TOO_SMALL;
     }
-    memcpy(self->cursor, other->buf_start, sz);
+    embc_memcpy(self->cursor, other->buf_start, sz);
     return cursor_write(self, sz);
 }
 
-int bbuf_copy_buffer(struct bbuf_u8_s * self, uint8_t * buffer, size_t length) {
+int bbuf_copy_buffer(struct bbuf_u8_s * self, uint8_t * buffer, embc_size_t length) {
     CHECK_ENCODE_ARGS(self, length);
-    memcpy(self->cursor, buffer, length);
+    embc_memcpy(self->cursor, buffer, length);
     return cursor_write(self, length);
 }
 
-int bbuf_seek(struct bbuf_u8_s * self, size_t pos) {
+int bbuf_seek(struct bbuf_u8_s * self, embc_size_t pos) {
     DBC_NOT_NULL(self);
-    ARGCHK_REQUIRE(pos <= (size_t) (self->end - self->buf_start));
+    ARGCHK_REQUIRE(pos <= (embc_size_t) (self->end - self->buf_start));
     self->cursor = self->buf_start + pos;
     return 0;
 }
@@ -177,12 +173,12 @@ void bbuf_clear_and_overwrite(struct bbuf_u8_s * self, uint8_t value) {
     DBC_NOT_NULL(self);
     self->cursor = self->buf_start;
     self->end = self->buf_start + 1;
-    memset(self->buf_start, value, self->buf_end - self->buf_start);
+    embc_memset(self->buf_start, value, self->buf_end - self->buf_start);
 }
 
-size_t bbuf_tell(struct bbuf_u8_s * self) {
+embc_size_t bbuf_tell(struct bbuf_u8_s * self) {
     DBC_NOT_NULL(self);
-    return ((size_t) (self->cursor - self->buf_start));
+    return ((embc_size_t) (self->cursor - self->buf_start));
 }
 
 int bbuf_encode_u8(struct bbuf_u8_s * self, uint8_t value) {
@@ -192,9 +188,9 @@ int bbuf_encode_u8(struct bbuf_u8_s * self, uint8_t value) {
 }
 
 EMBC_API int bbuf_encode_u8a(struct bbuf_u8_s * self,
-                             uint8_t const * value, size_t size) {
+                             uint8_t const * value, embc_size_t size) {
     CHECK_ENCODE_ARGS(self, size);
-    memcpy(self->cursor, value, size);
+    embc_memcpy(self->cursor, value, size);
     return cursor_write(self, size);
 }
 
@@ -241,9 +237,9 @@ int bbuf_decode_u8(struct bbuf_u8_s * self, uint8_t * value) {
 }
 
 int bbuf_decode_u8a(struct bbuf_u8_s * self,
-                    size_t size, uint8_t * value) {
+                    embc_size_t size, uint8_t * value) {
     CHECK_DECODE_ARGS(self, value, size);
-    memcpy(value, self->cursor, size);
+    embc_memcpy(value, self->cursor, size);
     return cursor_advance(self, size);
 }
 

@@ -2,7 +2,6 @@
 #include "embc/memory/block.h"
 #include "embc/cdef.h"
 #include "embc/dbc.h"
-#include <string.h> // memset
 
 struct mblock_s {
     uint8_t * mem;
@@ -35,7 +34,7 @@ int32_t embc_mblock_initialize(
     DBC_GT_ZERO(block_size);
     struct mblock_s * s = (struct mblock_s *) self;
     int32_t sz = embc_mblock_instance_size(mem_size, block_size);
-    memset(s, 0, sz);
+    embc_memset(s, 0, sz);
     s->mem = (uint8_t *) mem;
     s->mem_size = mem_size;
     s->block_size = block_size;

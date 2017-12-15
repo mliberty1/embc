@@ -36,9 +36,8 @@
  * @{
  */
 
-#include <stdint.h>
-#include <stddef.h>
 #include "embc/cmacro_inc.h"
+#include "embc/platform.h"
 
 EMBC_CPP_GUARD_START
 
@@ -82,7 +81,7 @@ EMBC_API void embc_lib_print_set(embc_lib_print_fn fn, void * user_data);
  * @param sz The size in bytes.
  * @return The pointer to the allocated memory or 0.
  */
-EMBC_API void * embc_lib_alloc(size_t sz);
+EMBC_API void * embc_lib_alloc(embc_size_t sz);
 
 /**
  * @brief Free a block of memory allocated by embc_lib_alloc().

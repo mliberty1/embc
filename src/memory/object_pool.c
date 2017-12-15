@@ -21,8 +21,6 @@
 #include "embc/log.h"
 #include "embc.h"
 #include "utlist.h"
-#include <stdlib.h>
-#include <string.h> // memset
 
 
 #define EMBC_POOL_ALIGNMENT 8  /* in bytes */
@@ -72,11 +70,11 @@ struct embc_object_pool_s {
 };
 
 struct embc_object_pool_size_s {
-    size_t obj_hdr;
-    size_t obj_data;
-    size_t pool_hdr;
-    size_t element_sz;
-    size_t sz;
+    embc_size_t obj_hdr;
+    embc_size_t obj_data;
+    embc_size_t pool_hdr;
+    embc_size_t element_sz;
+    embc_size_t sz;
 };
 
 static struct embc_object_pool_size_s embc_object_pool_size(int32_t obj_count, int32_t obj_size) {
@@ -101,7 +99,7 @@ int32_t embc_object_pool_initialize(
     ARGCHK_GT_ZERO(obj_count);
     ARGCHK_GT_ZERO(obj_size);
     struct embc_object_pool_size_s sz = embc_object_pool_size(obj_count, obj_size);
-    memset(self, 0, sz.sz);
+    embc_memset(self, 0, sz.sz);
     self->magic = MAGIC;
     self->obj_size = obj_size;
     self->constructor = constructor;
@@ -133,7 +131,7 @@ void * embc_object_pool_alloc(struct embc_object_pool_s * self) {
     if (self->constructor) {
         self->constructor(next);
     } else {
-        memset(next, 0, self->obj_size);
+        embc_memset(next, 0, self->obj_size);
     }
     return next;
 }

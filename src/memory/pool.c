@@ -17,8 +17,6 @@
 #include "embc/memory/pool.h"
 #include "embc.h"
 #include "utlist.h"
-#include <stdlib.h>
-#include <string.h> // memset
 
 #define EMBC_POOL_ALIGNMENT sizeof(int *)
 #define MAGIC 0x9548CE12
@@ -42,11 +40,11 @@ struct embc_pool_s {
 };
 
 struct embc_pool_size_s {
-    size_t block_hdr;
-    size_t block_data;
-    size_t pool_hdr;
-    size_t element_sz;
-    size_t sz;
+    embc_size_t block_hdr;
+    embc_size_t block_data;
+    embc_size_t pool_hdr;
+    embc_size_t element_sz;
+    embc_size_t sz;
 };
 
 static struct embc_pool_size_s embc_pool_size(int32_t block_count, int32_t block_size) {
@@ -72,7 +70,7 @@ int32_t embc_pool_initialize(
     DBC_GT_ZERO(block_count);
     DBC_GT_ZERO(block_size);
     struct embc_pool_size_s sz = embc_pool_size(block_count, block_size);
-    memset(self, 0, sz.sz);
+    embc_memset(self, 0, sz.sz);
     self->magic = MAGIC;
     uint8_t * m = (uint8_t *) self;
     for (int32_t i = 0; i < block_count; ++i) {

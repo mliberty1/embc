@@ -16,13 +16,14 @@
 
 #include "embc/stream/framer.h"
 #include "embc/stream/framer_util.h"
+#include "embc/collections/list.h"
+#include "embc/collections/bbuf.h"
 #include "embc.h"
 #include "embc/crc.h"
-#include <string.h>
 
-#define SOF ((uint8_t) 0xAA)
-#define HEADER_SIZE ((uint16_t) 5)
-#define FOOTER_SIZE ((uint16_t) 3)
+#define SOF ((uint8_t) EMBC_FRAMER_SOF)
+#define HEADER_SIZE ((uint16_t) EMBC_FRAMER_HEADER_SIZE)
+#define FOOTER_SIZE ((uint16_t) EMBC_FRAMER_FOOTER_SIZE)
 
 enum embc_framer_state_e {
     ST_SOF_UNSYNC = 0x00,
@@ -32,34 +33,45 @@ enum embc_framer_state_e {
     ST_PAYLOAD_AND_FOOTER = 0x82,
 };
 
+struct embc_framer_rx_s {
+    uint8_t frame_id;
+    uint8_t b[EMBC_FRAMER_FRAME_MAX_SIZE];
+    uint16_t size;
+    struct embc_list_s item;
+};
+
+struct embc_framer_tx_s {
+    uint8_t frame_id;
+    uint8_t b[EMBC_FRAMER_FRAME_MAX_SIZE];
+    uint16_t size;
+    struct embc_list_s item;
+};
+
+struct embc_framer_ack_s {
+    uint8_t b[EMBC_FRAMER_ACK_FRAME_SIZE];
+};
+
 struct embc_framer_s {
-    embc_framer_tx_fn tx_fn;
-    void * tx_user_data;
-    embc_framer_rx_fn rx_fn;
-    void * rx_user_data;
-    embc_framer_error_fn error_fn;
-    void * error_user_data;
-    uint8_t rx_buffer[264];
+    struct embc_framer_event_callbacks_s event_cbk;
+    struct embc_framer_hal_callbacks_s hal_cbk;
+
+    uint8_t rx_frame_id;
+    struct embc_framer_rx_s rx[EMBC_FRAMER_OUTSTANDING_FRAMES_MAX];
     uint16_t rx_offset;
     uint16_t rx_remaining;
     uint8_t rx_state;
+    struct embc_framer_rx_s * rx_active;
+    struct embc_list_s rx_free;
+    struct embc_list_s rx_pending;
+
+    struct embc_framer_tx_s tx[EMBC_FRAMER_OUTSTANDING_FRAMES_MAX];
+    uint8_t tx_frame_id;
+    struct embc_list_s tx_free;
+    struct embc_list_s tx_pending;
+
+    struct embc_framer_ack_s ack[EMBC_FRAMER_OUTSTANDING_FRAMES_MAX + 1];
+    uint8_t ack_index;
 };
-
-static void rx_null(void *user_data,
-        uint8_t id, uint8_t port,
-        uint8_t const * buffer, uint32_t length) {
-    (void) user_data;
-    (void) id;
-    (void) port;
-    (void) buffer;
-    (void) length;
-}
-
-void error_null(void *user_data, uint8_t id, uint8_t status) {
-    (void) user_data;
-    (void) id;
-    (void) status;
-}
 
 uint32_t embc_framer_instance_size(void) {
     return sizeof(struct embc_framer_s);
@@ -67,14 +79,39 @@ uint32_t embc_framer_instance_size(void) {
 
 void embc_framer_initialize(
         struct embc_framer_s * self,
-        embc_framer_tx_fn tx_fn, void * tx_user_data) {
+        struct embc_framer_hal_callbacks_s * callbacks) {
     DBC_NOT_NULL(self);
-    DBC_NOT_NULL(tx_fn);
-    memset(self, 0, sizeof(*self));
-    self->tx_fn = tx_fn;
-    self->tx_user_data = tx_user_data;
-    self->rx_fn = rx_null;
-    self->error_fn = error_null;
+    DBC_NOT_NULL(callbacks);
+    DBC_NOT_NULL(callbacks->tx_fn);
+    DBC_NOT_NULL(callbacks->timer_set_fn);
+    DBC_NOT_NULL(callbacks->timer_cancel_fn);
+    EMBC_STRUCT_PTR_INIT(self);
+    self->hal_cbk = *callbacks;
+
+    // initialize the RX messages
+    embc_list_initialize(&self->rx_free);
+    embc_list_initialize(&self->rx_pending);
+    self->rx_active =  &self->rx[0];
+    for (embc_size_t i = 1; i < EMBC_ARRAY_SIZE(self->rx); ++i) {
+        embc_list_add_tail(&self->rx_free, &self->rx[i].item);
+    }
+
+    // initialize the TX messages
+    embc_list_initialize(&self->tx_free);
+    embc_list_initialize(&self->tx_pending);
+    for (embc_size_t i = 0; i < EMBC_ARRAY_SIZE(self->tx); ++i) {
+        embc_list_add_tail(&self->tx_free, &self->tx[i].item);
+    }
+}
+
+void embc_framer_event_callbacks(
+        struct embc_framer_s * self,
+        struct embc_framer_event_callbacks_s * callbacks) {
+    DBC_NOT_NULL(self);
+    DBC_NOT_NULL(callbacks);
+    DBC_NOT_NULL(callbacks->rx_fn);
+    DBC_NOT_NULL(callbacks->tx_done_fn);
+    self->event_cbk = *callbacks;
 }
 
 void embc_framer_finalize(struct embc_framer_s * self) {
@@ -95,7 +132,7 @@ static int is_header_valid(uint8_t const * buffer) {
 }
 
 static uint16_t frame_payload_length(uint8_t const * buffer) {
-    uint16_t length = buffer[3];
+    uint16_t length = buffer[4];
     return (length == 0) ? 256 : length;
 }
 
@@ -103,6 +140,7 @@ static uint16_t frame_length(uint8_t const * buffer) {
     return frame_payload_length(buffer) + HEADER_SIZE + FOOTER_SIZE;
 }
 
+#if 0
 static void signal_error(struct embc_framer_s * self, uint8_t * buffer, uint8_t error) {
     uint8_t id = 0;
     if (0 == (self->rx_state & 0x80)) { // no errors until synchronized
@@ -128,6 +166,7 @@ static void signal_rx(struct embc_framer_s * self, uint8_t * buffer) {
                 buffer + HEADER_SIZE,
                 frame_payload_length(buffer));
 }
+#endif
 
 int32_t embc_framer_validate(uint8_t const * buffer,
                                     uint16_t buffer_length,
@@ -145,14 +184,16 @@ int32_t embc_framer_validate(uint8_t const * buffer,
     if (buffer_length < sz) {
         return EMBC_ERROR_TOO_SMALL;
     }
-    uint16_t crc_rx = (((uint16_t) buffer[sz - 2]) << 8) | buffer[sz - 3];
-    uint16_t crc_calc = crc_ccitt_16(0, buffer, sz - FOOTER_SIZE);
+    uint8_t const * crc_value = &buffer[sz - 5];
+    uint32_t crc_rx = BBUF_DECODE_U32_LE(crc_value);
+    uint32_t crc_calc = crc32(0, buffer, sz - FOOTER_SIZE);
     if (crc_rx != crc_calc) {
         return EMBC_ERROR_MESSAGE_INTEGRITY;
     }
     return 0;
 }
 
+#if 0
 static void framer_resync(struct embc_framer_s * self) {
     uint16_t count = self->rx_offset;
     uint16_t sz = 0;
@@ -282,21 +323,31 @@ void embc_framer_error_callback(
     }
 }
 
+#endif
+
 void embc_framer_send(
         struct embc_framer_s * self,
-        uint8_t id, uint8_t port,
+        uint8_t port, uint8_t message_id, uint16_t port_def,
         uint8_t const * buffer, uint32_t length) {
     DBC_NOT_NULL(self);
-    DBC_RANGE_INT(id, 0, 15);
+    DBC_NOT_NULL(buffer);
     DBC_RANGE_INT(length, 1, 256);
-    uint16_t frame_crc = 0;
-    uint8_t b[5];
-    b[0] = SOF;
-    b[1] = id & 0xff;
-    b[2] = port;
-    b[3] = ((length == 256) ? 0 : length) & 0xff;
-    b[4] = crc_ccitt_8(0, b, 4);
-    frame_crc = crc_ccitt_16(frame_crc, b, 5);
+    uint32_t frame_crc = 0;
+
+    struct embc_list_s * item = embc_list_remove_head(&self->tx_free);
+    EMBC_ASSERT(item);
+    struct embc_framer_tx_s * tx = embc_list_entry(item, struct embc_framer_tx_s, item);
+    struct embc_framer_header_s * hdr = (struct embc_framer_header_s *) tx->b;
+    hdr->sof = SOF;
+    hdr->frame_id = self->tx_frame_id;
+    hdr->port = port;
+    hdr->message_id = message_id;
+    hdr->length = ((length == 256) ? 0 : length) & 0xff;
+    hdr->port_def0 = (uint8_t) (port_def & 0xff);
+    hdr->port_def1 = (uint8_t) ((port_def >> 8) & 0xff);
+    hdr->crc8 = crc_ccitt_8(0, tx->b, 7);
+    frame_crc = crc32(frame_crc, tx->b, 5);
+#if 0
     frame_crc = crc_ccitt_16(frame_crc, buffer, length);
     self->tx_fn(self->tx_user_data, b, 5);
     self->tx_fn(self->tx_user_data, buffer, length);
@@ -304,4 +355,5 @@ void embc_framer_send(
     b[1] = (frame_crc >> 8) & 0xff;
     b[2] = SOF;
     self->tx_fn(self->tx_user_data, b, 3);
+#endif
 }

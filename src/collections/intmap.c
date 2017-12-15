@@ -16,12 +16,11 @@
 
 #include "embc/collections/intmap.h"
 #include "embc.h"
-#include <string.h>
 #include "embc/inttypes.h"
 #include "utlist.h"
 
 struct entry_s {
-    size_t key;
+    embc_size_t key;
     void * value;
     struct entry_s * next;
 };
@@ -37,19 +36,19 @@ struct intmap_s {
     /**
      * @brief The mask to apply to a hash before indexing into hashtable.
      */
-    size_t hash_mask;
+    embc_size_t hash_mask;
 
     /**
      * @brief The total number of items in this container.
      */
-    size_t length;
+    embc_size_t length;
 
     struct intmap_iterator_s * iterators;
 };
 
 struct intmap_iterator_s {
     struct intmap_s * intmap;
-    size_t current_bin;
+    embc_size_t current_bin;
     struct entry_s * next_item;
     struct intmap_iterator_s * next;
     struct intmap_iterator_s * prev;
@@ -58,15 +57,16 @@ struct intmap_iterator_s {
 static void itermap_iterator_next_advance(struct intmap_iterator_s * self);
 
 struct intmap_s * intmap_new() {
-    struct intmap_s * intmap = calloc(1, sizeof(struct intmap_s));
+    struct intmap_s * intmap = embc_alloc_clr(sizeof(struct intmap_s));
     EMBC_ASSERT_ALLOC(intmap);
     intmap->hash_mask = 0x7;
-    intmap->bins = calloc(intmap->hash_mask + 1, sizeof(struct entry_s *));
+    embc_size_t sz = (intmap->hash_mask + 1) * sizeof(struct entry_s *);
+    intmap->bins = embc_alloc_clr(sz);
     return intmap;
 }
 
 void intmap_free(struct intmap_s * self) {
-    size_t idx = 0;
+    embc_size_t idx = 0;
     struct entry_s * item = 0;
     struct entry_s * next_item = 0;
     if (self) {
@@ -74,20 +74,20 @@ void intmap_free(struct intmap_s * self) {
             item = self->bins[idx];
             while (item) {
                 next_item = item->next;
-                free(item);
+                embc_free(item);
                 item = next_item;
             }
         }
-        free(self->bins);
-        free(self);
+        embc_free(self->bins);
+        embc_free(self);
     }
 }
 
-size_t intmap_length(struct intmap_s * self) {
+embc_size_t intmap_length(struct intmap_s * self) {
     return self ? self->length : 0;
 }
 
-static inline size_t compute_bin(struct intmap_s * self, size_t x) {
+static inline embc_size_t compute_bin(struct intmap_s * self, embc_size_t x) {
     return (x & self->hash_mask);
 }
 
@@ -96,10 +96,10 @@ static void resize(struct intmap_s * self) {
     struct entry_s **previous;
     struct entry_s * next;
     struct entry_s ** bins_old = self->bins;
-    size_t idx = 0;
-    size_t mask_old = self->hash_mask;
-    size_t length = (self->hash_mask + 1) << 2;
-    self->bins = calloc(length, sizeof(struct entry_s *));
+    embc_size_t idx = 0;
+    embc_size_t mask_old = self->hash_mask;
+    embc_size_t length = (self->hash_mask + 1) << 2;
+    self->bins = embc_alloc_clr(length * sizeof(struct entry_s *));
     self->hash_mask = length - 1;
     LOGF_DEBUG("intmap.resize -> %d", (int) length);
     for (idx = 0; idx <= mask_old; ++idx) {
@@ -117,7 +117,7 @@ static void resize(struct intmap_s * self) {
     }
 }
 
-int intmap_put(struct intmap_s * self, size_t key, void * value, void ** old_value) {
+int intmap_put(struct intmap_s * self, embc_size_t key, void * value, void ** old_value) {
     struct entry_s **previous;
     struct entry_s *item;
     DBC_NOT_NULL(self);
@@ -141,7 +141,7 @@ int intmap_put(struct intmap_s * self, size_t key, void * value, void ** old_val
         }
     }
 
-    item = calloc(1, sizeof(struct entry_s));
+    item = embc_alloc_clr(sizeof(struct entry_s));
     if (!item) {
         return EMBC_ERROR_NOT_ENOUGH_MEMORY;
     }
@@ -155,7 +155,7 @@ int intmap_put(struct intmap_s * self, size_t key, void * value, void ** old_val
     return 0;
 }
 
-int intmap_get(struct intmap_s * self, size_t key, void ** value) {
+int intmap_get(struct intmap_s * self, embc_size_t key, void ** value) {
     struct entry_s *item;
     DBC_NOT_NULL(self);
     item = self->bins[compute_bin(self, key)];
@@ -174,7 +174,7 @@ int intmap_get(struct intmap_s * self, size_t key, void ** value) {
     return EMBC_ERROR_NOT_FOUND;
 }
 
-int intmap_remove(struct intmap_s * self, size_t key, void ** old_value) {
+int intmap_remove(struct intmap_s * self, embc_size_t key, void ** old_value) {
     struct entry_s **previous;
     struct entry_s *item;
     struct intmap_iterator_s * iter;
@@ -223,7 +223,7 @@ static void itermap_iterator_next_advance(struct intmap_iterator_s * self) {
 
 struct intmap_iterator_s * intmap_iterator_new(struct intmap_s * self) {
     DBC_NOT_NULL(self);
-    struct intmap_iterator_s * iter = calloc(1, sizeof(struct intmap_iterator_s));
+    struct intmap_iterator_s * iter = embc_alloc_clr(sizeof(struct intmap_iterator_s));
     EMBC_ASSERT_ALLOC(iter);
     iter->intmap = self;
     iter->next_item = 0;
@@ -232,7 +232,7 @@ struct intmap_iterator_s * intmap_iterator_new(struct intmap_s * self) {
     return iter;
 }
 
-int intmap_iterator_next(struct intmap_iterator_s * self, size_t * key, void ** value) {
+int intmap_iterator_next(struct intmap_iterator_s * self, embc_size_t * key, void ** value) {
     DBC_NOT_NULL(self);
     DBC_NOT_NULL(key);
     DBC_NOT_NULL(value);
@@ -248,6 +248,6 @@ int intmap_iterator_next(struct intmap_iterator_s * self, size_t * key, void ** 
 void intmap_iterator_free(struct intmap_iterator_s * self) {
     if (self) {
         DL_DELETE(self->intmap->iterators, self);
-        free(self);
+        embc_free(self);
     }
 }

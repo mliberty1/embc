@@ -24,9 +24,7 @@
 #define EMBC_HASHMAP_H_
 
 #include "embc/cmacro_inc.h"
-#include <stddef.h>
-#include <stdint.h>
-#include <stdbool.h>
+#include "embc/platform.h"
 
 EMBC_CPP_GUARD_START
 
@@ -55,7 +53,7 @@ struct hashmap_iterator_s;
  * @param value The value to hash.
  * @return The hash.
  */
-typedef size_t (*hashmap_hash)(void * value);
+typedef embc_size_t (*hashmap_hash)(void * value);
 
 /**
  * @brief Test two values for equivalence.
@@ -69,7 +67,7 @@ typedef bool (*hashmap_equiv)(void * self, void * other);
 
 struct hashmap_s * hashmap_new(hashmap_hash hash, hashmap_equiv equiv);
 void hashmap_free(struct hashmap_s * self);
-size_t hashmap_length(struct hashmap_s * self);
+embc_size_t hashmap_length(struct hashmap_s * self);
 int hashmap_put(struct hashmap_s * self, void * key, void * value, void ** old_value);
 int hashmap_get(struct hashmap_s * self, void * key, void ** value);
 int hashmap_remove(struct hashmap_s * self, void * key, void ** old_value);

@@ -26,8 +26,7 @@
 
 #include "embc/cli.h"
 #include "embc/dbc.h"
-#include <stdbool.h>
-#include <string.h>
+#include "embc/platform.h"
 
 
 const char LINE_TOO_LONG[] = "Maximum command line length reached";
@@ -110,7 +109,7 @@ static bool isCommentStart(char const * s) {
 }
 
 static void cli_compact(cli_t * self) {
-    size_t i = 0;
+    embc_size_t i = 0;
     int offset = 0;
     bool isWhite = true;
     for (i = 0; i < self->cmdlen; ++i) {
@@ -169,7 +168,7 @@ static void cli_process_line(cli_t * self) {
 
 void cli_initialize(cli_t * self) {
     DBC_NOT_NULL(self);
-    memset(self->cmdline, 0, sizeof(self->cmdline));
+    embc_memset(self->cmdline, 0, sizeof(self->cmdline));
     self->cmdlen = 0;
     if (self->execute_args) {
         self->execute_line = cli_line_parser;
@@ -222,8 +221,8 @@ int cli_line_parser(void * self, const char * cmdline) {
     int argc = 0;
     char * argv[CLI_MAX_ARGS];
     char * lineptr = line;
-    memset(&argv, 0, sizeof(argv));
-    memcpy(line, cmdline, sizeof(line));
+    embc_memset(&argv, 0, sizeof(argv));
+    embc_memcpy(line, cmdline, sizeof(line));
     line[sizeof(line) - 1] = 0; // just to be sure.
     while (1) {
         // consume multiple delimiters

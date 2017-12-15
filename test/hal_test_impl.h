@@ -23,7 +23,9 @@
 EMBC_CPP_GUARD_START
 
 
+void hal_test_initialize();
 void hal_test_enable_logging();
+
 
 
 EMBC_CPP_GUARD_END

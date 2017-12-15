@@ -16,9 +16,6 @@
 
 #include "embc/stream/async_source.h"
 #include "embc.h"
-#include <string.h> // memset
-#include <stddef.h>
-#include <embc/stream/async.h>
 
 static void send(struct embc_stream_producer_s * self,
                  struct embc_stream_transaction_s * transaction) {
@@ -35,7 +32,7 @@ static void send(struct embc_stream_producer_s * self,
         case EMBC_STREAM_IOCTL_WRITE:
             s->rx_offset += transaction->length;
             if (s->rx_offset >= s->source_length) {
-                memset(transaction, 0, sizeof(*transaction));
+                EMBC_STRUCT_PTR_INIT(transaction);
                 transaction->type = EMBC_STREAM_IOCTL_CLOSE;
                 s->consumer->send(s->consumer, transaction);
             }
@@ -62,7 +59,7 @@ static void send(struct embc_stream_producer_s * self,
                 sz = remaining;
             }
             transaction->type = EMBC_STREAM_IOCTL_WRITE;
-            memcpy(buffer, s->source_buffer + s->tx_offset, sz);
+            embc_memcpy(buffer, s->source_buffer + s->tx_offset, sz);
             transaction->data.ioctl_write.ptr = buffer;
             transaction->length = sz;
             s->tx_offset += sz;
@@ -84,7 +81,7 @@ void embc_stream_source_initialize(
         uint8_t * transaction_buffer,
         uint16_t transaction_length) {
     DBC_NOT_NULL(self);
-    memset(self, 0, sizeof(*self));
+    EMBC_STRUCT_PTR_INIT(self);
     self->transaction_buffer = transaction_buffer;
     self->transaction_length = transaction_length;
     self->producer.send = send;
@@ -132,7 +129,7 @@ EMBC_API void embc_stream_source_open_ex(
     self->tx_offset = 0;
     self->rx_offset = 0;
     struct embc_stream_transaction_s transaction;
-    memset(&transaction, 0, sizeof(transaction));
+    EMBC_STRUCT_INIT(transaction);
     transaction.type = EMBC_STREAM_IOCTL_OPEN;
     transaction.length = length;
     transaction.data.ptr = ptr;

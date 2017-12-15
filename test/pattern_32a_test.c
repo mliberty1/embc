@@ -48,7 +48,7 @@ static int setup(void ** state) {
 
 static void test_tx_next(void **state) {
     (void) state;
-    for (size_t i = 0; i < EMBC_ARRAY_SIZE(PATTERN); ++i) {
+    for (embc_size_t i = 0; i < EMBC_ARRAY_SIZE(PATTERN); ++i) {
         assert_int_equal(PATTERN[i], embc_pattern_32a_tx_next(&tx1));
     }
 }
@@ -57,7 +57,7 @@ static void test_tx_next_validate_shift(void **state) {
     (void) state;
     uint32_t expected_value = 0;
     uint32_t value = 0;
-    for (size_t i = 0; i < 50; ++i) {
+    for (embc_size_t i = 0; i < 50; ++i) {
         value = embc_pattern_32a_tx_next(&tx1);
         assert_int_equal(expected_value, value);
         expected_value = (expected_value == 0) ? 1 : (expected_value << 1);
@@ -69,7 +69,7 @@ static void test_tx_buffer(void **state) {
     (void) state;
     uint32_t buffer[1024];
     embc_pattern_32a_tx_buffer(&tx2, buffer, sizeof(buffer));
-    for (size_t i = 0; i < EMBC_ARRAY_SIZE(buffer); ++i) {
+    for (embc_size_t i = 0; i < EMBC_ARRAY_SIZE(buffer); ++i) {
         assert_int_equal(buffer[i], embc_pattern_32a_tx_next(&tx1));
     }
 }
@@ -77,9 +77,9 @@ static void test_tx_buffer(void **state) {
 static void test_tx_buffer_multiple(void **state) {
     (void) state;
     uint32_t buffer[128];
-    for (size_t i = 0; i < 128; ++i) {
+    for (embc_size_t i = 0; i < 128; ++i) {
         embc_pattern_32a_tx_buffer(&tx2, buffer, i * 4);
-        for (size_t k = 0; k < i; k++) {
+        for (embc_size_t k = 0; k < i; k++) {
             assert_int_equal(buffer[k], embc_pattern_32a_tx_next(&tx1));
         }
     }
@@ -87,7 +87,7 @@ static void test_tx_buffer_multiple(void **state) {
 
 static void test_rx_next_start_from_shift(void **state) {
     (void) state;
-    for (size_t i = 0; i < EMBC_ARRAY_SIZE(PATTERN); ++i) {
+    for (embc_size_t i = 0; i < EMBC_ARRAY_SIZE(PATTERN); ++i) {
         embc_pattern_32a_rx_next(&rx1, PATTERN[i]);
     }
     assert_int_equal(EMBC_ARRAY_SIZE(PATTERN), rx1.receive_count);
@@ -99,7 +99,7 @@ static void test_rx_next_start_from_shift(void **state) {
 
 static void test_rx_next_start_from_counter(void **state) {
     (void) state;
-    for (size_t i = 1; i < EMBC_ARRAY_SIZE(PATTERN); ++i) {
+    for (embc_size_t i = 1; i < EMBC_ARRAY_SIZE(PATTERN); ++i) {
         embc_pattern_32a_rx_next(&rx1, PATTERN[i]);
     }
     assert_int_equal(EMBC_ARRAY_SIZE(PATTERN) - 1, rx1.receive_count);

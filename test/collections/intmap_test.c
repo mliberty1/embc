@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+#include "../hal_test_impl.h"
 #include <stdarg.h>
 #include <stddef.h>
 #include <setjmp.h>
@@ -40,7 +41,7 @@ void dbc_assert(char const *file, unsigned line, const char * msg) {
 /* A test case that does nothing and succeeds. */
 static void intmap_empty(void **state) {
     (void) state; /* unused */
-    size_t value = 42;
+    embc_size_t value = 42;
     struct intmap_s * h = intmap_new();
     assert_int_equal(0, intmap_length(h));
     assert_int_equal(EMBC_ERROR_NOT_FOUND, intmap_get(h, 10, (void **) &value));
@@ -50,7 +51,7 @@ static void intmap_empty(void **state) {
 
 static void intmap_put_get_remove_get(void **state) {
     (void) state; /* unused */
-    size_t value;
+    embc_size_t value;
     struct intmap_s * h = intmap_new();
     assert_int_equal(0, intmap_put(h, 10, (void *) 20, (void **) &value));
     assert_int_equal(1, intmap_length(h));
@@ -64,17 +65,17 @@ static void intmap_put_get_remove_get(void **state) {
 
 static void intmap_resize(void **state) {
     (void) state; /* unused */
-    size_t value_in;
-    size_t value_out;
+    embc_size_t value_in;
+    embc_size_t value_out;
     struct intmap_s * h = intmap_new();
-    for (size_t idx = 0; idx < 0x100; ++idx) {
+    for (embc_size_t idx = 0; idx < 0x100; ++idx) {
         value_in = idx + 0x1000;
         assert_int_equal(0, intmap_put(h, idx, (void *) value_in, 0));
         assert_int_equal(idx + 1, intmap_length(h));
         assert_int_equal(0, intmap_get(h, idx, (void **) &value_out));
         assert_int_equal(value_in, value_out);
     }
-    for (size_t idx = 0; idx < 0x100; ++idx) {
+    for (embc_size_t idx = 0; idx < 0x100; ++idx) {
         assert_int_equal(0, intmap_get(h, idx, (void **) &value_out));
         assert_int_equal(idx + 0x1000, value_out);
     }
@@ -83,8 +84,8 @@ static void intmap_resize(void **state) {
 
 static void intmap_iterator(void **state) {
     (void) state; /* unused */
-    size_t key;
-    size_t value;
+    embc_size_t key;
+    embc_size_t value;
     struct intmap_iterator_s * iter = 0;
     struct intmap_s * h = intmap_new();
     assert_int_equal(0, intmap_put(h, 1, (void *) 1, 0));
@@ -103,8 +104,8 @@ static void intmap_iterator(void **state) {
 
 static void intmap_iterator_remove_current(void **state) {
     (void) state; /* unused */
-    size_t key;
-    size_t value;
+    embc_size_t key;
+    embc_size_t value;
     struct intmap_iterator_s * iter = 0;
     struct intmap_s * h = intmap_new();
     assert_int_equal(0, intmap_put(h, 1, (void *) 1, 0));
@@ -124,8 +125,8 @@ static void intmap_iterator_remove_current(void **state) {
 
 static void intmap_iterator_remove_next(void **state) {
     (void) state; /* unused */
-    size_t key;
-    size_t value;
+    embc_size_t key;
+    embc_size_t value;
     struct intmap_iterator_s * iter = 0;
     struct intmap_s * h = intmap_new();
     assert_int_equal(0, intmap_put(h, 1, (void *) 1, 0));
@@ -142,14 +143,14 @@ static void intmap_iterator_remove_next(void **state) {
     intmap_free(h);
 }
 
-INTMAP_DECLARE(mysym, size_t)
+INTMAP_DECLARE(mysym, embc_size_t)
 INTMAP_DEFINE_STRUCT(mysym)
-INTMAP_DEFINE(mysym, size_t)
+INTMAP_DEFINE(mysym, embc_size_t)
 
 static void mysym(void **state) {
     (void) state; /* unused */
-    size_t key;
-    size_t value;
+    embc_size_t key;
+    embc_size_t value;
     struct mysym_iterator_s * iter = 0;
     struct mysym_s * h = mysym_new();
     assert_int_equal(0, mysym_put(h, 1, 1, 0));
@@ -169,6 +170,7 @@ static void mysym(void **state) {
 
 
 int main(void) {
+    embc_allocator_set((embc_alloc_fn) malloc, free);
     const struct CMUnitTest tests[] = {
         cmocka_unit_test(intmap_empty),
         cmocka_unit_test(intmap_put_get_remove_get),
