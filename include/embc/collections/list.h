@@ -274,7 +274,7 @@ static inline void embc_list_insert_after(
  * @brief Iterate over each item in the list in forward order (head to tail).
  *
  * @param list The list pointer.
- * @return The current item pointer from the list.
+ * @param item The current item pointer from the list.
  *
  * The item may be safely removed from the list while iterating.  If new items
  * are inserted immediately after this item during the traversal, they will
@@ -282,8 +282,8 @@ static inline void embc_list_insert_after(
  */
 #define embc_list_foreach(list, item) \
     item = (list)->next; \
-    for (struct embc_list_s * next = item->next; item != (list); \
-         item = next, next = next->next)
+    for (struct embc_list_s * next__ = item->next; item != (list); \
+         item = next__, next__ = next__->next)
 
 /**
  * @brief Iterate over each item in the list in reverse order (tail to head).

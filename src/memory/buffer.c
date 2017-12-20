@@ -154,8 +154,8 @@ void embc_buffer_write(struct embc_buffer_s * buffer,
                        void const * data,
                        embc_size_t size) {
     DBC_NOT_NULL(buffer);
-    DBC_NOT_NULL(data);
     if (size > 0) {
+        DBC_NOT_NULL(data);
         EMBC_ASSERT(size <= embc_buffer_write_remaining(buffer));
         uint8_t * ptr = buffer->data + buffer->cursor;
         embc_memcpy(ptr, data, size);

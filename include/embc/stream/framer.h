@@ -58,7 +58,10 @@
  *      <th>3</td><th>2</td><th>1</td><th>0</td></tr>
  *  <tr><td colspan="8">SOF</td></tr>
  *  <tr>
- *      <td colspan="4">reserved</td>
+ *      <td colspan="1">frame_type</td>
+ *      <td colspan="1">0</td>
+ *      <td colspan="1">0</td>
+ *      <td colspan="1">0</td>
  *      <td colspan="4">frame_id</td>
  *  </tr>
  *  <tr><td colspan="8">port</td></tr>
@@ -78,20 +81,20 @@
  * - "SOF" is the start of frame byte.  Although SOF is not unique and also not
  *   escaped, the SOF drastically reduces the framing search space.  The
  *   SOF may also be used for autobaud detection.
+ * - "frame_type" contains the frame type.  0=DATA, 1=ACK.
  * - "frame_id" contains an identifier that is temporally unique for all
- *   frames across all ports, except for port 0.  Frames are
- *   individually CONFIRMed on port 0 using the frame_id.  The
- *   frame_id increments sequentially with each new frame and is assigned
- *   by the framer implementation.
+ *   DATA frames across all ports.  Frames are individually ACKed using the
+ *   frame_id.  The frame_id increments sequentially with each new frame and
+ *   is assigned by the framer implementation.
  * - "port" contains an application-specific payload format identifier.
  *   This field is used to multiplex multiple message types onto a single
  *   byte stream, similar to a TCP port.  Port 0 is reserved for
- *   CONFIRM (acknowledgements) and link management.
+ *   link management.
  * - "message_id" contains an identifier that is assigned by the application.
  *   Normally, message_id values are unique within each port.
- * - "length" is the payload length (not full frame length) in bytes.
- *   Since the frame overhead is 13 bytes, the actual frame length ranges
- *   from 13 to 253 bytes.
+ * - "length" is the payload length (not full frame length) in bytes.  The
+ *   maximum payload length is 240 bytes.  Since the frame overhead is 13
+ *   bytes, the actual frame length ranges from 13 to 253 bytes.
  * - "port_def" may contain arbitrary data that is defined by the specific
  *   port and application.
  * - "header_crc" contains the CRC computed over the SOF and six header bytes
@@ -113,22 +116,33 @@
  *
  * If the 8-bit header CRC check fails, then the receiver should ignore the
  * sync byte and search for the next start of frame.  The receiver may
- * optionally send a CONFIRMed with EMBC_ERROR_SYNCHRONIZATION with "id" 0.
+ * optionally send a ACK with status EMBC_ERROR_SYNCHRONIZATION.
  *
  * If the 32-bit frame CRC check fails, then the receiver should send a
- * CONFIRM frame with status EMBC_ERROR_MESSAGE_INTEGRITY that also contains
+ * ACK frame with status EMBC_ERROR_MESSAGE_INTEGRITY that also contains
  * the id.  If the frame is received successfully, then the receiver should
  * provide the frame to the next higher level.
  *
- * Port 0 is is reserved for acknowledgements, error notifications and link
- * management.  For every received frame received successfully or with a
- * detectable error, the receiver sends a CONFIRM messages back to the
- * transmitter.  CONFIRM messages have zero length.  The fields are:
- * - frame_id = the originating frame_id
- * - message_id = 0 (all other values are not CONFIRM frames)
- * - port_def[7:0] = status code which is 0 on success or an
- *   error code on failure.
- * - port_def[15:8] = the originating port.
+ * Port 0 is is reserved for acknowledgements and link management.
+ * Acknowledgements which allow for confirmed, in-order delivery.
+ * For every frame received successfully or with a detectable error, the
+ * receiver sends a ACK frame back to the transmitter that acknowledges
+ * receipt of a DATA frame.
+ *
+ * The ACK frame fields are:
+ * - frame_type = 1 (ACK)
+ * - frame_id = the originating frame_id.
+ * - port = the originating port.
+ * - message_id = the originating message_id
+ * - port_def = The bitmask of frames that have been successfully received.
+ *   Bit 8 corresponds to this frame_id.  Bit 9 is the next frame it while
+ *   bit 7 is the previous frame id.
+ * - port_def[15:8] = The bitmask of prior frame_ids that were successfully
+ *   received.  Bit 8 corresponds to (frame_id - 1) and bit 15 corresponds
+ *   to (frame_id - 9).  This field simplifies transmitter retry and reduces
+ *   the impact of lost/corrupted ACK frames.
+ * - payload: 1 byte status code which is 0 on success or an error code on
+ *   failure.
  *
  * This framer contains support for backpressure by providing notifications
  * when a frame transmission completes, either successfully or with error.
@@ -166,8 +180,14 @@ EMBC_CPP_GUARD_START
     EMBC_FRAMER_HEADER_SIZE + \
     EMBC_FRAMER_PAYLOAD_MAX_SIZE + \
     EMBC_FRAMER_FOOTER_SIZE)
-/// The maximum number of outstanding frames (not yet acknowledged).
-#define EMBC_FRAMER_OUTSTANDING_FRAMES_MAX (2)
+/**
+ * @brief The maximum number of outstanding frames (not yet acknowledged).
+ *
+ * The protocol is designed to support up to 7 maximum outstanding DATA frames,
+ * but most designs should only need 2 or 3 to achieve maximum throughput
+ * for full-sized frames.
+ */
+#define EMBC_FRAMER_OUTSTANDING_FRAMES_MAX (3)
 /// The acknowledgement payload size.
 #define EMBC_FRAMER_ACK_PAYLOAD_SIZE (1)
 /// The acknowledgement frame size.
@@ -177,19 +197,43 @@ EMBC_CPP_GUARD_START
     EMBC_FRAMER_FOOTER_SIZE)
 /// The maximum number of ports supported by implementations
 #define EMBC_FRAMER_PORTS (16)
+/// The ack mask (port_def) for the current frame.
+#define EMBC_FRAMER_ACK_MASK_CURRENT ((uint16_t) 0x0100)
 
 /**
  * @brief The frame header.
  */
 struct embc_framer_header_s {
+    /// Start of frame = EMBC_FRAMER_SOF.
     uint8_t sof;
+    /// The frame_type in bit 7 (0=Data, 1=ACK) and lower nibble is frame_id.
     uint8_t frame_id;  // upper nibble reserved
+    /// The port number.  0 is reserved for the framer link management.
     uint8_t port;
+    /// The message identifier assigned by the application.
     uint8_t message_id;
+    /// The payload length in bytes.
     uint8_t length;
+    /// The port-specific data (lower byte).
     uint8_t port_def0;
+    /// The port specific data (upper byte)
     uint8_t port_def1;
+    /// The CRC over the first 7 header bytes.
     uint8_t crc8;
+};
+
+/**
+ * @brief The framer status.
+ */
+struct embc_framer_status_s {
+    uint32_t version;
+    uint32_t rx_count;
+    uint32_t rx_deduplicate_count;
+    uint32_t rx_synchronization_error;
+    uint32_t rx_mic_error;
+    uint32_t rx_frame_id_error;
+    uint32_t tx_count;
+    uint32_t tx_retransmit_count;
 };
 
 /**
@@ -214,7 +258,10 @@ struct embc_framer_port_callbacks_s {
      * @param port The port (payload type).
      * @param message_id The application-defined message identifier.
      * @param port_def The application-defined frame-associated data.
-     * @param buffer The buffer containing the frame payload.
+     * @param buffer The buffer containing the frame.  The cursor is
+     *      set to the start of the payload which is at
+     *      buffer->data + buffer->cursor.  The actual payload length
+     *      is embc_buffer_read_remaining(buffer), not length!
      *      The function takes ownership of buffer and must call
      *      embc_buffer_free() when done.
      *      The buffer.buffer_id contains the message_id and
@@ -249,12 +296,10 @@ struct embc_framer_hal_callbacks_s {
      *
      * @param user_data The user data.
      * @param buffer The buffer containing the transmit data.  The function
-     *      takes ownership of buffer and must call embc_buffer_free() when
-     *      done.
-     *      buffer will remain valid until an acknowledgement is received
-     *      or a timeout occurs.  In either case, the HAL may safely use
-     *      this buffer directly during data transmission without needing
-     *      to copy.
+     *      takes ownership of buffer and the HAL can use the item field to
+     *      manage its pending list.  When the buffer is transmitted, call
+     *      embc_framer_hal_tx_done() to return buffer ownership to the framer.
+     *      The callback is also necessary to provide backpressure.
      * @param length The length of buffer in bytes.
      */
     void (*tx_fn)(void * user_data, struct embc_buffer_s * buffer);
@@ -336,6 +381,35 @@ EMBC_API void embc_framer_register_port_callbacks(
         struct embc_framer_port_callbacks_s * callbacks);
 
 /**
+ * @brief The receive hook for unit testing.
+ *
+ * @param user_data The arbitrary user data.
+ * @param frame The buffer that was received containing the entire frame.
+ */
+typedef void (*embc_framer_rx_hook_fn)(
+        void * user_data,
+        struct embc_buffer_s * frame);
+
+/**
+ * @brief Register the receive hook for unit testing.
+ *
+ * @param self The framer instance.
+ * @param status The status: 0 on success or error code.
+ * @param rx_fn The receive callback hook.  0 resets to the default internal
+ *      handler.
+ * @param rx_user_data The arbitrary data for rx_fn.
+ * @return 0 or error code.
+ *
+ * This function is exposed only to facilitate unit testing of the underlying
+ * framer.  It bypasses the framer logic for issuing ACKs and properly
+ * passing frames to the ports.
+ */
+EMBC_API void embc_framer_register_rx_hook(
+        struct embc_framer_s * self,
+        embc_framer_rx_hook_fn rx_fn,
+        void * rx_user_data);
+
+/**
  * @brief Finalize a framer instance.
  *
  * @param self The instance.
@@ -365,6 +439,52 @@ EMBC_API void embc_framer_hal_rx_buffer(
         uint8_t const * buffer, uint32_t length);
 
 /**
+ * @brief Handle frame transmit completion.
+ *
+ * @param self The instance.
+ * @param buffer The buffer that was successfully transmitted.
+ */
+EMBC_API void embc_framer_hal_tx_done(
+        struct embc_framer_s * self,
+        struct embc_buffer_s * buffer);
+
+/**
+ * @brief Construct a raw frame (for unit testing)
+ *
+ * @param self The instance.
+ * @param frame_id The frame_id nibble.
+ * @param port The port (payload type).
+ * @param message_id The application-defined message identifier.
+ * @param port_def The application-defined frame-associated data.
+ * @param payload The payload data.
+ * @param length The length of payload in bytes.
+ * @return The buffer containing the constructed frame.
+ */
+EMBC_API struct embc_buffer_s * embc_framer_construct_frame(
+        struct embc_framer_s *self,
+        uint8_t frame_id, uint8_t port, uint8_t message_id, uint16_t port_def,
+        uint8_t const *payload, uint8_t length);
+
+/**
+ * @brief Construct an acknowledgement frame (for unit testing)
+ *
+ * @param self The instance
+ * @param frame_id The frame_id nibble.
+ * @param port The port (payload type).
+ * @param message_id The application-defined message identifier.
+ * @param ack_mask The frame ack mask for successfully received data frames.
+ *   Bit 8 corresponds to (frame_id - 1) and bit 15 corresponds
+ *   to (frame_id - 9).  This field simplifies transmitter retry and reduces
+ *   the impact of lost/corrupted ACK frames.
+ * @param status The data frame status: 0 on success or error code.
+ * @return The buffer containing the acknowledgement frame.
+ */
+EMBC_API struct embc_buffer_s * embc_framer_construct_ack(
+        struct embc_framer_s *self,
+        uint8_t frame_id, uint8_t port, uint8_t message_id, uint16_t ack_mask,
+        uint8_t status);
+
+/**
  * @brief Send a frame.
  *
  * @param self The instance.
@@ -380,6 +500,21 @@ EMBC_API void embc_framer_send(
         struct embc_buffer_s * buffer);
 
 /**
+ * @brief Send a frame.
+ *
+ * @param self The instance.
+ * @param port The port (payload type).
+ * @param message_id The application-defined message identifier.
+ * @param port_def The application-defined frame-associated data.
+ * @param data The data.
+ * @param length The length of data in bytes.
+ */
+EMBC_API void embc_framer_send_payload(
+        struct embc_framer_s * self,
+        uint8_t port, uint8_t message_id, uint16_t port_def,
+        uint8_t const * data, uint8_t length);
+
+/**
  * @brief Allocate a buffer for frame payload.
  *
  * @param self The instance.
@@ -389,6 +524,13 @@ EMBC_API void embc_framer_send(
 EMBC_API struct embc_buffer_s * embc_framer_alloc(
         struct embc_framer_s * self);
 
+/**
+ * @brief Get the status for the framer.
+ * @param self The framer instance.
+ * @return The framer status.
+ */
+EMBC_API struct embc_framer_status_s embc_framer_status_get(
+        struct embc_framer_s * self);
 
 EMBC_CPP_GUARD_END
 
