@@ -34,10 +34,22 @@ const uint8_t FRAME1[] = {0xAA, 0x00, 0x02, 0x03, 0x08, 0x11, 0x22, 0x41,
                           0x63, 0x31, 0xb3, 0xbe, 0xAA};
 uint8_t PAYLOAD2[] = {0x00, 0x11, 0x22, 0x33, 0x44, 0x55};
 
+struct timer_s {
+    uint64_t duration;
+    void (*cbk_fn)(void *, uint32_t);
+    void * cbk_user_data;
+    uint32_t timer_id;
+    struct embc_list_s item;
+};
+
 struct test_s {
     struct embc_buffer_allocator_s * buffer_allocator;
     struct embc_framer_s * f1;
     struct embc_list_s tx;
+
+    struct timer_s timers[24];
+    struct embc_list_s timers_free;
+    struct embc_list_s timers_pending;
 };
 
 void hal_tx_cbk(void *user_data, struct embc_buffer_s * buffer) {
@@ -49,19 +61,24 @@ int32_t hal_timer_set_cbk(void *user_data, uint64_t duration,
                           void (*cbk_fn)(void *, uint32_t), void *cbk_user_data,
                           uint32_t *timer_id) {
     struct test_s * self = (struct test_s *) user_data;
-    (void) self;
-    check_expected(duration);
-    // todo
-    (void) cbk_fn;
-    (void) cbk_user_data;
-    *timer_id = 0;
+    struct embc_list_s * item = embc_list_remove_head(&self->timers_free);
+    assert_non_null(item);
+    struct timer_s * timer = embc_list_entry(item, struct timer_s, item);
+    timer->duration = duration;
+    timer->cbk_fn = cbk_fn;
+    timer->cbk_user_data = cbk_user_data;
+    embc_list_add_tail(&self->timers_pending, &timer->item);
+    *timer_id = timer->timer_id;
     return 0;
 }
 
 int32_t hal_timer_cancel_cbk(void *user_data, uint32_t timer_id) {
     struct test_s * self = (struct test_s *) user_data;
-    (void) self;
-    check_expected(timer_id);
+    struct timer_s * timer = &self->timers[timer_id];
+    embc_list_remove(&timer->item);
+    timer->cbk_fn = 0;
+    timer->cbk_user_data = 0;
+    embc_list_add_tail(&self->timers_free, &timer->item);
     return 0;
 }
 
@@ -111,7 +128,7 @@ static void port_register(struct test_s * self, uint8_t port) {
 static int setup(void ** state) {
     struct test_s * self =  0;
     uint32_t sz = embc_framer_instance_size();
-    assert_int_equal(0x328, sz);
+    //assert_int_equal(0x330, sz);
     self = (struct test_s *) test_calloc(1, sizeof(struct test_s));
     self->buffer_allocator = embc_buffer_initialize(BUFFER_ALLOCATOR, EMBC_ARRAY_SIZE(BUFFER_ALLOCATOR));
     self->f1 = test_calloc(1, sz);
@@ -127,6 +144,14 @@ static int setup(void ** state) {
     };
     embc_framer_initialize(self->f1, self->buffer_allocator, &hal_callbacks);
     port_register(self, 1);
+
+    embc_list_initialize(&self->timers_free);
+    embc_list_initialize(&self->timers_pending);
+    for (embc_size_t i = 0; i < EMBC_ARRAY_SIZE(self->timers); ++i) {
+        self->timers[i].timer_id = i;
+        embc_list_add_tail(&self->timers_free, &self->timers[i].item);
+    }
+
     *state = self;
     return 0;
 }
@@ -506,7 +531,6 @@ static void tx_retransmit_on_ack_mic_error(void **state) {
 
 static void tx_queue_then_transmit(void **state) {
     struct test_s *self = (struct test_s *) *state;
-    (void) self;
 
     embc_framer_send_payload(self->f1, 1, 6, 0x2211, PAYLOAD1, sizeof(PAYLOAD1));
     embc_framer_send_payload(self->f1, 1, 7, 0x2211, PAYLOAD1, sizeof(PAYLOAD1));
@@ -526,8 +550,70 @@ static void tx_queue_then_transmit(void **state) {
     //tx_validate_and_confirm(self, 4, 1, 10, 0x2211, PAYLOAD1, sizeof(PAYLOAD1));
 }
 
-// tx_retransmit_on_timeout
-// tx_too_many_retransmits
+static void signal_timeout(struct test_s * self) {
+    struct embc_list_s * item = embc_list_remove_head(&self->timers_pending);
+    struct timer_s * timer = embc_list_entry(item, struct timer_s, item);
+    timer->cbk_fn(timer->cbk_user_data, timer->timer_id);
+}
+
+static void tx_retransmit_on_timeout(void **state) {
+    struct test_s *self = (struct test_s *) *state;
+    embc_framer_send_payload(self->f1, 1, 6, 0x2211, PAYLOAD1, sizeof(PAYLOAD1));
+    tx_validate_and_confirm(self, 0, 1, 6, 0x2211, PAYLOAD1, sizeof(PAYLOAD1));
+    assert_int_equal(1, embc_list_length(&self->timers_pending));
+    signal_timeout(self);
+    tx_validate_and_confirm(self, 0, 1, 6, 0x2211, PAYLOAD1, sizeof(PAYLOAD1));
+    expect_tx_done(1, 6, 0);
+    perform_ack(self, 0, 1, 6, 0x0100, 0);
+}
+
+static void tx_too_many_timeout_retransmits(void **state) {
+    struct test_s *self = (struct test_s *) *state;
+
+    embc_framer_send_payload(self->f1, 1, 6, 0x2211, PAYLOAD1, sizeof(PAYLOAD1));
+    for (int i = 0; i < EMBC_FRAMER_MAX_RETRIES; ++i) {
+        tx_validate_and_confirm(self, 0, 1, 6, 0x2211, PAYLOAD1, sizeof(PAYLOAD1));
+        assert_int_equal(1, embc_list_length(&self->timers_pending));
+        signal_timeout(self);
+    }
+
+    tx_validate_and_confirm(self, 0, 1, 6, 0x2211, PAYLOAD1, sizeof(PAYLOAD1));
+    expect_tx_done(1, 6, EMBC_ERROR_TIMED_OUT);
+    signal_timeout(self);
+}
+
+static void tx_recover_after_error(void **state) {
+    struct test_s *self = (struct test_s *) *state;
+
+    embc_framer_send_payload(self->f1, 1, 6, 0x2211, PAYLOAD1, sizeof(PAYLOAD1));
+    embc_framer_send_payload(self->f1, 1, 7, 0x2211, PAYLOAD1, sizeof(PAYLOAD1));
+    embc_framer_send_payload(self->f1, 1, 8, 0x2211, PAYLOAD1, sizeof(PAYLOAD1));
+
+    tx_validate_and_confirm(self, 0, 1, 6, 0x2211, PAYLOAD1, sizeof(PAYLOAD1));
+    signal_timeout(self);
+    tx_validate_and_confirm(self, 1, 1, 7, 0x2211, PAYLOAD1, sizeof(PAYLOAD1));
+    tx_validate_and_confirm(self, 2, 1, 8, 0x2211, PAYLOAD1, sizeof(PAYLOAD1));
+    signal_timeout(self);
+
+    for (int i = 1; i < EMBC_FRAMER_MAX_RETRIES; ++i) {
+        tx_validate_and_confirm(self, 0, 1, 6, 0x2211, PAYLOAD1, sizeof(PAYLOAD1));
+        tx_validate_and_confirm(self, 1, 1, 7, 0x2211, PAYLOAD1, sizeof(PAYLOAD1));
+        tx_validate_and_confirm(self, 2, 1, 8, 0x2211, PAYLOAD1, sizeof(PAYLOAD1));
+        signal_timeout(self);
+    }
+
+    tx_validate_and_confirm(self, 0, 1, 6, 0x2211, PAYLOAD1, sizeof(PAYLOAD1));
+    expect_tx_done(1, 6, EMBC_ERROR_TIMED_OUT);
+    signal_timeout(self);
+
+    tx_validate_and_confirm(self, 1, 1, 7, 0x2211, PAYLOAD1, sizeof(PAYLOAD1));
+    tx_validate_and_confirm(self, 2, 1, 8, 0x2211, PAYLOAD1, sizeof(PAYLOAD1));
+
+    perform_ack(self, 2, 1, 8, 0x0100, 0);
+    expect_tx_done(1, 7, 0);
+    expect_tx_done(1, 8, 0);
+    perform_ack(self, 1, 1, 7, 0x0300, 0);
+}
 
 
 int main(void) {
@@ -557,6 +643,9 @@ int main(void) {
             cmocka_unit_test_setup_teardown(tx_lost_frame_and_retransmit_with_ack, setup, teardown),
             cmocka_unit_test_setup_teardown(tx_retransmit_on_ack_mic_error, setup, teardown),
             cmocka_unit_test_setup_teardown(tx_queue_then_transmit, setup, teardown),
+            cmocka_unit_test_setup_teardown(tx_retransmit_on_timeout, setup, teardown),
+            cmocka_unit_test_setup_teardown(tx_too_many_timeout_retransmits, setup, teardown),
+            cmocka_unit_test_setup_teardown(tx_recover_after_error, setup, teardown),
     };
 
     return cmocka_run_group_tests(tests, NULL, NULL);

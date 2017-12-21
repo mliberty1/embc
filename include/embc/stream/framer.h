@@ -34,9 +34,9 @@
  *
  * This module provides reliable message transmission over byte streams.
  * Framing multi-byte messages over a byte-oriented interface is a common
- * problem for UART and TCP communications.  In addition to framing and
- * deframing messages, this module also provides confirmed delivery with
- * support for up to 240 byte payloads, which allows the entire frame to
+ * problem for UART and network communications.  In addition to framing and
+ * deframing messages, this module also provides confirmed, in-order delivery
+ * with support for up to 240 byte payloads, which allows the entire frame to
  * fit within 256 bytes.  Larger messages may be segmented over multiple
  * frames and then reassembled.
  *
@@ -45,11 +45,21 @@
  * - Robust framing using SOF byte, length, frame header CRC, framer CRC
  *   and EOF byte.
  * - Guaranteed in-order delivery.
- * - Reliable data delivery with per-frame acknowledgement and
+ * - Reliable data delivery with per-frame acknowledgements, timeouts and
  *   automatic retransmission.
  * - Multiple outstanding frames for maximum throughput.
- * - Support for higher-level message segmentation/reassembly.
+ * - Support for larger message using segmentation/reassembly.
  * - Support for multiple payload types using the port field.
+ *
+ * For extremely fast transmitters (UART CDC over USB), the maximum number of
+ * outstanding frames limits the total rate.  A slower receiver can hold up
+ * the transmitter by delaying ACKs.  However, the current implementation does
+ * not allow higher layers to directly delay ACKs.  The implementation
+ * presumes that this framer is running in the same thread as the receive
+ * message processing.  The framer calls the port's rx_fn before issuing the
+ * ACK.  Any processing time stalls the ACK to throttle back the transmitters
+ * data rate.  Delaying incoming byte processing or dropping receive bytes
+ * effectively delays the ACKs, too.
  *
  * The frame format is:
  *
@@ -201,6 +211,8 @@ EMBC_CPP_GUARD_START
 #define EMBC_FRAMER_ACK_MASK_CURRENT ((uint16_t) 0x0100)
 /// The framer_id field mask for the frame id.
 #define EMBC_FRAMER_ID_MASK ((uint8_t) 0x0f)
+/// The maximum number of retries per frame before giving up
+#define EMBC_FRAMER_MAX_RETRIES ((uint8_t) 16)
 
 /**
  * @brief The frame header.
@@ -281,7 +293,8 @@ struct embc_framer_port_callbacks_s {
      * @param user_data The user data.
      * @param port The port (payload type).
      * @param message_id The application-defined message identifier.
-     * @param status 0 or error code.
+     * @param status 0 or error.  The framer module automatically retransmits
+     *      frames as needed, and only the last error condition is reported.
      */
     void (*tx_done_fn)(
             void * user_data,
@@ -311,9 +324,9 @@ struct embc_framer_hal_callbacks_s {
     /**
      * @brief Set a timer.
      *
-     * @param user_data The user data provided to fpe_initialize().
+     * @param user_data The user data provided to embc_framer_initialize().
      * @param duration The timer duration as 34Q30 seconds relative to the
-     *      current time.
+     *      current time (compatible with time.h).
      * @param cbk_fn The function to call if the timer expires which has
      *      arguments of (user_data, timer_id).
      * @param cbk_user_data The additional data to provide to cbk_fn.
@@ -329,7 +342,7 @@ struct embc_framer_hal_callbacks_s {
     /**
      * @brief Cancel a timer.
      *
-     * @param user_data The user data provided to fpe_initialize().
+     * @param user_data The user data provided to embc_framer_initialize().
      * @param timer_id The timer id assigned by timer_set().
      */
     int32_t (*timer_cancel_fn)(void * user_data, uint32_t timer_id);

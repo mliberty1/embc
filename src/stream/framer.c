@@ -21,11 +21,13 @@
 #include "embc/bbuf.h"
 #include "embc.h"
 #include "embc/crc.h"
+#include "embc/time.h"
 
 #define SOF ((uint8_t) EMBC_FRAMER_SOF)
 #define HEADER_SIZE ((uint16_t) EMBC_FRAMER_HEADER_SIZE)
 #define FOOTER_SIZE ((uint16_t) EMBC_FRAMER_FOOTER_SIZE)
 #define BITMAP_CURRENT ((uint16_t) 0x100)
+#define EMBC_FRAMER_TIMEOUT EMBC_MILLISECONDS_TO_TIME(100)
 
 EMBC_STATIC_ASSERT(EMBC_FRAMER_FRAME_MAX_SIZE < 256, frame_size_too_big);
 
@@ -48,7 +50,10 @@ struct tx_buf_s {
     struct embc_buffer_s * b;
     struct embc_list_s item;
     uint8_t status;
+    uint8_t retries;
 };
+
+static void transmit_tx_buf(struct embc_framer_s * self, struct tx_buf_s * t);
 
 struct embc_framer_s {
     struct embc_buffer_allocator_s * buffer_allocator;
@@ -56,6 +61,7 @@ struct embc_framer_s {
     struct embc_framer_hal_callbacks_s hal_cbk;
     struct embc_framer_status_s status;
 
+    uint32_t timer_id;
     uint8_t rx_frame_id;
     uint16_t rx_frame_bitmask;
     uint16_t rx_frame_bitmask_outstanding;
@@ -311,6 +317,85 @@ static struct tx_buf_s * find_tx(struct embc_framer_s * self, uint8_t frame_id) 
     return 0;
 }
 
+static void tx_complete(struct embc_framer_s * self, struct tx_buf_s * t, uint8_t status) {
+    struct embc_framer_header_s *hdr = (struct embc_framer_header_s *) (t->b->data);
+    embc_list_remove(&t->item);
+    embc_list_add_tail(&self->tx_buffers_free, &t->item);
+    self->port_cbk[hdr->port].tx_done_fn(
+            self->port_cbk[hdr->port].tx_done_user_data,
+            hdr->port,
+            hdr->message_id,
+            status
+    );
+    embc_buffer_free(t->b);
+    t->b = 0;
+    t->status = TX_STATUS_EMPTY;
+}
+
+static void tx_error(struct embc_framer_s * self, struct tx_buf_s * t, uint8_t status) {
+    if (t->retries >= EMBC_FRAMER_MAX_RETRIES) {
+        tx_complete(self, t, status);
+    } else {
+        ++t->retries;
+        transmit_tx_buf(self, t);
+    }
+}
+
+static void tx_complete_in_order(struct embc_framer_s * self, struct tx_buf_s * t_current) {
+    // Complete only when guaranteed in order!
+    bool match_current = false;
+    struct embc_list_s * item;
+    uint8_t tx_ack_frame_id = expected_tx_frame_id(self);
+    embc_list_foreach(&self->tx_buffers_active, item) {
+        struct tx_buf_s *t = embc_list_entry(item, struct tx_buf_s, item);
+        match_current |= (t == t_current);
+        struct embc_framer_header_s *hdr = (struct embc_framer_header_s *) (t->b->data);
+        if ((TX_STATUS_ACKED == t->status) && (hdr->frame_id == tx_ack_frame_id)) {
+            tx_complete(self, t, 0);
+        } else if (!match_current && (t->status == TX_STATUS_AWAIT_ACK)) {
+            transmit_tx_buf(self, t);
+            break;
+        } else {
+            break;
+        }
+        tx_ack_frame_id = (tx_ack_frame_id + 1) & EMBC_FRAMER_ID_MASK;
+    }
+}
+
+static void timer_callback(void * user_data, uint32_t timer_id) {
+    struct embc_framer_s * self = (struct embc_framer_s *) user_data;
+    (void) timer_id;
+    struct embc_list_s * item;
+    struct tx_buf_s * t;
+    embc_list_foreach(&self->tx_buffers_active, item) {
+        t = embc_list_entry(item, struct tx_buf_s, item);
+        if (t->status == TX_STATUS_AWAIT_ACK) {
+            tx_error(self, t, EMBC_ERROR_TIMED_OUT);
+        }
+    }
+}
+
+static void timer_start(struct embc_framer_s * self) {
+    self->hal_cbk.timer_set_fn(
+            self->hal_cbk.timer_set_user_data,
+            EMBC_FRAMER_TIMEOUT,
+            timer_callback, self,
+            &self->timer_id);
+}
+
+static void timer_cancel(struct embc_framer_s * self) {
+    self->hal_cbk.timer_cancel_fn(
+            self->hal_cbk.timer_cancel_user_data,
+            self->timer_id);
+}
+
+static void transmit_tx_buf(struct embc_framer_s * self, struct tx_buf_s * t) {
+    timer_cancel(self);
+    t->status = TX_STATUS_TRANSMITTING;
+    self->hal_cbk.tx_fn(self->hal_cbk.tx_user_data, t->b);
+    timer_start(self);
+}
+
 static void transmit_queued(struct embc_framer_s * self) {
     while (!embc_list_is_empty(&self->tx_buffers_free) && !embc_list_is_empty(&self->tx_queue)) {
         struct embc_list_s * item =  embc_list_remove_head(&self->tx_queue);
@@ -319,8 +404,8 @@ static void transmit_queued(struct embc_framer_s * self) {
         struct tx_buf_s * t = embc_list_entry(item, struct tx_buf_s, item);
         embc_list_add_tail(&self->tx_buffers_active, item);
         t->b = b;
-        t->status = TX_STATUS_TRANSMITTING;
-        self->hal_cbk.tx_fn(self->hal_cbk.tx_user_data, t->b);
+        t->retries = 0;
+        transmit_tx_buf(self, t);
     }
 }
 
@@ -345,38 +430,16 @@ static void tx_confirmed(struct embc_framer_s * self, struct embc_framer_header_
         struct embc_framer_header_s *hdr = (struct embc_framer_header_s *) (t->b->data);
         frame_id = (frame_id - 1) & EMBC_FRAMER_ID_MASK;
         EMBC_ASSERT(frame_id == hdr->frame_id);
-        if (mask & EMBC_FRAMER_ACK_MASK_CURRENT) {
+        if ((TX_STATUS_AWAIT_ACK == t->status) && (mask & EMBC_FRAMER_ACK_MASK_CURRENT)) {
             t->status = TX_STATUS_ACKED;
         }
     }
 
-    // Complete only when guaranteed in order!
-    bool match_current = false;
-    uint8_t tx_ack_frame_id = expected_tx_frame_id(self);
-    embc_list_foreach(&self->tx_buffers_active, item) {
-        struct tx_buf_s *t = embc_list_entry(item, struct tx_buf_s, item);
-        match_current |= (t == t_match);
-        struct embc_framer_header_s *hdr = (struct embc_framer_header_s *) (t->b->data);
-        if ((TX_STATUS_ACKED == t->status) && (hdr->frame_id == tx_ack_frame_id)) {
-            embc_list_remove(&t->item);
-            embc_list_add_tail(&self->tx_buffers_free, item);
-            self->port_cbk[hdr->port].tx_done_fn(
-                    self->port_cbk[hdr->port].tx_done_user_data,
-                    hdr->port,
-                    hdr->message_id,
-                    0
-            );
-            embc_buffer_free(t->b);
-            t->b = 0;
-            t->status = TX_STATUS_EMPTY;
-            tx_ack_frame_id = (tx_ack_frame_id + 1) & EMBC_FRAMER_ID_MASK;
-        } else if (!match_current && (t->status == TX_STATUS_AWAIT_ACK)) {
-            t->status = TX_STATUS_TRANSMITTING;
-            self->hal_cbk.tx_fn(self->hal_cbk.tx_user_data, t->b);
-        }
-    }
-
+    tx_complete_in_order(self, t_match);
     transmit_queued(self);
+    if (embc_list_is_empty(&self->tx_buffers_active)) {
+        timer_cancel(self);
+    }
 }
 
 static void handle_ack(struct embc_framer_s *self, struct embc_buffer_s * ack) {
@@ -401,8 +464,7 @@ static void handle_ack(struct embc_framer_s *self, struct embc_buffer_s * ack) {
         uint8_t frame_id = hdr->frame_id & EMBC_FRAMER_ID_MASK;
         struct tx_buf_s * t = find_tx(self, frame_id);
         if (t) {
-            t->status = TX_STATUS_TRANSMITTING;
-            self->hal_cbk.tx_fn(self->hal_cbk.tx_user_data, t->b);
+            tx_error(self, t, EMBC_ERROR_MESSAGE_INTEGRITY);
         } else {
             LOGF_WARN("NACK: frame_id %d not found", (int) frame_id);
         }
