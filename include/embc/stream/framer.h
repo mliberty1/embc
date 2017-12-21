@@ -199,6 +199,8 @@ EMBC_CPP_GUARD_START
 #define EMBC_FRAMER_PORTS (16)
 /// The ack mask (port_def) for the current frame.
 #define EMBC_FRAMER_ACK_MASK_CURRENT ((uint16_t) 0x0100)
+/// The framer_id field mask for the frame id.
+#define EMBC_FRAMER_ID_MASK ((uint8_t) 0x0f)
 
 /**
  * @brief The frame header.

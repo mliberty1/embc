@@ -162,14 +162,18 @@ static void tx_validate_and_confirm(
         uint8_t const * payload, uint8_t length) {
     struct embc_buffer_s * c = embc_framer_construct_frame(
             self->f1, frame_id, port, message_id, port_def, payload, length);
-    assert_int_equal(1, embc_list_length(&self->tx));
+    assert_false(embc_list_is_empty(&self->tx));
     struct embc_buffer_s * b = embc_list_entry(embc_list_remove_head(&self->tx), struct embc_buffer_s, item);
     assert_int_equal(b->length, c->length);
     assert_memory_equal(b->data, c->data, b->length);
-    embc_buffer_free(b);
-    embc_buffer_free(c);
     embc_framer_hal_tx_done(self->f1, b);
+    embc_buffer_free(c);
 }
+
+#define expect_tx_done(port_, message_id_, status_) \
+    expect_value(tx_done_cbk, port, port_); \
+    expect_value(tx_done_cbk, message_id, message_id_); \
+    expect_value(tx_done_cbk, status, status_)
 
 static void perform_ack(
         struct test_s *self,
@@ -177,9 +181,6 @@ static void perform_ack(
         uint8_t status) {
     struct embc_buffer_s * ack = embc_framer_construct_ack(
             self->f1, frame_id, port, message_id, port_def, status);
-    expect_value(tx_done_cbk, port, port);
-    expect_value(tx_done_cbk, message_id, message_id);
-    expect_value(tx_done_cbk, status, status);
     embc_framer_hal_rx_buffer(self->f1, ack->data, ack->length);
     embc_buffer_free(ack);
 }
@@ -188,6 +189,7 @@ static void tx_single(void **state) {
     struct test_s *self = (struct test_s *) *state;
     embc_framer_send_payload(self->f1, 1, 3, 0x2211, PAYLOAD1, sizeof(PAYLOAD1));
     tx_validate_and_confirm(self, 0, 1, 3, 0x2211, PAYLOAD1, sizeof(PAYLOAD1));
+    expect_tx_done(1, 3, 0);
     perform_ack(self, 0, 1, 3, EMBC_FRAMER_ACK_MASK_CURRENT, 0);
 }
 
@@ -198,8 +200,9 @@ static void tx_multiple(void **state) {
         uint8_t message_id = (uint8_t) (i & 0xff);
         embc_framer_send_payload(self->f1, 1, message_id, 0x2211, PAYLOAD1, sizeof(PAYLOAD1));
         tx_validate_and_confirm(self, frame_id, 1, message_id, 0x2211, PAYLOAD1, sizeof(PAYLOAD1));
+        expect_tx_done(1, message_id, 0);
         perform_ack(self, frame_id, 1, message_id, EMBC_FRAMER_ACK_MASK_CURRENT, 0);
-        ++frame_id;
+        frame_id = (frame_id + 1) & EMBC_FRAMER_ID_MASK;
     }
 }
 
@@ -315,7 +318,7 @@ static void check_ack(struct test_s *self, uint8_t frame_id, uint8_t port, uint8
 }
 
 static void send_frame(struct test_s *self, int id, uint16_t mask, bool expect) {
-    uint8_t frame_id = (uint8_t) (id & 0x0f);
+    uint8_t frame_id = (uint8_t) (id & EMBC_FRAMER_ID_MASK);
     uint8_t message_id = (uint8_t) (id & 0xff);
     uint16_t port_def = (uint16_t) (id * 3);
     struct embc_buffer_s * b = embc_framer_construct_frame(
@@ -326,7 +329,6 @@ static void send_frame(struct test_s *self, int id, uint16_t mask, bool expect) 
     embc_framer_hal_rx_buffer(self->f1, b->data, b->length);
     check_ack(self, frame_id, 1, message_id, 0, mask);
     embc_buffer_free(b);
-
 }
 
 static void rx_and_ack(void **state) {
@@ -391,7 +393,7 @@ static void rx_sequence(struct test_s *self, uint8_t offset, int count) {
     uint16_t mask = 0;
     for (int i = 0; i <= count; ++i) {
         uint8_t k = (uint8_t) (i + offset);
-        uint8_t frame_id = k & 0x0f;
+        uint8_t frame_id = k & EMBC_FRAMER_ID_MASK;
         struct embc_buffer_s * b = embc_framer_construct_frame(
                 self->f1, frame_id, 1, k, 0x1122, PAYLOAD1, sizeof(PAYLOAD1));
         expect_frame(1, k, 0x1122, PAYLOAD1, sizeof(PAYLOAD1));
@@ -420,7 +422,7 @@ static void rx_mic_error(void ** state) {
     assert_int_equal(0, embc_framer_status_get(self->f1).rx_mic_error);
     embc_framer_hal_rx_buffer(self->f1, b->data, b->length);
     assert_int_equal(1, embc_framer_status_get(self->f1).rx_mic_error);
-    check_ack(self, 2, 1, 7, EMBC_ERROR_MESSAGE_INTEGRITY, 0x1c0);
+    check_ack(self, 2, 1, 7, EMBC_ERROR_MESSAGE_INTEGRITY, 0x0100);
     send_frame(self, 2, 0x1C0, true);
 }
 
@@ -443,8 +445,87 @@ static void rx_resync_error(void ** state) {
     send_frame(self, 2, 0x1C0, true);
 }
 
-// tx_lost_ack_and_retransmit_with_next_frame_ack
-// tx_retransmit_on_ack_mic_error
+static void tx_lost_acks(void **state) {
+    struct test_s *self = (struct test_s *) *state;
+
+    // frame 0 - no ack
+    embc_framer_send_payload(self->f1, 1, 6, 0x2211, PAYLOAD1, sizeof(PAYLOAD1));
+    tx_validate_and_confirm(self, 0, 1, 6, 0x2211, PAYLOAD1, sizeof(PAYLOAD1));
+
+    // frame 1 - no ack
+    embc_framer_send_payload(self->f1, 1, 7, 0x2211, PAYLOAD1, sizeof(PAYLOAD1));
+    tx_validate_and_confirm(self, 1, 1, 7, 0x2211, PAYLOAD1, sizeof(PAYLOAD1));
+
+    expect_tx_done(1, 6, 0);
+    expect_tx_done(1, 7, 0);
+    expect_tx_done(1, 8, 0);
+
+    // frame 2 - ack
+    embc_framer_send_payload(self->f1, 1, 8, 0x2211, PAYLOAD1, sizeof(PAYLOAD1));
+    tx_validate_and_confirm(self, 2, 1, 8, 0x2211, PAYLOAD1, sizeof(PAYLOAD1));
+    perform_ack(self, 2, 1, 8, 0x01C0, 0);
+}
+
+static void tx_lost_frame_and_retransmit_with_ack(void **state) {
+    struct test_s *self = (struct test_s *) *state;
+
+    // frame 0 - ack
+    embc_framer_send_payload(self->f1, 1, 6, 0x2211, PAYLOAD1, sizeof(PAYLOAD1));
+    tx_validate_and_confirm(self, 0, 1, 6, 0x2211, PAYLOAD1, sizeof(PAYLOAD1));
+    expect_tx_done(1, 6, 0);
+    perform_ack(self, 0, 1, 6, 0x0100, 0);
+
+    // frame 1 - lost, no ack
+    embc_framer_send_payload(self->f1, 1, 7, 0x2211, PAYLOAD1, sizeof(PAYLOAD1));
+    tx_validate_and_confirm(self, 1, 1, 7, 0x2211, PAYLOAD1, sizeof(PAYLOAD1));
+
+    // frame 2 - ack, still missing 1
+    embc_framer_send_payload(self->f1, 1, 8, 0x2211, PAYLOAD1, sizeof(PAYLOAD1));
+    tx_validate_and_confirm(self, 2, 1, 8, 0x2211, PAYLOAD1, sizeof(PAYLOAD1));
+    perform_ack(self, 2, 1, 8, 0x0140, 0);
+
+    expect_tx_done(1, 7, 0);
+    expect_tx_done(1, 8, 0);
+    tx_validate_and_confirm(self, 1, 1, 7, 0x2211, PAYLOAD1, sizeof(PAYLOAD1));
+    perform_ack(self, 1, 1, 7, 0x0380, 0);
+}
+
+static void tx_retransmit_on_ack_mic_error(void **state) {
+    struct test_s *self = (struct test_s *) *state;
+
+    // frame 0 - ack
+    embc_framer_send_payload(self->f1, 1, 6, 0x2211, PAYLOAD1, sizeof(PAYLOAD1));
+    tx_validate_and_confirm(self, 0, 1, 6, 0x2211, PAYLOAD1, sizeof(PAYLOAD1));
+
+    // nack causes retransmit
+    perform_ack(self, 0, 1, 6, 0x0100, EMBC_ERROR_MESSAGE_INTEGRITY);
+    tx_validate_and_confirm(self, 0, 1, 6, 0x2211, PAYLOAD1, sizeof(PAYLOAD1));
+    expect_tx_done(1, 6, 0);
+    perform_ack(self, 0, 1, 6, 0, 0);
+}
+
+static void tx_queue_then_transmit(void **state) {
+    struct test_s *self = (struct test_s *) *state;
+    (void) self;
+
+    embc_framer_send_payload(self->f1, 1, 6, 0x2211, PAYLOAD1, sizeof(PAYLOAD1));
+    embc_framer_send_payload(self->f1, 1, 7, 0x2211, PAYLOAD1, sizeof(PAYLOAD1));
+    embc_framer_send_payload(self->f1, 1, 8, 0x2211, PAYLOAD1, sizeof(PAYLOAD1));
+    embc_framer_send_payload(self->f1, 1, 9, 0x2211, PAYLOAD1, sizeof(PAYLOAD1));
+    embc_framer_send_payload(self->f1, 1, 10, 0x2211, PAYLOAD1, sizeof(PAYLOAD1));
+    assert_int_equal(3, embc_list_length(&self->tx));
+
+    tx_validate_and_confirm(self, 0, 1, 6, 0x2211, PAYLOAD1, sizeof(PAYLOAD1));
+    tx_validate_and_confirm(self, 1, 1, 7, 0x2211, PAYLOAD1, sizeof(PAYLOAD1));
+    tx_validate_and_confirm(self, 2, 1, 8, 0x2211, PAYLOAD1, sizeof(PAYLOAD1));
+    assert_true(embc_list_is_empty(&self->tx));
+
+    expect_tx_done(1, 6, 0);
+    perform_ack(self, 0, 1, 6, 0x0100, 0);
+    tx_validate_and_confirm(self, 3, 1, 9, 0x2211, PAYLOAD1, sizeof(PAYLOAD1));
+    //tx_validate_and_confirm(self, 4, 1, 10, 0x2211, PAYLOAD1, sizeof(PAYLOAD1));
+}
+
 // tx_retransmit_on_timeout
 // tx_too_many_retransmits
 
@@ -472,6 +553,10 @@ int main(void) {
             cmocka_unit_test_setup_teardown(rx_frame_id_resync, setup, teardown),
             cmocka_unit_test_setup_teardown(rx_mic_error, setup, teardown),
             cmocka_unit_test_setup_teardown(rx_resync_error, setup, teardown),
+            cmocka_unit_test_setup_teardown(tx_lost_acks, setup, teardown),
+            cmocka_unit_test_setup_teardown(tx_lost_frame_and_retransmit_with_ack, setup, teardown),
+            cmocka_unit_test_setup_teardown(tx_retransmit_on_ack_mic_error, setup, teardown),
+            cmocka_unit_test_setup_teardown(tx_queue_then_transmit, setup, teardown),
     };
 
     return cmocka_run_group_tests(tests, NULL, NULL);

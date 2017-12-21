@@ -315,11 +315,10 @@ static inline void embc_list_insert_after(
          item = next, next = next->prev)
 
 /**
- * @brief Get the number of items in the list.
+ * @brief Get the number of items in the list: O(n).
  *
  * @param list The list pointer.
  * @return The number of items in the list.
- *
  */
 static inline embc_size_t embc_list_length(struct embc_list_s * list) {
     embc_size_t sz = 0;
