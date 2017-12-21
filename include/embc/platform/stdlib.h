@@ -30,6 +30,9 @@
 
 EMBC_CPP_GUARD_START
 
+
+#if 0
+// straightforward bit shift implementation
 static inline uint32_t embc_clz(uint32_t x) {
     uint32_t c = 0;
     uint32_t m = 0x80000000U;
@@ -39,6 +42,28 @@ static inline uint32_t embc_clz(uint32_t x) {
     }
     return c;
 }
+#else
+
+#define check_bits(bits) \
+    y = x >> bits; \
+    if (y) { \
+        leading_zeros -= bits; \
+        x = y; \
+    }
+
+// Divide & conquer implementation
+static inline uint32_t embc_clz(uint32_t x) {
+    uint32_t leading_zeros = 32;
+    uint32_t y;
+    check_bits(16);
+    check_bits(8);
+    check_bits(4);
+    check_bits(2);
+    check_bits(1);
+    leading_zeros -= x;
+    return leading_zeros;
+}
+#endif
 
 // https://graphics.stanford.edu/~seander/bithacks.html#RoundUpPowerOf2
 // 1 << (32 - clz) is even faster with native CLZ support.
