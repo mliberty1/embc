@@ -82,6 +82,23 @@ class TestFramer(unittest.TestCase):
             self.f1.send(0, message_id, embc.stream.framer.Port0.PING_REQ, payload)
             expected.append(call(0, message_id, embc.stream.framer.Port0.PING_RSP, payload))
             self.process()
-        print(self.f1.status)
-        print(self.f2.status)
+        status_expected = dict(
+            version=0, rx_count=256, rx_data_count=128, rx_ack_count=128,
+            rx_deduplicate_count=0, rx_synchronization_error=0, rx_mic_error=0,
+            rx_frame_id_error=0, tx_count=128, tx_retransmit_count=0)
+        for key, value in status_expected.items():
+            self.assertEqual(value, getattr(self.f1.status, key))
+            self.assertEqual(value, getattr(self.f2.status, key))
         self.f1_rx.assert_has_calls(expected)
+
+    def test_remote_status(self):
+        self.f1.send(0, 0, embc.stream.framer.Port0.PING_REQ, b'ping1')
+        self.f1.send(0, 1, embc.stream.framer.Port0.PING_REQ, b'ping2')
+        self.f1.send(0, 2, embc.stream.framer.Port0.STATUS_REQ, b'data?')
+        self.process()
+        self.assertEqual(3, self.f1_rx.call_count)
+        args = self.f1_rx.call_args[0]
+        self.assertEqual((0, 2, embc.stream.framer.Port0.STATUS_RSP), args[:3])
+        payload = args[3]
+        self.assertEqual(payload,
+                         b'\x00\x00\x00\x00\x03\x00\x00\x00\x03\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00')
