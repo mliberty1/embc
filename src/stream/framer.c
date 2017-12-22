@@ -783,7 +783,7 @@ void embc_framer_hal_rx_byte(struct embc_framer_s * self, uint8_t byte) {
 
 void embc_framer_hal_rx_buffer(struct embc_framer_s * self,
         uint8_t const * buffer, embc_size_t length) {
-    for (uint32_t i = 0; i < length; ++i) {
+    for (embc_size_t i = 0; i < length; ++i) {
         embc_framer_hal_rx_byte(self, buffer[i]);
     }
 }
