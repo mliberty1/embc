@@ -34,11 +34,11 @@ class TestFramer(unittest.TestCase):
         self.f1 = None
 
     def f1_to_f2(self, x):
-        print(' -> %s' % buffer_to_hex(x))
+        # print(' -> %s' % buffer_to_hex(x))
         self.f1_to_f2_queue.append(x)
 
     def f2_to_f1(self, x):
-        print(' <- %s' % buffer_to_hex(x))
+        # print(' <- %s' % buffer_to_hex(x))
         self.f2_to_f1_queue.append(x)
 
     def process(self):
@@ -55,15 +55,15 @@ class TestFramer(unittest.TestCase):
                 processing = True
 
     def test_normal(self):
-        print(self.f1.status)
+        # print(self.f1.status)
         self.f1.send(1, 1, 3, b'hello 1')
         self.process()
         self.f1.send(1, 2, 3, b'hello 2')
         self.process()
         self.f1.send(1, 3, 3, b'hello 3')
         self.process()
-        print(self.f1.status)
-        print(self.f2.status)
+        # print(self.f1.status)
+        # print(self.f2.status)
         self.f2_rx.assert_has_calls([
             call(1, 1, 3, b'hello 1'),
             call(1, 2, 3, b'hello 2'),
@@ -74,9 +74,9 @@ class TestFramer(unittest.TestCase):
             call(1, 3, 0)])
 
     def test_ping(self):
-        print('test_ping')
+        # print('test_ping')
         expected = []
-        for i in range(32):
+        for i in range(128):
             message_id = i & 0xff
             payload = b'hello %d' % i
             self.f1.send(0, message_id, embc.stream.framer.Port0.PING_REQ, payload)

@@ -59,6 +59,14 @@ static inline uint16_t hdr_port_def(struct embc_framer_header_s * hdr) {
             (((uint16_t) hdr->port_def0) & 0xff);
 }
 
+static inline uint8_t hdr_frame_id(struct embc_framer_header_s * hdr) {
+    return (uint8_t) (hdr->frame_id & EMBC_FRAMER_ID_MASK);
+}
+
+static inline uint8_t frame_id_incr(uint8_t frame_id) {
+    return (uint8_t) ((frame_id + 1) & EMBC_FRAMER_ID_MASK);
+}
+
 static void transmit_tx_buf(struct embc_framer_s * self, struct tx_buf_s * t);
 
 struct embc_framer_s {
@@ -310,7 +318,7 @@ struct embc_buffer_s * embc_framer_construct_ack_to_frame(
         uint16_t mask,
         uint8_t status) {
     struct embc_framer_header_s *hdr = buffer_hdr(data_frame);
-    uint8_t frame_id = hdr->frame_id & EMBC_FRAMER_ID_MASK;
+    uint8_t frame_id = hdr_frame_id(hdr);
 
     if (0 == mask) {
         uint8_t frame_delta_new = frame_id - self->rx_frame_id;
@@ -420,7 +428,7 @@ static void tx_complete_in_order(struct embc_framer_s * self, struct tx_buf_s * 
         } else {
             break;
         }
-        tx_ack_frame_id = (tx_ack_frame_id + 1) & EMBC_FRAMER_ID_MASK;
+        tx_ack_frame_id = frame_id_incr(tx_ack_frame_id);
     }
 }
 
@@ -474,7 +482,7 @@ static void transmit_queued(struct embc_framer_s * self) {
 }
 
 static void tx_confirmed(struct embc_framer_s * self, struct embc_framer_header_s *ack_hdr) {
-    uint8_t frame_id = ack_hdr->frame_id & EMBC_FRAMER_ID_MASK;
+    uint8_t frame_id = hdr_frame_id(ack_hdr);
     struct tx_buf_s * t_match = find_tx(self, frame_id);
     if (0 == t_match) {
         LOGF_WARN("ack for unknown frame_id %d", (int) frame_id);
@@ -520,7 +528,7 @@ static void handle_ack(struct embc_framer_s *self, struct embc_buffer_s * ack) {
         // general nack (not for a specific frame)
     } else {
         // specific nack for a frame (usually message integrity error).
-        uint8_t frame_id = hdr->frame_id & EMBC_FRAMER_ID_MASK;
+        uint8_t frame_id = hdr_frame_id(hdr);
         struct tx_buf_s * t = find_tx(self, frame_id);
         if (t) {
             tx_error(self, t, EMBC_ERROR_MESSAGE_INTEGRITY);
@@ -544,7 +552,7 @@ static void rx_hook_fn(
     }
     EMBC_ASSERT(frame->length == (hdr->length + EMBC_FRAMER_HEADER_SIZE + EMBC_FRAMER_FOOTER_SIZE));
 
-    uint8_t frame_id = hdr->frame_id & EMBC_FRAMER_ID_MASK;
+    uint8_t frame_id = hdr_frame_id(hdr);
     uint16_t ack_frame_bitmask = 0;
     bool discard = false;
 
@@ -562,23 +570,23 @@ static void rx_hook_fn(
     if (frame_id == self->rx_frame_id) {
         // expected frame!
         ack_frame_bitmask = BITMAP_CURRENT | self->rx_frame_bitmask;
-        ++self->rx_frame_id;
+        self->rx_frame_id = frame_id_incr(self->rx_frame_id);;
         self->rx_frame_bitmask = (BITMAP_CURRENT | self->rx_frame_bitmask) >> 1;
         embc_list_add_tail(&self->rx_pending, &frame->item);
     } else {
-        uint8_t frame_delta_new = frame_id - self->rx_frame_id;
-        uint8_t frame_delta_old = self->rx_frame_id - frame_id;
+        uint8_t delta = (frame_id - self->rx_frame_id) & EMBC_FRAMER_ID_MASK;
+        int frame_delta = (delta > 8) ? (((int) delta - 16)) : (int) delta;
 
-        if (frame_delta_new < EMBC_FRAMER_OUTSTANDING_FRAMES_MAX) {
+        if ((frame_delta > 0) && (frame_delta < EMBC_FRAMER_OUTSTANDING_FRAMES_MAX)) {
             // skipped frame(s), store this frame.
             // will receive skipped frames on retransmit
-            ack_frame_bitmask = BITMAP_CURRENT | (self->rx_frame_bitmask >> frame_delta_new);
-            self->rx_frame_id += frame_delta_new + 1;
+            ack_frame_bitmask = BITMAP_CURRENT | (self->rx_frame_bitmask >> frame_delta);
+            self->rx_frame_id = (self->rx_frame_id + frame_delta + 1) & EMBC_FRAMER_ID_MASK;
             self->rx_frame_bitmask = (ack_frame_bitmask >> 1);
             embc_list_add_tail(&self->rx_pending, &frame->item);
-        } else if (frame_delta_old <= EMBC_FRAMER_OUTSTANDING_FRAMES_MAX) {
+        } else if ((frame_delta < 0) && (frame_delta >= -EMBC_FRAMER_OUTSTANDING_FRAMES_MAX)) {
             // older frame, dedup as necessary
-            uint16_t mask = BITMAP_CURRENT >> frame_delta_old;
+            uint16_t mask = BITMAP_CURRENT >> (-frame_delta);
             if (self->rx_frame_bitmask & mask) {
                 discard = true;
                 ++self->status.rx_deduplicate_count;
@@ -586,12 +594,12 @@ static void rx_hook_fn(
                 self->rx_frame_bitmask |= mask;
                 rx_insert(self, frame);
             }
-            ack_frame_bitmask = self->rx_frame_bitmask << frame_delta_old;
+            ack_frame_bitmask = self->rx_frame_bitmask << (-frame_delta);
         } else {
             // completely out of order: assume resync required.
             rx_purge_queued(self);
             ack_frame_bitmask = BITMAP_CURRENT;
-            self->rx_frame_id = frame_id + 1;
+            self->rx_frame_id = frame_id_incr(frame_id);
             self->rx_frame_bitmask = BITMAP_CURRENT >> 1;
             embc_list_add_tail(&self->rx_pending, &frame->item);
             ++self->status.rx_frame_id_error;
@@ -886,7 +894,7 @@ void embc_framer_send(
     embc_buffer_cursor_set(buffer, length);
     embc_buffer_write_u32_le(buffer, frame_crc);
     embc_buffer_write_u8(buffer, SOF);
-    self->tx_next_frame_id = (self->tx_next_frame_id + 1) & EMBC_FRAMER_ID_MASK;
+    self->tx_next_frame_id = frame_id_incr(self->tx_next_frame_id);
     embc_list_add_tail(&self->tx_queue, &buffer->item);
     transmit_queued(self);
 }
