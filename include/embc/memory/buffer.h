@@ -181,7 +181,7 @@ struct embc_buffer_s {
  *  <tr><td>7</td><td>4096</td><td>4128</td><td>0.8%</td></tr>
  * </table>
  */
-struct embc_buffer_allocator_s * embc_buffer_initialize(embc_size_t const * sizes, embc_size_t length);
+EMBC_API struct embc_buffer_allocator_s * embc_buffer_initialize(embc_size_t const * sizes, embc_size_t length);
 
 /**
  * @brief Finalize the buffer module and return all memory to the heap.
@@ -191,7 +191,7 @@ struct embc_buffer_allocator_s * embc_buffer_initialize(embc_size_t const * size
  * WARNING: all instances of all buffers must be returned first, or use after
  * free will be likely!
  */
-void embc_buffer_finalize(struct embc_buffer_allocator_s * self);
+EMBC_API void embc_buffer_finalize(struct embc_buffer_allocator_s * self);
 
 /**
  * @brief Allocate a buffer.
@@ -207,7 +207,7 @@ void embc_buffer_finalize(struct embc_buffer_allocator_s * self);
  * This function is not thread-safe and must be protected by critical sections
  * if it is to be used from multiple tasks or ISRs.
  */
-struct embc_buffer_s * embc_buffer_alloc(struct embc_buffer_allocator_s * self, embc_size_t size);
+EMBC_API struct embc_buffer_s * embc_buffer_alloc(struct embc_buffer_allocator_s * self, embc_size_t size);
 
 /**
  * @brief Free the buffer and return ownership to the allocator.
@@ -220,7 +220,7 @@ struct embc_buffer_s * embc_buffer_alloc(struct embc_buffer_allocator_s * self, 
  * Note that the buffer knows what allocator it came from.  The allocator
  * information is stored opaquely in adjacent memory.
  */
-void embc_buffer_free(struct embc_buffer_s * buffer);
+EMBC_API void embc_buffer_free(struct embc_buffer_s * buffer);
 
 /**
  * @brief Get the total number of bytes that can be stored in the buffer.

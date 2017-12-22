@@ -19,6 +19,7 @@
 #include "embc/lib.h"
 #include <stdarg.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 static embc_lib_fatal_fn fatal_fn_ = 0;
 static void * fatal_user_data_ = 0;
@@ -26,6 +27,10 @@ static embc_lib_print_fn print_fn_ = 0;
 static void * print_user_data_ = 0;
 
 static void embc_lib_printf_(const char *format, ...);
+
+void embc_lib_initialize() {
+    embc_allocator_set((embc_alloc_fn) malloc, (embc_free_fn) free);
+}
 
 void embc_lib_fatal_set(embc_lib_fatal_fn fn, void * user_data) {
     fatal_fn_ = fn;

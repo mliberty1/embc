@@ -212,10 +212,12 @@ static void perform_ack(
 
 static void tx_single(void **state) {
     struct test_s *self = (struct test_s *) *state;
+    assert_int_equal(0, embc_framer_status_get(self->f1).tx_count);
     embc_framer_send_payload(self->f1, 1, 3, 0x2211, PAYLOAD1, sizeof(PAYLOAD1));
     tx_validate_and_confirm(self, 0, 1, 3, 0x2211, PAYLOAD1, sizeof(PAYLOAD1));
     expect_tx_done(1, 3, 0);
     perform_ack(self, 0, 1, 3, EMBC_FRAMER_ACK_MASK_CURRENT, 0);
+    assert_int_equal(1, embc_framer_status_get(self->f1).tx_count);
 }
 
 static void tx_multiple(void **state) {
@@ -229,6 +231,8 @@ static void tx_multiple(void **state) {
         perform_ack(self, frame_id, 1, message_id, EMBC_FRAMER_ACK_MASK_CURRENT, 0);
         frame_id = (frame_id + 1) & EMBC_FRAMER_ID_MASK;
     }
+    assert_int_equal(10, embc_framer_status_get(self->f1).tx_count);
+    assert_int_equal(0, embc_framer_status_get(self->f1).tx_retransmit_count);
 }
 
 static void send_payload1(struct test_s *self) {
@@ -513,6 +517,8 @@ static void tx_lost_frame_and_retransmit_with_ack(void **state) {
     expect_tx_done(1, 8, 0);
     tx_validate_and_confirm(self, 1, 1, 7, 0x2211, PAYLOAD1, sizeof(PAYLOAD1));
     perform_ack(self, 1, 1, 7, 0x0380, 0);
+
+    assert_int_equal(1, embc_framer_status_get(self->f1).tx_retransmit_count);
 }
 
 static void tx_retransmit_on_ack_mic_error(void **state) {
@@ -615,6 +621,36 @@ static void tx_recover_after_error(void **state) {
     perform_ack(self, 1, 1, 7, 0x0300, 0);
 }
 
+static void send_ping_req(struct test_s *self, int id, uint16_t mask) {
+    uint8_t frame_id = (uint8_t) (id & EMBC_FRAMER_ID_MASK);
+    uint8_t message_id = (uint8_t) (id & 0xff);
+    struct embc_buffer_s * b = embc_framer_construct_frame(
+            self->f1, frame_id, 0, message_id, EMBC_FRAMER_PORT0_PING_REQ, PAYLOAD1, sizeof(PAYLOAD1));
+    embc_framer_hal_rx_buffer(self->f1, b->data, b->length);
+    if (id == 2) {
+        tx_validate_and_confirm(self, 0, 0, 0, EMBC_FRAMER_PORT0_PING_RSP, PAYLOAD1, sizeof(PAYLOAD1));
+        tx_validate_and_confirm(self, 1, 0, 1, EMBC_FRAMER_PORT0_PING_RSP, PAYLOAD1, sizeof(PAYLOAD1));
+        perform_ack(self, 0, 0, 0, 0x0100, 0);
+        perform_ack(self, 1, 0, 1, 0x0180, 0);
+    }
+    if (id >= 2) {
+        tx_validate_and_confirm(self, frame_id, 0, message_id, EMBC_FRAMER_PORT0_PING_RSP, PAYLOAD1, sizeof(PAYLOAD1));
+        perform_ack(self, frame_id, 0, message_id, 0x01C0, 0);
+    }
+    check_ack(self, frame_id, 0, message_id, 0, mask);
+    embc_buffer_free(b);
+}
+
+static void ping(void **state) {
+    struct test_s *self = (struct test_s *) *state;
+    send_ping_req(self, 0, 0x0100);
+    send_ping_req(self, 1, 0x0180);
+    send_ping_req(self, 2, 0x01C0);
+    send_ping_req(self, 3, 0x01E0);
+    send_ping_req(self, 4, 0x01F0);
+    send_ping_req(self, 5, 0x01F8);
+}
+
 
 int main(void) {
     hal_test_initialize();
@@ -646,6 +682,7 @@ int main(void) {
             cmocka_unit_test_setup_teardown(tx_retransmit_on_timeout, setup, teardown),
             cmocka_unit_test_setup_teardown(tx_too_many_timeout_retransmits, setup, teardown),
             cmocka_unit_test_setup_teardown(tx_recover_after_error, setup, teardown),
+            cmocka_unit_test_setup_teardown(ping, setup, teardown),
     };
 
     return cmocka_run_group_tests(tests, NULL, NULL);

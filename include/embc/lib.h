@@ -42,6 +42,11 @@
 EMBC_CPP_GUARD_START
 
 /**
+ * @brief Initialize the library.
+ */
+EMBC_API void embc_lib_initialize();
+
+/**
  * @brief The function called on fatal errors.
  *
  * @param user_data The arbitrary user data for the callback.

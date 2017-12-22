@@ -51,6 +51,18 @@ static void init_alloc_until_empty(void **state) {
     embc_buffer_finalize(a);
 }
 
+static void init_alloc_free_around(void **state) {
+    (void) state;
+    struct embc_buffer_allocator_s * a = embc_buffer_initialize(SIZES1, EMBC_ARRAY_SIZE(SIZES1));
+    struct embc_buffer_s * b;
+    for (int i = 0; i < 16; ++i) {
+        b = embc_buffer_alloc(a, 30);
+        embc_buffer_free(b);
+    }
+    embc_buffer_finalize(a);
+}
+
+
 static void buffer_write_str(void **state) {
     (void) state;
     struct embc_buffer_allocator_s * a = embc_buffer_initialize(SIZES1, EMBC_ARRAY_SIZE(SIZES1));
@@ -308,6 +320,7 @@ int main(void) {
     const struct CMUnitTest tests[] = {
             cmocka_unit_test(init_alloc_free_one),
             cmocka_unit_test(init_alloc_until_empty),
+            cmocka_unit_test(init_alloc_free_around),
             cmocka_unit_test(buffer_write_str),
             cmocka_unit_test(buffer_little_endian),
             cmocka_unit_test(buffer_big_endian),

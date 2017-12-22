@@ -24,7 +24,7 @@
 #define EMBC_STREAM_FRAMER_H_
 
 #include "embc/cmacro_inc.h"
-#include <stdint.h>
+#include "embc/platform.h"
 
 /**
  * @ingroup embc
@@ -169,10 +169,12 @@
  *      [StackOverflow](http://stackoverflow.com/questions/815758/simple-serial-point-to-point-communication-protocol)
  *    - PPP:
  *      [wikipedia](https://en.wikipedia.org/wiki/Point-to-Point_Protocol),
- *      [RFC](https://tools.ietf.org/html/rfc1661)
+ *      [RFC](https://tools.ietf.org/html/rfc1661),
+ *      [Segger embOS/IP](https://www.segger.com/products/connectivity/embosip/add-ons/ppppppoe/)
  *    - Constant Overhead Byte Stuffing (COBS):
  *      [wikipedia](https://en.wikipedia.org/wiki/Consistent_Overhead_Byte_Stuffing)
  *    - [Telemetry](https://github.com/Overdrivr/Telemetry)
+ *    - [Microcontroller Interconnect Network](https://github.com/min-protocol/min)
  */
 
 EMBC_CPP_GUARD_START
@@ -211,6 +213,14 @@ EMBC_CPP_GUARD_START
 #define EMBC_FRAMER_ACK_MASK_CURRENT ((uint16_t) 0x0100)
 /// The framer_id field mask for the frame id.
 #define EMBC_FRAMER_ID_MASK ((uint8_t) 0x0f)
+
+/// The framer type mask for the framer_id field
+#define EMBC_FRAMER_TYPE_MASK ((uint8_t) 0x80)
+/// The framer type DATA for framer_id field
+#define EMBC_FRAMER_TYPE_DATA ((uint8_t) 0x00)
+/// The framer type ACK for framer_id field
+#define EMBC_FRAMER_TYPE_ACK ((uint8_t) 0x80)
+
 /// The maximum number of retries per frame before giving up
 #define EMBC_FRAMER_MAX_RETRIES ((uint8_t) 16)
 
@@ -242,12 +252,26 @@ struct embc_framer_header_s {
 struct embc_framer_status_s {
     uint32_t version;
     uint32_t rx_count;
+    uint32_t rx_data_count;
+    uint32_t rx_ack_count;
     uint32_t rx_deduplicate_count;
     uint32_t rx_synchronization_error;
     uint32_t rx_mic_error;
     uint32_t rx_frame_id_error;
     uint32_t tx_count;
     uint32_t tx_retransmit_count;
+};
+
+/**
+ * @brief The framer Port 0 commands
+ */
+enum embc_framer_port0_cmd_e {
+    EMBC_FRAMER_PORT0_RSV1 = 0,
+    EMBC_FRAMER_PORT0_RSV2 = 1,
+    EMBC_FRAMER_PORT0_PING_REQ = 2,
+    EMBC_FRAMER_PORT0_PING_RSP = 3,
+    EMBC_FRAMER_PORT0_STATUS_REQ = 4,
+    EMBC_FRAMER_PORT0_STATUS_RSP = 5,
 };
 
 /**
@@ -258,8 +282,6 @@ struct embc_framer_s;
 // forward declaration from embc/memory/buffer.h
 struct embc_buffer_s;
 struct embc_buffer_allocator_s;
-
-//
 
 /**
  * @brief The framer port callbacks, registered for each port.
@@ -314,7 +336,8 @@ struct embc_framer_hal_callbacks_s {
      *      takes ownership of buffer and the HAL can use the item field to
      *      manage its pending list.  When the buffer is transmitted, call
      *      embc_framer_hal_tx_done() to return buffer ownership to the framer.
-     *      The callback is also necessary to provide backpressure.
+     *      The callback is also necessary to provide backpressure.  The HAL
+     *      must NOT call embc_buffer_free()!
      * @param length The length of buffer in bytes.
      */
     void (*tx_fn)(void * user_data, struct embc_buffer_s * buffer);
@@ -359,7 +382,7 @@ struct embc_framer_hal_callbacks_s {
  * This function is used to dynamically allocate embc_framer_s instances
  * without knowing about the embc_framer_s details.
  */
-EMBC_API uint32_t embc_framer_instance_size(void);
+EMBC_API embc_size_t embc_framer_instance_size(void);
 
 /**
  * @brief Initialize or reinitialize an instance.
@@ -393,7 +416,7 @@ EMBC_API void embc_framer_initialize(
 EMBC_API void embc_framer_register_port_callbacks(
         struct embc_framer_s * self,
         uint8_t port,
-        struct embc_framer_port_callbacks_s * callbacks);
+        struct embc_framer_port_callbacks_s const * callbacks);
 
 /**
  * @brief The receive hook for unit testing.
@@ -451,7 +474,7 @@ EMBC_API void embc_framer_hal_rx_byte(struct embc_framer_s * self, uint8_t byte)
  */
 EMBC_API void embc_framer_hal_rx_buffer(
         struct embc_framer_s * self,
-        uint8_t const * buffer, uint32_t length);
+        uint8_t const * buffer, embc_size_t length);
 
 /**
  * @brief Handle frame transmit completion.
@@ -508,6 +531,8 @@ EMBC_API struct embc_buffer_s * embc_framer_construct_ack(
  * @param port_def The application-defined frame-associated data.
  * @param buffer The buffer containing the transmit payload.  This function
  *      takes ownership.
+ *
+ * This function is not reentrant!
  */
 EMBC_API void embc_framer_send(
         struct embc_framer_s * self,
@@ -523,6 +548,8 @@ EMBC_API void embc_framer_send(
  * @param port_def The application-defined frame-associated data.
  * @param data The data.
  * @param length The length of data in bytes.
+ *
+ * This function is not reentrant!
  */
 EMBC_API void embc_framer_send_payload(
         struct embc_framer_s * self,

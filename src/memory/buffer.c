@@ -130,11 +130,13 @@ struct embc_buffer_s * embc_buffer_alloc(
         p->alloc_max = p->alloc_current;
     }
     buffer_init(buffer);
+    LOGF_DEBUG3("embc_buffer_alloc %p", (void *) buffer);
     return buffer;
 }
 
 void embc_buffer_free(struct embc_buffer_s * buffer) {
     DBC_NOT_NULL(buffer);
+    LOGF_DEBUG3("embc_buffer_free %p", (void *) buffer);
     struct embc_buffer_container_s * b = (struct embc_buffer_container_s *) buffer;
     struct pool_s * p = b->pool;
     EMBC_ASSERT((0 != p) && (p->magic == EMBC_BUFFER_MAGIC));
