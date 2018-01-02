@@ -5,7 +5,7 @@ import ctypes
 from ctypes import cdll, Structure, POINTER, pointer, cast, \
     c_uint64, c_uint32, c_uint16, c_uint8, c_void_p, c_size_t, c_char_p
 from ctypes.wintypes import DWORD, HANDLE, BOOL, LPVOID, LPWSTR
-from embc import dll as _dll
+from embc.lib import dll as _dll
 from ..collections.list import embc_list_s
 
 

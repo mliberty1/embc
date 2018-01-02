@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-//#define LOG_LEVEL LOG_LEVEL_ALL
+#define LOG_LEVEL LOG_LEVEL_ALL
 #include "embc/stream/framer.h"
 #include "embc/stream/framer_util.h"
 #include "embc/collections/list.h"
@@ -153,11 +153,8 @@ static void port0_tx_done(
         uint8_t message_id,
         int32_t status) {
     struct embc_framer_s * self = (struct embc_framer_s *) user_data;
-    (void) self;
     EMBC_ASSERT(0 == port);
-    (void) port;
-    (void) message_id;
-    (void) status;
+    self->port0_cbk.tx_done_fn(self->port0_cbk.tx_done_user_data, port, message_id, status);
 }
 
 static void rx_hook_fn(

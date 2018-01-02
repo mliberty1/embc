@@ -6,7 +6,7 @@ from ctypes import cdll, Structure, POINTER, pointer, cast, CFUNCTYPE, \
     c_uint64, c_uint32, c_uint16, c_uint8, c_void_p, c_size_t, c_char_p, \
     c_int32
 from ctypes.wintypes import DWORD, HANDLE, BOOL, LPVOID, LPWSTR
-from embc import dll as _dll
+from embc.lib import dll as _dll
 from embc import lib as embc_lib
 from ..collections.list import embc_list_s
 from ..memory import buffer as embc_buffer
@@ -16,6 +16,7 @@ import time
 embc_buffer_s = embc_buffer.embc_buffer_s
 RX_FN = CFUNCTYPE(None, c_void_p, c_uint8, c_uint8, c_uint16, POINTER(embc_buffer_s))
 TX_DONE_FN = CFUNCTYPE(None, c_void_p, c_uint8, c_uint8, c_int32)
+MAX_RETRIES = 16
 
 
 class Port0:
@@ -143,11 +144,19 @@ status_get.restype = embc_framer_status_s
 status_get.argtypes = [c_void_p]
 
 
+def _timer_cbk_default(user_data, timer_id):
+    pass
+
+
+timer_cbk_default = TIMER_DONE_FN(_timer_cbk_default)
+
+
 class Framer:
 
     def __init__(self):
         sizes = (c_size_t * 5)(8, 8, 8, 8, 8)
         self.allocator = embc_buffer.initialize(sizes, len(sizes))
+        self._timer_cbk = [timer_cbk_default, None]
 
         self.timeout = None
         self.hal_tx = lambda x: None
@@ -195,11 +204,16 @@ class Framer:
         hal_tx_done(self.framer, buffer)
 
     def _hal_timer_set(self, user_data, duration, cbk_fn, cbk_user_data, timer_id):
-        self.timeout = time.time() + duration * (2 ** -30)
+        dt = duration * (2 ** -30)
+        self.timeout = time.time() + dt
+        if timer_id is not None:
+            timer_id[0] = 1
+        self._timer_cbk = [cbk_fn, cbk_user_data]
         return 0
 
     def _hal_timer_cancel(self, user_data, timer_id):
         self.timeout = None
+        self._timer_cbk = [timer_cbk_default, None]
         return 0
 
     def _port_rx(self, user_data, port, message_id, port_def, buffer):
@@ -228,3 +242,13 @@ class Framer:
         msg_char = ctypes.create_string_buffer(payload)
         msg = cast(msg_char, POINTER(c_uint8))
         send_payload(self.framer, port, message_id, port_def, msg, payload_len)
+
+    def process(self):
+        if self.timeout is None:
+            return
+        if time.time() > self.timeout:
+            print('timeout')
+            cbk_fn, cbk_user_data = self._timer_cbk
+            self.timeout = None
+            self._timer_cbk = [timer_cbk_default, None]
+            cbk_fn(cbk_user_data, 1)

@@ -102,3 +102,14 @@ class TestFramer(unittest.TestCase):
         payload = args[3]
         self.assertEqual(payload,
                          b'\x00\x00\x00\x00\x03\x00\x00\x00\x03\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00')
+
+    def test_timeout(self):
+        self.f1.send(1, 2, 3, b'hello 1')
+        for i in range(embc.stream.framer.MAX_RETRIES + 1):
+            self.f1_tx_done.assert_not_called()
+            self.assertEqual(1, len(self.f1_to_f2_queue))
+            self.f1_to_f2_queue = []
+            self.assertIsNotNone(self.f1.timeout)
+            self.f1.timeout -= 1.0
+            self.f1.process()
+        self.f1_tx_done.assert_called_once_with(1, 2, embc.ec.TIMED_OUT)

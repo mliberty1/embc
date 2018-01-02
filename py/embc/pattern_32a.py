@@ -4,7 +4,7 @@ import os
 from ctypes import cdll, Structure, POINTER, pointer, cast, \
     c_uint64, c_uint32, c_uint16, c_uint8
 from ctypes.wintypes import DWORD, HANDLE, BOOL, LPVOID, LPWSTR
-from embc import dll as _dll
+from embc.lib import dll as _dll
 
 
 class embc_pattern_32a_tx_s(Structure):

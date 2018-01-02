@@ -64,6 +64,6 @@ class TestBuffer(unittest.TestCase):
             buffers.append(b)
             if write_index >= (count - 1):
                 b = buffers.pop(0)
-                self.assertEquals(bytes([read_index]), b[0].read_all())
+                self.assertEqual(bytes([read_index]), b[0].read_all())
                 b[0].free()
                 read_index = read_index + 1
