@@ -69,9 +69,22 @@ class TestFramer(unittest.TestCase):
             call(1, 2, 3, b'hello 2'),
             call(1, 3, 3, b'hello 3')])
         self.f1_tx_done.assert_has_calls([
-            call(1, 1, 0),
-            call(1, 2, 0),
-            call(1, 3, 0)])
+            call(1, 1, 3, 0),
+            call(1, 2, 3, 0),
+            call(1, 3, 3, 0)])
+
+    def test_multiple(self):
+        rx_expected = []
+        tx_done_expected = []
+        for i in range(128):
+            payload = b'hello %d' % i
+            rx_expected.append(call(1, i, 3, payload))
+            tx_done_expected.append(call(1, i, 3, 0))
+            self.f1.send(1, i, 3, payload)
+            if i >= 2:
+                self.process()
+        self.f2_rx.assert_has_calls(rx_expected)
+        self.f1_tx_done.assert_has_calls(tx_done_expected)
 
     def test_ping(self):
         # print('test_ping')
@@ -112,4 +125,4 @@ class TestFramer(unittest.TestCase):
             self.assertIsNotNone(self.f1.timeout)
             self.f1.timeout -= 1.0
             self.f1.process()
-        self.f1_tx_done.assert_called_once_with(1, 2, embc.ec.TIMED_OUT)
+        self.f1_tx_done.assert_called_once_with(1, 2, 3, embc.ec.TIMED_OUT)

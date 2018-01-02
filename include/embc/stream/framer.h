@@ -315,6 +315,7 @@ struct embc_framer_port_callbacks_s {
      * @param user_data The user data.
      * @param port The port (payload type).
      * @param message_id The application-defined message identifier.
+     * @param port_def The application-defined value.
      * @param status 0 or error.  The framer module automatically retransmits
      *      frames as needed, and only the last error condition is reported.
      */
@@ -322,6 +323,7 @@ struct embc_framer_port_callbacks_s {
             void * user_data,
             uint8_t port,
             uint8_t message_id,
+            uint16_t port_def,
             int32_t status);
 
     void * tx_done_user_data;

@@ -108,10 +108,11 @@ void rx_cbk(void *user_data,
     embc_buffer_free(buffer);
 }
 
-void tx_done_cbk(void * user_data, uint8_t port, uint8_t message_id, int32_t status) {
+void tx_done_cbk(void * user_data, uint8_t port, uint8_t message_id, uint16_t port_def, int32_t status) {
     (void) user_data;
     check_expected(port);
     check_expected(message_id);
+    check_expected(port_def),
     check_expected(status);
 }
 
@@ -195,9 +196,10 @@ static void tx_validate_and_confirm(
     embc_buffer_free(c);
 }
 
-#define expect_tx_done(port_, message_id_, status_) \
+#define expect_tx_done(port_, message_id_, port_def_, status_) \
     expect_value(tx_done_cbk, port, port_); \
     expect_value(tx_done_cbk, message_id, message_id_); \
+    expect_value(tx_done_cbk, port_def, port_def_); \
     expect_value(tx_done_cbk, status, status_)
 
 static void perform_ack(
@@ -215,7 +217,7 @@ static void tx_single(void **state) {
     assert_int_equal(0, embc_framer_status_get(self->f1).tx_count);
     embc_framer_send_payload(self->f1, 1, 3, 0x2211, PAYLOAD1, sizeof(PAYLOAD1));
     tx_validate_and_confirm(self, 0, 1, 3, 0x2211, PAYLOAD1, sizeof(PAYLOAD1));
-    expect_tx_done(1, 3, 0);
+    expect_tx_done(1, 3, 0x2211, 0);
     perform_ack(self, 0, 1, 3, EMBC_FRAMER_ACK_MASK_CURRENT, 0);
     assert_int_equal(1, embc_framer_status_get(self->f1).tx_count);
 }
@@ -227,7 +229,7 @@ static void tx_multiple(void **state) {
         uint8_t message_id = (uint8_t) (i & 0xff);
         embc_framer_send_payload(self->f1, 1, message_id, 0x2211, PAYLOAD1, sizeof(PAYLOAD1));
         tx_validate_and_confirm(self, frame_id, 1, message_id, 0x2211, PAYLOAD1, sizeof(PAYLOAD1));
-        expect_tx_done(1, message_id, 0);
+        expect_tx_done(1, message_id, 0x2211, 0);
         perform_ack(self, frame_id, 1, message_id, EMBC_FRAMER_ACK_MASK_CURRENT, 0);
         frame_id = (frame_id + 1) & EMBC_FRAMER_ID_MASK;
     }
@@ -485,9 +487,9 @@ static void tx_lost_acks(void **state) {
     embc_framer_send_payload(self->f1, 1, 7, 0x2211, PAYLOAD1, sizeof(PAYLOAD1));
     tx_validate_and_confirm(self, 1, 1, 7, 0x2211, PAYLOAD1, sizeof(PAYLOAD1));
 
-    expect_tx_done(1, 6, 0);
-    expect_tx_done(1, 7, 0);
-    expect_tx_done(1, 8, 0);
+    expect_tx_done(1, 6, 0x2211, 0);
+    expect_tx_done(1, 7, 0x2211, 0);
+    expect_tx_done(1, 8, 0x2211, 0);
 
     // frame 2 - ack
     embc_framer_send_payload(self->f1, 1, 8, 0x2211, PAYLOAD1, sizeof(PAYLOAD1));
@@ -501,7 +503,7 @@ static void tx_lost_frame_and_retransmit_with_ack(void **state) {
     // frame 0 - ack
     embc_framer_send_payload(self->f1, 1, 6, 0x2211, PAYLOAD1, sizeof(PAYLOAD1));
     tx_validate_and_confirm(self, 0, 1, 6, 0x2211, PAYLOAD1, sizeof(PAYLOAD1));
-    expect_tx_done(1, 6, 0);
+    expect_tx_done(1, 6, 0x2211, 0);
     perform_ack(self, 0, 1, 6, 0x0100, 0);
 
     // frame 1 - lost, no ack
@@ -513,8 +515,8 @@ static void tx_lost_frame_and_retransmit_with_ack(void **state) {
     tx_validate_and_confirm(self, 2, 1, 8, 0x2211, PAYLOAD1, sizeof(PAYLOAD1));
     perform_ack(self, 2, 1, 8, 0x0140, 0);
 
-    expect_tx_done(1, 7, 0);
-    expect_tx_done(1, 8, 0);
+    expect_tx_done(1, 7, 0x2211, 0);
+    expect_tx_done(1, 8, 0x2211, 0);
     tx_validate_and_confirm(self, 1, 1, 7, 0x2211, PAYLOAD1, sizeof(PAYLOAD1));
     perform_ack(self, 1, 1, 7, 0x0380, 0);
 
@@ -531,7 +533,7 @@ static void tx_retransmit_on_ack_mic_error(void **state) {
     // nack causes retransmit
     perform_ack(self, 0, 1, 6, 0x0100, EMBC_ERROR_MESSAGE_INTEGRITY);
     tx_validate_and_confirm(self, 0, 1, 6, 0x2211, PAYLOAD1, sizeof(PAYLOAD1));
-    expect_tx_done(1, 6, 0);
+    expect_tx_done(1, 6, 0x2211, 0);
     perform_ack(self, 0, 1, 6, 0, 0);
 }
 
@@ -550,7 +552,7 @@ static void tx_queue_then_transmit(void **state) {
     tx_validate_and_confirm(self, 2, 1, 8, 0x2211, PAYLOAD1, sizeof(PAYLOAD1));
     assert_true(embc_list_is_empty(&self->tx));
 
-    expect_tx_done(1, 6, 0);
+    expect_tx_done(1, 6, 0x2211, 0);
     perform_ack(self, 0, 1, 6, 0x0100, 0);
     tx_validate_and_confirm(self, 3, 1, 9, 0x2211, PAYLOAD1, sizeof(PAYLOAD1));
     //tx_validate_and_confirm(self, 4, 1, 10, 0x2211, PAYLOAD1, sizeof(PAYLOAD1));
@@ -569,7 +571,7 @@ static void tx_retransmit_on_timeout(void **state) {
     assert_int_equal(1, embc_list_length(&self->timers_pending));
     signal_timeout(self);
     tx_validate_and_confirm(self, 0, 1, 6, 0x2211, PAYLOAD1, sizeof(PAYLOAD1));
-    expect_tx_done(1, 6, 0);
+    expect_tx_done(1, 6, 0x2211, 0);
     perform_ack(self, 0, 1, 6, 0x0100, 0);
 }
 
@@ -584,7 +586,7 @@ static void tx_too_many_timeout_retransmits(void **state) {
     }
 
     tx_validate_and_confirm(self, 0, 1, 6, 0x2211, PAYLOAD1, sizeof(PAYLOAD1));
-    expect_tx_done(1, 6, EMBC_ERROR_TIMED_OUT);
+    expect_tx_done(1, 6, 0x2211, EMBC_ERROR_TIMED_OUT);
     signal_timeout(self);
 }
 
@@ -609,15 +611,15 @@ static void tx_recover_after_error(void **state) {
     }
 
     tx_validate_and_confirm(self, 0, 1, 6, 0x2211, PAYLOAD1, sizeof(PAYLOAD1));
-    expect_tx_done(1, 6, EMBC_ERROR_TIMED_OUT);
+    expect_tx_done(1, 6, 0x2211, EMBC_ERROR_TIMED_OUT);
     signal_timeout(self);
 
     tx_validate_and_confirm(self, 1, 1, 7, 0x2211, PAYLOAD1, sizeof(PAYLOAD1));
     tx_validate_and_confirm(self, 2, 1, 8, 0x2211, PAYLOAD1, sizeof(PAYLOAD1));
 
     perform_ack(self, 2, 1, 8, 0x0100, 0);
-    expect_tx_done(1, 7, 0);
-    expect_tx_done(1, 8, 0);
+    expect_tx_done(1, 7, 0x2211, 0);
+    expect_tx_done(1, 8, 0x2211, 0);
     perform_ack(self, 1, 1, 7, 0x0300, 0);
 }
 

@@ -15,7 +15,7 @@ import time
 
 embc_buffer_s = embc_buffer.embc_buffer_s
 RX_FN = CFUNCTYPE(None, c_void_p, c_uint8, c_uint8, c_uint16, POINTER(embc_buffer_s))
-TX_DONE_FN = CFUNCTYPE(None, c_void_p, c_uint8, c_uint8, c_int32)
+TX_DONE_FN = CFUNCTYPE(None, c_void_p, c_uint8, c_uint8, c_uint16, c_int32)
 MAX_RETRIES = 16
 
 
@@ -222,16 +222,16 @@ class Framer:
         buffer[0].free()
         rx(port, message_id, port_def, data)
 
-    def _port_tx_done(self, user_data, port, message_id, status):
+    def _port_tx_done(self, user_data, port, message_id, port_def, status):
         _, tx_done = self._pyport[port]
-        tx_done(port, message_id, status)
+        tx_done(port, message_id, port_def, status)
 
     def register_port(self, port, rx, tx_done):
         """Register callbacks for a port
 
         :param port: The port number from 1 to EMBC_FRAMER_PORTS.
         :param rx: The callable(port, message_id, port_def, data)
-        :param tx_done: The callable(port, message_id, status).
+        :param tx_done: The callable(port, message_id, port_def, status).
         """
         port = int(port)
         assert(0 <= port < 256)
@@ -247,7 +247,6 @@ class Framer:
         if self.timeout is None:
             return
         if time.time() > self.timeout:
-            print('timeout')
             cbk_fn, cbk_user_data = self._timer_cbk
             self.timeout = None
             self._timer_cbk = [timer_cbk_default, None]

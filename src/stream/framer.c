@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#define LOG_LEVEL LOG_LEVEL_ALL
+//#define LOG_LEVEL LOG_LEVEL_ALL
 #include "embc/stream/framer.h"
 #include "embc/stream/framer_util.h"
 #include "embc/collections/list.h"
@@ -113,10 +113,12 @@ static void tx_done_default(
         void * user_data,
         uint8_t port,
         uint8_t message_id,
+        uint16_t port_def,
         int32_t status) {
     (void) user_data;
     (void) port;
     (void) message_id;
+    (void) port_def,
     (void) status;
 }
 
@@ -151,10 +153,20 @@ static void port0_tx_done(
         void * user_data,
         uint8_t port,
         uint8_t message_id,
+        uint16_t port_def,
         int32_t status) {
     struct embc_framer_s * self = (struct embc_framer_s *) user_data;
     EMBC_ASSERT(0 == port);
-    self->port0_cbk.tx_done_fn(self->port0_cbk.tx_done_user_data, port, message_id, status);
+    uint8_t cmd = (uint8_t) (port_def & 0xff);
+    switch (cmd) {
+        case EMBC_FRAMER_PORT0_PING_RSP:
+            break;
+        case EMBC_FRAMER_PORT0_STATUS_RSP:
+            break;
+        default:
+            self->port0_cbk.tx_done_fn(self->port0_cbk.tx_done_user_data, port, message_id, port_def, status);
+            break;
+    }
 }
 
 static void rx_hook_fn(
@@ -377,24 +389,26 @@ static struct tx_buf_s * find_tx(struct embc_framer_s * self, uint8_t frame_id) 
 }
 
 static void tx_complete(struct embc_framer_s * self, struct tx_buf_s * t, uint8_t status) {
-    struct embc_framer_header_s *hdr = buffer_hdr(t->b);
+    struct embc_framer_header_s hdr = *buffer_hdr(t->b);
+    LOGF_DEBUG2("tx_complete %p, port=%d", (void *) t->b, (int) hdr.port);
     ++self->status.tx_count;
     embc_list_remove(&t->item);
-    embc_list_add_tail(&self->tx_buffers_free, &t->item);
-    if (hdr->port < EMBC_FRAMER_PORTS) {
-        self->port_cbk[hdr->port].tx_done_fn(
-                self->port_cbk[hdr->port].tx_done_user_data,
-                hdr->port,
-                hdr->message_id,
-                status
-        );
-    } else {
-        LOGF_WARN("ack invalid port: %d", (int) hdr->port);
-    }
-    LOGF_DEBUG2("tx_complete %p", (void *) t->b);
     embc_buffer_free(t->b);
     t->b = 0;
     t->status = TX_STATUS_EMPTY;
+    embc_list_add_tail(&self->tx_buffers_free, &t->item);
+    uint16_t port_def = hdr_port_def(&hdr);
+    if (hdr.port < EMBC_FRAMER_PORTS) {
+        self->port_cbk[hdr.port].tx_done_fn(
+                self->port_cbk[hdr.port].tx_done_user_data,
+                hdr.port,
+                hdr.message_id,
+                port_def,
+                status
+        );
+    } else {
+        LOGF_WARN("invalid port %d", (int) hdr.port);
+    }
 }
 
 static void tx_error(struct embc_framer_s * self, struct tx_buf_s * t, uint8_t status) {
@@ -482,8 +496,10 @@ static void tx_confirmed(struct embc_framer_s * self, struct embc_framer_header_
     uint8_t frame_id = hdr_frame_id(ack_hdr);
     struct tx_buf_s * t_match = find_tx(self, frame_id);
     if (0 == t_match) {
-        LOGF_WARN("ack for unknown frame_id %d", (int) frame_id);
+        LOGF_WARN("ack unknown frame_id=%d", (int) frame_id);
         return;
+    } else {
+        LOGF_DEBUG("ack frame_id=%d", (int) frame_id);
     }
 
     // update current item status.
@@ -522,15 +538,17 @@ static void handle_ack(struct embc_framer_s *self, struct embc_buffer_s * ack) {
     if (0 == status) { // success!
         tx_confirmed(self, hdr);
     } else if (0 == port_def) {
-        // general nack (not for a specific frame)
+        LOGF_INFO("handle_ack general nack, status=%d", (int) status);
+        // todo
     } else {
         // specific nack for a frame (usually message integrity error).
         uint8_t frame_id = hdr_frame_id(hdr);
+        LOGF_INFO("handle_ack nack, status=%d, frame_id=%d", (int) status, (int) frame_id);
         struct tx_buf_s * t = find_tx(self, frame_id);
         if (t) {
             tx_error(self, t, EMBC_ERROR_MESSAGE_INTEGRITY);
         } else {
-            LOGF_WARN("NACK: frame_id %d not found", (int) frame_id);
+            LOGF_WARN("handle_ack nack: frame_id=%d not found", (int) frame_id);
         }
     }
 }
@@ -900,7 +918,7 @@ EMBC_API void embc_framer_send_payload(
         struct embc_framer_s * self,
         uint8_t port, uint8_t message_id, uint16_t port_def,
         uint8_t const * data, uint8_t length) {
-    DBC_RANGE_INT(length, 0, EMBC_FRAMER_PAYLOAD_MAX_SIZE - 1);
+    DBC_RANGE_INT(length, 0, EMBC_FRAMER_PAYLOAD_MAX_SIZE);
     LOGS_DEBUG3("embc_framer_send_payload");
     struct embc_buffer_s * b = embc_framer_alloc(self);
     embc_buffer_write(b, data, length);

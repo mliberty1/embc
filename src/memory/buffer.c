@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+//#define LOG_LEVEL LOG_LEVEL_ALL
 #include "embc/memory/buffer.h"
 #include "embc/dbc.h"
 #include "embc/platform.h"
