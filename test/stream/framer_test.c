@@ -150,6 +150,7 @@ static int setup(void ** state) {
     embc_list_initialize(&self->timers_pending);
     for (embc_size_t i = 0; i < EMBC_ARRAY_SIZE(self->timers); ++i) {
         self->timers[i].timer_id = i;
+        embc_list_initialize(&self->timers[i].item);
         embc_list_add_tail(&self->timers_free, &self->timers[i].item);
     }
 
@@ -378,7 +379,10 @@ static void rx_dedup_on_lost_ack(void **state) {
     send_frame(self, 2, 0x1C0, true);
     assert_int_equal(0, embc_framer_status_get(self->f1).rx_deduplicate_count);
     send_frame(self, 1, 0x380, false);
-    assert_int_equal(1, embc_framer_status_get(self->f1).rx_deduplicate_count);
+    send_frame(self, 2, 0x1C0, false);
+    assert_int_equal(2, embc_framer_status_get(self->f1).rx_deduplicate_count);
+    send_frame(self, 3, 0x1E0, true);
+    assert_int_equal(2, embc_framer_status_get(self->f1).rx_deduplicate_count);
 }
 
 static void rx_expect_ordered(struct test_s *self) {
@@ -653,6 +657,25 @@ static void ping(void **state) {
     send_ping_req(self, 5, 0x01F8);
 }
 
+static void tx_resync_cmd(void **state) {
+    struct test_s *self = (struct test_s *) *state;
+    embc_framer_resync(self->f1);
+    tx_validate_and_confirm(self, 0, 0, 0, EMBC_FRAMER_PORT0_RESYNC, 0, 0);
+    perform_ack(self, 0, 0, EMBC_FRAMER_PORT0_RESYNC, EMBC_FRAMER_ACK_MASK_CURRENT, 0);
+    assert_int_equal(1, embc_framer_status_get(self->f1).tx_count);
+}
+
+static void rx_resync_cmd(void **state) {
+    struct test_s *self = (struct test_s *) *state;
+
+    uint8_t frame_id = 9;
+    struct embc_buffer_s * b = embc_framer_construct_frame(
+            self->f1, frame_id, 0, 0, EMBC_FRAMER_PORT0_RESYNC, 0, 0);
+    embc_framer_hal_rx_buffer(self->f1, b->data, b->length);
+    check_ack(self, frame_id, 0, 0, 0, EMBC_FRAMER_ACK_MASK_CURRENT);
+    embc_buffer_free(b);
+    send_frame(self, frame_id + 1, EMBC_FRAMER_ACK_MASK_SYNC, true);
+}
 
 int main(void) {
     hal_test_initialize();
@@ -685,6 +708,8 @@ int main(void) {
             cmocka_unit_test_setup_teardown(tx_too_many_timeout_retransmits, setup, teardown),
             cmocka_unit_test_setup_teardown(tx_recover_after_error, setup, teardown),
             cmocka_unit_test_setup_teardown(ping, setup, teardown),
+            cmocka_unit_test_setup_teardown(tx_resync_cmd, setup, teardown),
+            cmocka_unit_test_setup_teardown(rx_resync_cmd, setup, teardown),
     };
 
     return cmocka_run_group_tests(tests, NULL, NULL);

@@ -201,6 +201,34 @@ static void list_index(void **state) {
     assert_ptr_equal(embc_list_index(&s->list, 3), 0);
 }
 
+static void list_autoremove(void **state) {
+    struct state_s *s = (struct state_s *) *state;
+    struct embc_list_s a;
+    struct embc_list_s b;
+    embc_list_initialize(&a);
+    embc_list_initialize(&b);
+    embc_list_add_tail(&a, &s->elements[0].item);
+    embc_list_add_tail(&a, &s->elements[1].item);
+    embc_list_add_tail(&a, &s->elements[3].item);
+    assert_int_equal(3, embc_list_length(&a));
+
+    embc_list_add_tail(&b, &s->elements[2].item);
+    embc_list_add_head(&b, &s->elements[1].item);
+    embc_list_add_head(&b, &s->elements[0].item);
+    embc_list_add_tail(&b, &s->elements[3].item);
+    assert_int_equal(4, embc_list_length(&b));
+    assert_int_equal(0, embc_list_length(&a));
+
+    assert_int_equal(0, embc_list_index_of(&b, &s->elements[0].item));
+    assert_int_equal(1, embc_list_index_of(&b, &s->elements[1].item));
+    assert_int_equal(2, embc_list_index_of(&b, &s->elements[2].item));
+    assert_int_equal(3, embc_list_index_of(&b, &s->elements[3].item));
+
+    // remove from its own list
+    embc_list_add_tail(&b, &s->elements[2].item);
+    assert_int_equal(4, embc_list_length(&b));
+}
+
 int main(void) {
     const struct CMUnitTest tests[] = {
             cmocka_unit_test_setup(list_empty, setup),
@@ -215,6 +243,7 @@ int main(void) {
             cmocka_unit_test_setup(list_remove_and_insert_while_iterating, setup),
             cmocka_unit_test_setup(list_remove_when_not_in_list, setup),
             cmocka_unit_test_setup(list_index, setup),
+            cmocka_unit_test_setup(list_autoremove, setup),
     };
 
     return cmocka_run_group_tests(tests, NULL, NULL);

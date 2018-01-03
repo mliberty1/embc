@@ -40,9 +40,11 @@ free = dll.embc_lib_free
 free.argtypes = [c_void_p]
 free.restype = None
 
+
 def fatal(obj, filename, linenum, message):
-    log.critical('%s %d %s', filename, linenum, message)
-    assert(False)
+    msg = '%s %d %s' % (filename, linenum, message)
+    log.critical(msg)
+    raise Exception(msg)
 
 
 def print_(obj, message):

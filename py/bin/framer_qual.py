@@ -83,6 +83,21 @@ class MasterFramer:
         else:
             self.send_ping()
 
+    def _ping_rx_resync(self, message_id, data):
+        for idx in range(len(self._ping_queue)):
+            msg = self._ping_queue[idx]
+            if msg.tx_pending:
+                break
+            if msg.message_id == message_id and msg.payload == data:
+                log.info('resync to index %d', idx)
+                print(len(self._ping_queue))
+                del self._ping_queue[:idx]
+                print(len(self._ping_queue))
+                assert(msg == self._ping_queue[0])
+                return msg
+        log.warning('resync failed')
+        return None
+
     def rx(self, port, message_id, port_def, data):
         if 0 == port and embc.stream.framer.Port0.PING_RSP == port_def:
             if not self._ping_queue:  # error
@@ -90,16 +105,17 @@ class MasterFramer:
                 return
             msg = self._ping_queue[0]
             if msg.message_id != message_id:
-                log.debug('rx ping response message_id mismatch: %d != %d',
+                log.debug('rx ping response message_id mismatch: expected %d != received %d',
                           msg.message_id, message_id)
-                # todo resync?
-                return
-            if msg.payload != data:
+                msg = self._ping_rx_resync(message_id, data)
+            elif msg.payload != data:
                 log.warning('rx ping response %d payload mismatch', message_id)
+                msg = self._ping_rx_resync(message_id, data)
             else:
                 log.debug('rx ping response %d', message_id)
-            msg.rx_pending = False
-            self._ping_remove(0)
+            if msg is not None:
+                msg.rx_pending = False
+                self._ping_remove(0)
         else:
             log.info('%s %s %s %s', port, message_id, port_def, data)
 
@@ -140,9 +156,10 @@ class MasterFramer:
     def _get_tx_done_message(self, message_id):
         for idx, msg in enumerate(self._ping_queue):
             if msg.tx_pending:
-                return 0, None
+                break
             if not msg.tx_pending and msg.tx_done_pending and msg.message_id == message_id:
                 return idx, msg
+        return 0, None
 
     def tx_done(self, port, message_id, port_def, status):
         if 0 == port and embc.stream.framer.Port0.PING_REQ == port_def:
@@ -165,6 +182,7 @@ class MasterFramer:
 
     def open(self):
         self._serial.open()
+        self._framer.resync()
 
     def close(self):
         self._serial.close()

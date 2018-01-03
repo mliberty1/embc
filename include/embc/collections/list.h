@@ -92,6 +92,8 @@ struct embc_list_s {
  * @brief Initialize a list or an item.
  *
  * @param list The list pointer or item pointer to initialize.
+ *
+ * Every list and item must be initialized before use.
  */
 static inline void embc_list_initialize(struct embc_list_s * list) {
     list->next = list;
@@ -120,12 +122,31 @@ static inline bool embc_list_is_empty(struct embc_list_s * list) {
     EMBC_CONTAINER_OF(item, type, member)
 
 /**
+ * @brief Remove an item from a list without reinitializing item.
+ *
+ * @param item The pointer to the item to remove.
+ *
+ * This function is intended for internal use and should not be used by
+ * external modules.  External modules should use embc_list_remove() or
+ * add the item to a new list.  All add functions will remove the item
+ * from any lists in which it is participating.  This behavior prevents
+ * list corruption if a module forgets to remove an item from an old list
+ * before adding it to a new list.
+ */
+static inline void embc_list_remove_unsafe_(struct embc_list_s * item) {
+    item->prev->next = item->next;
+    item->next->prev = item->prev;
+}
+
+/**
  * @brief Add an item to the front of the list.
  *
  * @param list The list pointer.
- * @param item The pointer to the item to add.
+ * @param item The pointer to the item to add.  The item will be automatically
+ *      removed from any list in which it currently belongs.
  */
 static inline void embc_list_add_head(struct embc_list_s * list, struct embc_list_s * item) {
+    embc_list_remove_unsafe_(item);
     item->next = list->next;
     item->prev = list;
     item->next->prev = item;
@@ -136,9 +157,11 @@ static inline void embc_list_add_head(struct embc_list_s * list, struct embc_lis
  * @brief Add an item to the end of the list.
  *
  * @param list The list pointer.
- * @param item The pointer to the item to add.
+ * @param item The pointer to the item to add.  The item will be automatically
+ *      removed from any list in which it currently belongs.
  */
 static inline void embc_list_add_tail(struct embc_list_s * list, struct embc_list_s * item) {
+    embc_list_remove_unsafe_(item);
     item->next = list;
     item->prev = list->prev;
     item->prev->next = item;
@@ -234,6 +257,7 @@ static inline void embc_list_remove(struct embc_list_s * item) {
 static inline void embc_list_insert_before(
         struct embc_list_s * position_item,
         struct embc_list_s * new_item) {
+    embc_list_remove_unsafe_(new_item);
     new_item->prev = position_item->prev;
     new_item->next = position_item;
     new_item->prev->next = new_item;
@@ -250,6 +274,7 @@ static inline void embc_list_insert_before(
 static inline void embc_list_insert_after(
         struct embc_list_s * position_item,
         struct embc_list_s * new_item) {
+    embc_list_remove_unsafe_(new_item);
     new_item->next = position_item->next;
     new_item->prev = position_item;
     position_item->next = new_item;

@@ -51,19 +51,21 @@ class TestBuffer(unittest.TestCase):
         embc.memory.buffer.finalize(a)
 
     def test_alloc_all(self):
+        sz = 32
         count = 4
         sizes = (ctypes.c_size_t * 1)(count)
         a = embc.memory.buffer.initialize(sizes, len(sizes))
-        addr1 = self.get_buffer_addresses(a, 32, count)
+        addr1 = self.get_buffer_addresses(a, sz, count)
         buffers = []
         read_index = 0
         for write_index in range(3 * count):
-            b = embc.memory.buffer.alloc(a, 32)
+            b = embc.memory.buffer.alloc(a, sz)
             self.assertIn(ctypes.addressof(b.contents), addr1)
-            b[0].write(bytes([write_index]))
-            buffers.append(b)
+            contents = bytes(range(write_index, write_index + sz))
+            b[0].write(contents)
+            buffers.append((b, contents))
             if write_index >= (count - 1):
-                b = buffers.pop(0)
-                self.assertEqual(bytes([read_index]), b[0].read_all())
+                b, contents = buffers.pop(0)
+                self.assertEqual(contents, b[0].read_all())
                 b[0].free()
                 read_index = read_index + 1

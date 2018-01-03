@@ -211,6 +211,8 @@ EMBC_CPP_GUARD_START
 #define EMBC_FRAMER_PORTS (16)
 /// The ack mask (port_def) for the current frame.
 #define EMBC_FRAMER_ACK_MASK_CURRENT ((uint16_t) 0x0100)
+/// The ack mask (port_def) when fully in sync.
+#define EMBC_FRAMER_ACK_MASK_SYNC ((uint16_t) 0x01FF)
 /// The framer_id field mask for the frame id.
 #define EMBC_FRAMER_ID_MASK ((uint8_t) 0x0f)
 
@@ -268,10 +270,11 @@ struct embc_framer_status_s {
 enum embc_framer_port0_cmd_e {
     EMBC_FRAMER_PORT0_RSV1 = 0,
     EMBC_FRAMER_PORT0_RSV2 = 1,
-    EMBC_FRAMER_PORT0_PING_REQ = 2,
-    EMBC_FRAMER_PORT0_PING_RSP = 3,
-    EMBC_FRAMER_PORT0_STATUS_REQ = 4,
-    EMBC_FRAMER_PORT0_STATUS_RSP = 5,
+    EMBC_FRAMER_PORT0_RESYNC = 2,  ///< Force frame_id resync
+    EMBC_FRAMER_PORT0_PING_REQ = 4,
+    EMBC_FRAMER_PORT0_PING_RSP = 5,
+    EMBC_FRAMER_PORT0_STATUS_REQ = 6,
+    EMBC_FRAMER_PORT0_STATUS_RSP = 7,
 };
 
 /**
@@ -557,6 +560,16 @@ EMBC_API void embc_framer_send_payload(
         struct embc_framer_s * self,
         uint8_t port, uint8_t message_id, uint16_t port_def,
         uint8_t const * data, uint8_t length);
+
+/**
+ * @brief Send a frame_id resync command.
+ *
+ * @param self The instance.
+ *
+ * This function sends a link control frame that forces the receiver to resync
+ * to the frame_id.  Any existing frames in flight may be dropped.
+ */
+EMBC_API void embc_framer_resync(struct embc_framer_s * self);
 
 /**
  * @brief Allocate a buffer for frame payload.

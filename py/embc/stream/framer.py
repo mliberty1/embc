@@ -20,10 +20,11 @@ MAX_RETRIES = 16
 
 
 class Port0:
-    PING_REQ = 2
-    PING_RSP = 3
-    STATUS_REQ = 4
-    STATUS_RSP = 5
+    DISCARD = 2
+    PING_REQ = 4
+    PING_RSP = 5
+    STATUS_REQ = 6
+    STATUS_RSP = 7
 
 
 class embc_framer_status_s(Structure):
@@ -130,6 +131,11 @@ send.argtypes = [c_void_p, c_uint8, c_uint8, c_uint16, POINTER(embc_buffer_s)]
 send_payload = _dll.embc_framer_send_payload
 send_payload.restype = None
 send_payload.argtypes = [c_void_p, c_uint8, c_uint8, c_uint16, POINTER(c_uint8), c_uint8]
+
+# void embc_framer_resync(struct embc_framer_s * self)
+resync = _dll.embc_framer_resync
+resync.restype = None
+resync.argtypes = [c_void_p]
 
 # struct embc_buffer_s * embc_framer_alloc(
 #        struct embc_framer_s * self);
@@ -242,6 +248,9 @@ class Framer:
         msg_char = ctypes.create_string_buffer(payload)
         msg = cast(msg_char, POINTER(c_uint8))
         send_payload(self.framer, port, message_id, port_def, msg, payload_len)
+
+    def resync(self):
+        resync(self.framer)
 
     def process(self):
         if self.timeout is None:
