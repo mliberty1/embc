@@ -60,6 +60,15 @@ EMBC_CPP_GUARD_START
  */
 #define EMBC_TIME_Q 30
 
+/**
+ * @brief The maximum (positive) time representation
+ */
+#define EMBC_TIME_MAX ((int64_t) 0x7fffffffffffffffU)
+
+/**
+ * @brief The minimum (negative) time representation.
+ */
+#define EMBC_TIME_MIN ((int64_t) 0x8000000000000000U)
 
 /**
  * @brief The fixed-point representation for 1 second.

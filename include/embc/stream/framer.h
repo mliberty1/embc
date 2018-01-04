@@ -224,7 +224,7 @@ EMBC_CPP_GUARD_START
 #define EMBC_FRAMER_TYPE_ACK ((uint8_t) 0x80)
 
 /// The maximum number of retries per frame before giving up
-#define EMBC_FRAMER_MAX_RETRIES ((uint8_t) 16)
+#define EMBC_FRAMER_MAX_RETRIES ((uint8_t) 1)
 
 /**
  * @brief The frame header.
@@ -334,6 +334,16 @@ struct embc_framer_port_callbacks_s {
 
 struct embc_framer_hal_callbacks_s {
     /**
+     * @brief The HAL instance.
+     *
+     * This value is passed as the first variable to each of the HAL callback
+     * functions.  Most HAL implementations will either ignore this value
+     * and have static (singleton) implementations, or they will pass a struct
+     * for a C-style class implementation.
+     */
+    void * hal;
+
+    /**
      * @brief Function called to transmit bytes out the byte stream.
      *
      * @param user_data The user data.
@@ -345,27 +355,44 @@ struct embc_framer_hal_callbacks_s {
      *      must NOT call embc_buffer_free()!
      * @param length The length of buffer in bytes.
      */
-    void (*tx_fn)(void * user_data, struct embc_buffer_s * buffer);
+    void (*tx_fn)(void * hal, struct embc_buffer_s * buffer);
 
-    void * tx_user_data;
+    /**
+     * @brief Get the current time.
+     *
+     * @param hal The HAL instance (user_data).
+     * @return The current time as 34Q30 which is compatible with embc/time.h.
+     *      The framer module only uses relative time.  The HAL
+     *      implementation is free to select any definition of 0
+     *      relative to UTC, and it may be relative to the last reset.
+     */
+    int64_t (*time_get)(void * hal);
 
     /**
      * @brief Set a timer.
      *
      * @param user_data The user data provided to embc_framer_initialize().
-     * @param duration The timer duration as 34Q30 seconds relative to the
-     *      current time (compatible with time.h).
+     * @param timeout The timer timeout as 34Q30 seconds in the same relative
+     *      units as the time_get() value.  This argument is compatible with
+     *      embc/time.h.  The timeout rather than the duration is used to
+     *      eliminate any errors due to processing or servicing delays.
      * @param cbk_fn The function to call if the timer expires which has
      *      arguments of (user_data, timer_id).
      * @param cbk_user_data The additional data to provide to cbk_fn.
      * @param[out] timer_id The assigned event id.
      * @return 0 or error code.
+     *
+     * If timeout has already passed, then cbk_fn may be called from within
+     * this function.  The caller should be ready for the callback before
+     * invoking timer_set_fn().
+     *
+     * The framer implementation is guaranteed to only set a single timer at
+     * a time.  The framer implementation will cancel any existing timer before
+     * scheduling (or rescheduling) the next timer.
      */
-    int32_t (*timer_set_fn)(void * user_data, uint64_t duration,
+    int32_t (*timer_set_fn)(void * hal, int64_t timeout,
                          void (*cbk_fn)(void *, uint32_t), void * cbk_user_data,
                          uint32_t * timer_id);
-
-    void * timer_set_user_data;
 
     /**
      * @brief Cancel a timer.
@@ -373,9 +400,7 @@ struct embc_framer_hal_callbacks_s {
      * @param user_data The user data provided to embc_framer_initialize().
      * @param timer_id The timer id assigned by timer_set().
      */
-    int32_t (*timer_cancel_fn)(void * user_data, uint32_t timer_id);
-
-    void * timer_cancel_user_data;
+    int32_t (*timer_cancel_fn)(void * hal, uint32_t timer_id);
 };
 
 

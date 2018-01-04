@@ -24,6 +24,7 @@
 #include "embc/stream/framer_util.h"
 #include "embc/memory/buffer.h"
 #include "embc/collections/list.h"
+#include "embc/time.h"
 #include "embc.h"
 
 const embc_size_t BUFFER_ALLOCATOR[] = {4, 0, 0, 8};
@@ -34,22 +35,17 @@ const uint8_t FRAME1[] = {0xAA, 0x00, 0x02, 0x03, 0x08, 0x11, 0x22, 0x41,
                           0x63, 0x31, 0xb3, 0xbe, 0xAA};
 uint8_t PAYLOAD2[] = {0x00, 0x11, 0x22, 0x33, 0x44, 0x55};
 
-struct timer_s {
-    uint64_t duration;
-    void (*cbk_fn)(void *, uint32_t);
-    void * cbk_user_data;
-    uint32_t timer_id;
-    struct embc_list_s item;
-};
+static const uint32_t TIMER_ID = 42;
 
 struct test_s {
     struct embc_buffer_allocator_s * buffer_allocator;
     struct embc_framer_s * f1;
     struct embc_list_s tx;
 
-    struct timer_s timers[24];
-    struct embc_list_s timers_free;
-    struct embc_list_s timers_pending;
+    int64_t timeout;
+    void (*cbk_fn)(void *, uint32_t);
+    void * cbk_user_data;
+    int64_t current_time;
 };
 
 void hal_tx_cbk(void *user_data, struct embc_buffer_s * buffer) {
@@ -57,28 +53,34 @@ void hal_tx_cbk(void *user_data, struct embc_buffer_s * buffer) {
     embc_list_add_tail(&self->tx, &buffer->item);
 }
 
-int32_t hal_timer_set_cbk(void *user_data, uint64_t duration,
+int64_t hal_time_get(void * user_data) {
+    struct test_s * self = (struct test_s *) user_data;
+    return self->current_time;
+}
+
+int32_t hal_timer_set_cbk(void *user_data, int64_t timeout,
                           void (*cbk_fn)(void *, uint32_t), void *cbk_user_data,
                           uint32_t *timer_id) {
     struct test_s * self = (struct test_s *) user_data;
-    struct embc_list_s * item = embc_list_remove_head(&self->timers_free);
-    assert_non_null(item);
-    struct timer_s * timer = embc_list_entry(item, struct timer_s, item);
-    timer->duration = duration;
-    timer->cbk_fn = cbk_fn;
-    timer->cbk_user_data = cbk_user_data;
-    embc_list_add_tail(&self->timers_pending, &timer->item);
-    *timer_id = timer->timer_id;
+    assert_int_equal(EMBC_TIME_MAX, self->timeout);
+    if (timeout <= self->current_time) {
+        *timer_id = 0;
+        cbk_fn(cbk_user_data, 0);
+    } else {
+        self->timeout = timeout;
+        self->cbk_fn = cbk_fn;
+        self->cbk_user_data = cbk_user_data;
+        *timer_id = TIMER_ID;
+    }
     return 0;
 }
 
 int32_t hal_timer_cancel_cbk(void *user_data, uint32_t timer_id) {
     struct test_s * self = (struct test_s *) user_data;
-    struct timer_s * timer = &self->timers[timer_id];
-    embc_list_remove(&timer->item);
-    timer->cbk_fn = 0;
-    timer->cbk_user_data = 0;
-    embc_list_add_tail(&self->timers_free, &timer->item);
+    assert_int_equal(TIMER_ID, timer_id);
+    self->timeout = EMBC_TIME_MAX;
+    self->cbk_fn = 0;
+    self->cbk_user_data = 0;
     return 0;
 }
 
@@ -136,24 +138,15 @@ static int setup(void ** state) {
     embc_list_initialize(&self->tx);
 
     struct embc_framer_hal_callbacks_s hal_callbacks = {
+            .hal = self,
             .tx_fn = hal_tx_cbk,
-            .tx_user_data = self,
+            .time_get = hal_time_get,
             .timer_set_fn = hal_timer_set_cbk,
-            .timer_set_user_data = self,
             .timer_cancel_fn = hal_timer_cancel_cbk,
-            .timer_cancel_user_data = self,
     };
     embc_framer_initialize(self->f1, self->buffer_allocator, &hal_callbacks);
     port_register(self, 1);
-
-    embc_list_initialize(&self->timers_free);
-    embc_list_initialize(&self->timers_pending);
-    for (embc_size_t i = 0; i < EMBC_ARRAY_SIZE(self->timers); ++i) {
-        self->timers[i].timer_id = i;
-        embc_list_initialize(&self->timers[i].item);
-        embc_list_add_tail(&self->timers_free, &self->timers[i].item);
-    }
-
+    self->timeout = EMBC_TIME_MAX;
     *state = self;
     return 0;
 }
@@ -562,18 +555,26 @@ static void tx_queue_then_transmit(void **state) {
     //tx_validate_and_confirm(self, 4, 1, 10, 0x2211, PAYLOAD1, sizeof(PAYLOAD1));
 }
 
-static void signal_timeout(struct test_s * self) {
-    struct embc_list_s * item = embc_list_remove_head(&self->timers_pending);
-    struct timer_s * timer = embc_list_entry(item, struct timer_s, item);
-    timer->cbk_fn(timer->cbk_user_data, timer->timer_id);
+static void time_advance(struct test_s * self, int64_t time_delta) {
+    self->current_time += time_delta;
+    if (self->current_time >= self->timeout) {
+        self->timeout = EMBC_TIME_MAX;
+        self->cbk_fn(self->cbk_user_data, TIMER_ID);
+    }
+}
+
+static void time_advance_to_timeout(struct test_s * self) {
+    assert_true(self->timeout < EMBC_TIME_MAX);
+    self->current_time = self->timeout;
+    self->timeout = EMBC_TIME_MAX;
+    self->cbk_fn(self->cbk_user_data, TIMER_ID);
 }
 
 static void tx_retransmit_on_timeout(void **state) {
     struct test_s *self = (struct test_s *) *state;
     embc_framer_send_payload(self->f1, 1, 6, 0x2211, PAYLOAD1, sizeof(PAYLOAD1));
     tx_validate_and_confirm(self, 0, 1, 6, 0x2211, PAYLOAD1, sizeof(PAYLOAD1));
-    assert_int_equal(1, embc_list_length(&self->timers_pending));
-    signal_timeout(self);
+    time_advance_to_timeout(self);
     tx_validate_and_confirm(self, 0, 1, 6, 0x2211, PAYLOAD1, sizeof(PAYLOAD1));
     expect_tx_done(1, 6, 0x2211, 0);
     perform_ack(self, 0, 1, 6, 0x0100, 0);
@@ -585,46 +586,87 @@ static void tx_too_many_timeout_retransmits(void **state) {
     embc_framer_send_payload(self->f1, 1, 6, 0x2211, PAYLOAD1, sizeof(PAYLOAD1));
     for (int i = 0; i < EMBC_FRAMER_MAX_RETRIES; ++i) {
         tx_validate_and_confirm(self, 0, 1, 6, 0x2211, PAYLOAD1, sizeof(PAYLOAD1));
-        assert_int_equal(1, embc_list_length(&self->timers_pending));
-        signal_timeout(self);
+        time_advance_to_timeout(self);
     }
 
     tx_validate_and_confirm(self, 0, 1, 6, 0x2211, PAYLOAD1, sizeof(PAYLOAD1));
     expect_tx_done(1, 6, 0x2211, EMBC_ERROR_TIMED_OUT);
-    signal_timeout(self);
+    time_advance_to_timeout(self);
 }
+
+static void tx_multiple_timeouts_then_resume(void **state) {
+    struct test_s *self = (struct test_s *) *state;
+    uint8_t frame_id = 0;
+    uint8_t message_id = 0;
+
+    for (int j = 0; j < 10; j++) {
+        assert_int_equal(0, embc_list_length(&self->tx));
+        frame_id = (uint8_t) ((j * 3) & EMBC_FRAMER_ID_MASK);
+        message_id = (uint8_t) ((j * 3 + 1) & 0xff);
+        uint8_t frame_id1 = (uint8_t) ((frame_id + 1) & EMBC_FRAMER_ID_MASK);
+        uint8_t frame_id2 = (uint8_t) ((frame_id + 2) & EMBC_FRAMER_ID_MASK);
+        uint8_t message_id1 = (uint8_t) ((message_id + 1) & 0xff);
+        uint8_t message_id2 = (uint8_t) ((message_id + 2) & 0xff);
+
+        embc_framer_send_payload(self->f1, 1, message_id, 0x2211, PAYLOAD1, sizeof(PAYLOAD1));
+        time_advance(self, EMBC_TIME_MILLISECOND);
+        embc_framer_send_payload(self->f1, 1, message_id1, 0x2211, PAYLOAD1, sizeof(PAYLOAD1));
+        time_advance(self, EMBC_TIME_MILLISECOND);
+        embc_framer_send_payload(self->f1, 1, message_id2, 0x2211, PAYLOAD1, sizeof(PAYLOAD1));
+        time_advance(self, EMBC_TIME_MILLISECOND);
+
+        for (int i = 0; i <= EMBC_FRAMER_MAX_RETRIES; ++i) {
+            tx_validate_and_confirm(self, frame_id, 1, message_id, 0x2211, PAYLOAD1, sizeof(PAYLOAD1));
+            tx_validate_and_confirm(self, frame_id1, 1, message_id1, 0x2211, PAYLOAD1, sizeof(PAYLOAD1));
+            tx_validate_and_confirm(self, frame_id2, 1, message_id2, 0x2211, PAYLOAD1, sizeof(PAYLOAD1));
+            if (i == EMBC_FRAMER_MAX_RETRIES) {
+                expect_tx_done(1, message_id, 0x2211, EMBC_ERROR_TIMED_OUT);
+                expect_tx_done(1, message_id1, 0x2211, EMBC_ERROR_TIMED_OUT);
+                expect_tx_done(1, message_id2, 0x2211, EMBC_ERROR_TIMED_OUT);
+            }
+            time_advance_to_timeout(self);
+            time_advance_to_timeout(self);
+            time_advance_to_timeout(self);
+        }
+    }
+
+    frame_id = (uint8_t) ((frame_id + 3) & EMBC_FRAMER_ID_MASK);
+    message_id = (uint8_t) ((message_id + 1) & 0xff);
+    embc_framer_send_payload(self->f1, 1, message_id, 0x2211, PAYLOAD1, sizeof(PAYLOAD1));
+    tx_validate_and_confirm(self, frame_id, 1, message_id, 0x2211, PAYLOAD1, sizeof(PAYLOAD1));
+    expect_tx_done(1, message_id + 0, 0x2211, 0);
+    perform_ack(self, frame_id, 1, message_id, 0x01FF, 0);
+}
+
 
 static void tx_recover_after_error(void **state) {
     struct test_s *self = (struct test_s *) *state;
 
     embc_framer_send_payload(self->f1, 1, 6, 0x2211, PAYLOAD1, sizeof(PAYLOAD1));
+    time_advance(self, EMBC_TIME_MILLISECOND);
     embc_framer_send_payload(self->f1, 1, 7, 0x2211, PAYLOAD1, sizeof(PAYLOAD1));
+    time_advance(self, EMBC_TIME_MILLISECOND);
     embc_framer_send_payload(self->f1, 1, 8, 0x2211, PAYLOAD1, sizeof(PAYLOAD1));
+    time_advance(self, EMBC_TIME_MILLISECOND);
 
-    tx_validate_and_confirm(self, 0, 1, 6, 0x2211, PAYLOAD1, sizeof(PAYLOAD1));
-    signal_timeout(self);
-    tx_validate_and_confirm(self, 1, 1, 7, 0x2211, PAYLOAD1, sizeof(PAYLOAD1));
-    tx_validate_and_confirm(self, 2, 1, 8, 0x2211, PAYLOAD1, sizeof(PAYLOAD1));
-    signal_timeout(self);
-
-    for (int i = 1; i < EMBC_FRAMER_MAX_RETRIES; ++i) {
+    for (int i = 0; i <= EMBC_FRAMER_MAX_RETRIES; ++i) {
         tx_validate_and_confirm(self, 0, 1, 6, 0x2211, PAYLOAD1, sizeof(PAYLOAD1));
         tx_validate_and_confirm(self, 1, 1, 7, 0x2211, PAYLOAD1, sizeof(PAYLOAD1));
         tx_validate_and_confirm(self, 2, 1, 8, 0x2211, PAYLOAD1, sizeof(PAYLOAD1));
-        signal_timeout(self);
+
+        if (EMBC_FRAMER_MAX_RETRIES == i) {
+            expect_tx_done(1, 6, 0x2211, EMBC_ERROR_TIMED_OUT);
+            time_advance_to_timeout(self);
+            perform_ack(self, 2, 1, 8, 0x0100, 0);
+            expect_tx_done(1, 7, 0x2211, 0);
+            expect_tx_done(1, 8, 0x2211, 0);
+            perform_ack(self, 1, 1, 7, 0x0300, 0);
+        } else {
+            time_advance_to_timeout(self);
+            time_advance_to_timeout(self);
+            time_advance_to_timeout(self);
+        }
     }
-
-    tx_validate_and_confirm(self, 0, 1, 6, 0x2211, PAYLOAD1, sizeof(PAYLOAD1));
-    expect_tx_done(1, 6, 0x2211, EMBC_ERROR_TIMED_OUT);
-    signal_timeout(self);
-
-    tx_validate_and_confirm(self, 1, 1, 7, 0x2211, PAYLOAD1, sizeof(PAYLOAD1));
-    tx_validate_and_confirm(self, 2, 1, 8, 0x2211, PAYLOAD1, sizeof(PAYLOAD1));
-
-    perform_ack(self, 2, 1, 8, 0x0100, 0);
-    expect_tx_done(1, 7, 0x2211, 0);
-    expect_tx_done(1, 8, 0x2211, 0);
-    perform_ack(self, 1, 1, 7, 0x0300, 0);
 }
 
 static void send_ping_req(struct test_s *self, int id, uint16_t mask) {
@@ -633,6 +675,7 @@ static void send_ping_req(struct test_s *self, int id, uint16_t mask) {
     struct embc_buffer_s * b = embc_framer_construct_frame(
             self->f1, frame_id, 0, message_id, EMBC_FRAMER_PORT0_PING_REQ, PAYLOAD1, sizeof(PAYLOAD1));
     embc_framer_hal_rx_buffer(self->f1, b->data, b->length);
+    check_ack(self, frame_id, 0, message_id, 0, mask);
     if (id == 2) {
         tx_validate_and_confirm(self, 0, 0, 0, EMBC_FRAMER_PORT0_PING_RSP, PAYLOAD1, sizeof(PAYLOAD1));
         tx_validate_and_confirm(self, 1, 0, 1, EMBC_FRAMER_PORT0_PING_RSP, PAYLOAD1, sizeof(PAYLOAD1));
@@ -643,7 +686,6 @@ static void send_ping_req(struct test_s *self, int id, uint16_t mask) {
         tx_validate_and_confirm(self, frame_id, 0, message_id, EMBC_FRAMER_PORT0_PING_RSP, PAYLOAD1, sizeof(PAYLOAD1));
         perform_ack(self, frame_id, 0, message_id, 0x01C0, 0);
     }
-    check_ack(self, frame_id, 0, message_id, 0, mask);
     embc_buffer_free(b);
 }
 
@@ -706,6 +748,7 @@ int main(void) {
             cmocka_unit_test_setup_teardown(tx_queue_then_transmit, setup, teardown),
             cmocka_unit_test_setup_teardown(tx_retransmit_on_timeout, setup, teardown),
             cmocka_unit_test_setup_teardown(tx_too_many_timeout_retransmits, setup, teardown),
+            cmocka_unit_test_setup_teardown(tx_multiple_timeouts_then_resume, setup, teardown),
             cmocka_unit_test_setup_teardown(tx_recover_after_error, setup, teardown),
             cmocka_unit_test_setup_teardown(ping, setup, teardown),
             cmocka_unit_test_setup_teardown(tx_resync_cmd, setup, teardown),

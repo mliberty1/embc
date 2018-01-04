@@ -294,6 +294,14 @@ static void buffer_erase_all(void **state) {
     assert_int_equal(0, embc_buffer_cursor_get(self->b));
 }
 
+static void buffer_erase_to_length(void **state) {
+    struct erase_s *self = (struct erase_s *) *state;
+    embc_buffer_write_str(self->b, "hello good world!");
+    embc_buffer_erase(self->b, 5, self->b->length);
+    assert_int_equal(5, embc_buffer_length(self->b));
+    assert_int_equal(5, embc_buffer_cursor_get(self->b));
+}
+
 static void basic_test(struct embc_buffer_s * b) {
     assert_int_equal(32, embc_buffer_capacity(b));
     assert_int_equal(0, embc_buffer_length(b));
@@ -335,6 +343,7 @@ int main(void) {
             cmocka_unit_test_setup_teardown(buffer_erase_cursor_before, setup_erase, teardown_erase),
             cmocka_unit_test_setup_teardown(buffer_erase_invalid, setup_erase, teardown_erase),
             cmocka_unit_test_setup_teardown(buffer_erase_all, setup_erase, teardown_erase),
+            cmocka_unit_test_setup_teardown(buffer_erase_to_length, setup_erase, teardown_erase),
             cmocka_unit_test(buffer_static_declare),
             cmocka_unit_test(buffer_static_define),
     };

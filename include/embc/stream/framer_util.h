@@ -40,9 +40,9 @@ EMBC_CPP_GUARD_START
 /**
  * @brief Validate a frame.
  *
- * @param buffer The buffer containing the frame.
- * @param buffer_length The size of buffer in bytes.
- * @param frame_length The size of the validated frame.
+ * @param[in] buffer The buffer containing the frame.
+ * @param[in] buffer_length The size of buffer in bytes.
+ * @param[out] frame_length The size of the validated frame.
  * @return 0, EMBC_ERROR_TOO_SMALL, EMBC_ERROR_IO,
  *      EMBC_ERROR_MESSAGE_INTEGRITY.
  */
