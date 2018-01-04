@@ -90,9 +90,9 @@ struct embc_buffer_allocator_s * embc_buffer_initialize(embc_size_t const * size
             struct embc_buffer_container_s * c = (struct embc_buffer_container_s *) buffers_ptr;
             c->pool = pool;
             struct embc_buffer_s * b = &c->buffer;
-            uint8_t ** d = (uint8_t **) &b->data;
+            uint8_t ** d = (uint8_t **) &b->data; // discard const
             *d = buffers_ptr + HDR_SZ;
-            uint16_t * capacity = (uint16_t *) &b->capacity;
+            uint16_t * capacity = (uint16_t *) &b->capacity;  // discard const
             *capacity = pool->payload_size;
             buffer_init(b);
             embc_list_initialize(&b->item);

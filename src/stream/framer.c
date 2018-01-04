@@ -131,36 +131,36 @@ static inline struct embc_framer_header_s * buffer_hdr(struct embc_buffer_s * bu
 }
 
 static void port0_rx(void *user_data,
-                     uint8_t port, uint8_t message_id, uint16_t port_def,
+                     uint8_t port_id, uint8_t message_id, uint16_t port_def,
                      struct embc_buffer_s * buffer) {
     struct embc_framer_s * self = (struct embc_framer_s *) user_data;
-    EMBC_ASSERT(0 == port);
+    EMBC_ASSERT(0 == port_id);
     uint8_t cmd = (uint8_t) (port_def & 0xff);
     struct embc_framer_header_s * hdr = buffer_hdr(buffer);
     switch (cmd) {
         case EMBC_FRAMER_PORT0_PING_REQ:
             LOGF_DEBUG2("port0_rx ping_req: frame_id=0x%02x, message_id=%d",
                       (int) hdr->frame_id, (int) hdr->message_id);
-            embc_framer_send(self, port, message_id, EMBC_FRAMER_PORT0_PING_RSP, buffer);
+            embc_framer_send(self, port_id, message_id, EMBC_FRAMER_PORT0_PING_RSP, buffer);
             break;
         case EMBC_FRAMER_PORT0_STATUS_REQ:
             embc_buffer_write(buffer, &self->status, sizeof(self->status));
-            embc_framer_send(self, port, message_id, EMBC_FRAMER_PORT0_STATUS_RSP, buffer);
+            embc_framer_send(self, port_id, message_id, EMBC_FRAMER_PORT0_STATUS_RSP, buffer);
             break;
         default:
-            self->port0_cbk.rx_fn(self->port0_cbk.rx_user_data, port, message_id, port_def, buffer);
+            self->port0_cbk.rx_fn(self->port0_cbk.port, port_id, message_id, port_def, buffer);
             break;
     }
 }
 
 static void port0_tx_done(
         void * user_data,
-        uint8_t port,
+        uint8_t port_id,
         uint8_t message_id,
         uint16_t port_def,
         int32_t status) {
     struct embc_framer_s * self = (struct embc_framer_s *) user_data;
-    EMBC_ASSERT(0 == port);
+    EMBC_ASSERT(0 == port_id);
     uint8_t cmd = (uint8_t) (port_def & 0xff);
     switch (cmd) {
         case EMBC_FRAMER_PORT0_PING_RSP:
@@ -174,7 +174,7 @@ static void port0_tx_done(
             }
             break;
         default:
-            self->port0_cbk.tx_done_fn(self->port0_cbk.tx_done_user_data, port, message_id, port_def, status);
+            self->port0_cbk.tx_done_fn(self->port0_cbk.port, port_id, message_id, port_def, status);
             break;
     }
 }
@@ -219,10 +219,9 @@ void embc_framer_initialize(
 
     self->port0_cbk.rx_fn = rx_default;
     self->port0_cbk.tx_done_fn = tx_done_default;
+    self->port_cbk[0].port = self;
     self->port_cbk[0].rx_fn = port0_rx;
-    self->port_cbk[0].rx_user_data = self;
     self->port_cbk[0].tx_done_fn = port0_tx_done;
-    self->port_cbk[0].tx_done_user_data = self;
     for (embc_size_t i = 1; i < EMBC_ARRAY_SIZE(self->port_cbk); ++i) {
         self->port_cbk[i].rx_fn = rx_default;
         self->port_cbk[i].tx_done_fn = tx_done_default;
@@ -306,7 +305,7 @@ static void rx_complete(struct embc_framer_s *self, struct embc_buffer_s * frame
                 (int) hdr->port, (int) hdr->message_id, (int) port_def,
                 (void *) frame);
     self->port_cbk[hdr->port].rx_fn(
-            self->port_cbk[hdr->port].rx_user_data,
+            self->port_cbk[hdr->port].port,
             hdr->port,
             hdr->message_id,
             port_def,
@@ -412,7 +411,7 @@ static void tx_complete(struct embc_framer_s * self, struct tx_buf_s * t, uint8_
     uint16_t port_def = hdr_port_def(&hdr);
     if (hdr.port < EMBC_FRAMER_PORTS) {
         self->port_cbk[hdr.port].tx_done_fn(
-                self->port_cbk[hdr.port].tx_done_user_data,
+                self->port_cbk[hdr.port].port,
                 hdr.port,
                 hdr.message_id,
                 port_def,

@@ -120,10 +120,9 @@ void tx_done_cbk(void * user_data, uint8_t port, uint8_t message_id, uint16_t po
 
 static void port_register(struct test_s * self, uint8_t port) {
     struct embc_framer_port_callbacks_s port_callbacks = {
+            .port = self,
             .rx_fn = rx_cbk,
-            .rx_user_data = self,
             .tx_done_fn = tx_done_cbk,
-            .tx_done_user_data = self
     };
     embc_framer_register_port_callbacks(self->f1, port, &port_callbacks);
 }

@@ -316,9 +316,19 @@ struct embc_buffer_allocator_s;
  */
 struct embc_framer_port_callbacks_s {
     /**
+     * @brief The port instance.
+     *
+     * This value is passed as the first variable to each of the port callback
+     * functions.  Most port implementations will either ignore this value
+     * and have static (singleton) implementations, or they will pass a struct
+     * for a C-style class implementation.
+     */
+    void * port;
+
+    /**
      * @brief Function called after a frame is received.
      *
-     * @param user_data The user data.
+     * @param port The port member value.
      * @param port The port (payload type).
      * @param message_id The application-defined message identifier.
      * @param port_def The application-defined frame-associated data.
@@ -331,30 +341,26 @@ struct embc_framer_port_callbacks_s {
      *      The buffer.buffer_id contains the message_id and
      *      buffer.flags contains the port_def data.
      */
-    void (*rx_fn)(void *user_data,
-                  uint8_t port, uint8_t message_id, uint16_t port_def,
+    void (*rx_fn)(void *port,
+                  uint8_t port_id, uint8_t message_id, uint16_t port_def,
                   struct embc_buffer_s * buffer);
-
-    void * rx_user_data;
 
     /**
      * @brief Function called on successful transmissions.
      *
-     * @param user_data The user data.
-     * @param port The port (payload type).
+     * @param port The port member value.
+     * @param port_id The port (payload type).
      * @param message_id The application-defined message identifier.
      * @param port_def The application-defined value.
      * @param status 0 or error.  The framer module automatically retransmits
      *      frames as needed, and only the last error condition is reported.
      */
     void (*tx_done_fn)(
-            void * user_data,
-            uint8_t port,
+            void * port,
+            uint8_t port_id,
             uint8_t message_id,
             uint16_t port_def,
             int32_t status);
-
-    void * tx_done_user_data;
 };
 
 struct embc_framer_hal_callbacks_s {

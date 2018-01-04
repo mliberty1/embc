@@ -53,10 +53,9 @@ class embc_framer_status_s(Structure):
 
 class embc_framer_port_callbacks_s(Structure):
     _fields_ = [
+        ('port', c_void_p),
         ('rx_fn', RX_FN),
-        ('rx_user_data', c_void_p),
         ('tx_done_fn', TX_DONE_FN),
-        ('tx_done_user_data', c_void_p),
     ]
 
 HAL_TX_FN = CFUNCTYPE(None, c_void_p, POINTER(embc_buffer_s))
