@@ -223,8 +223,33 @@ EMBC_CPP_GUARD_START
 /// The framer type ACK for framer_id field
 #define EMBC_FRAMER_TYPE_ACK ((uint8_t) 0x80)
 
-/// The maximum number of retries per frame before giving up
-#define EMBC_FRAMER_MAX_RETRIES ((uint8_t) 1)
+/**
+ * @brief The maximum number of retries per frame.
+ *
+ * This value should really be dependent upon the link bit error rate
+ * and the total reliability budget.  A frame communication failure
+ * occurs when either the data frame or its corresponding ack frame
+ * are corrupted.  A full sized data frames is 253 bytes and an ack
+ * frame is 13 bytes.  The data/ack pair has has 2128 bits (266 bytes).
+ *
+ * Let's compute the expected total frame error rate for a horrible
+ * link with a bit error rate (BERT) of 10e-6 (10 corrupted bits per million).
+ * Note that USB 3.0 specifies a maximum BERT of 1e-12, and old school
+ * analog modems had a BERT of 1e-6 or better!  In this scenario,
+ * we would expect an individual frame error every 2128 * 10e-6 =
+ * 0.02128 (2.1%).  A total frame error occurs only when every individual
+ * frame has an error.  With EMBC_FRAMER_MAX_RETRIES set to 16, the
+ * total frame error is 0.02128 ^ 16 = 1.7e-27 errors/frame.
+ * A 3 MBaud N81 UART transmits 1186 data frames per second =
+ * 3.7e10 data frames/year which gives 1 error for every 1.5e16 years
+ * We expect to never see a frame failure in the field due to BERT since
+ * the universe is estimated to be 13.8e9 years old.
+ *
+ * Larger EMBC_FRAMER_MAX_RETRIES values do increase the total timeout for
+ * frame transmission.  The total timeout is approximately
+ * (EMBC_FRAMER_TIMEOUT * EMBC_FRAMER_MAX_RETRIES).
+ */
+#define EMBC_FRAMER_MAX_RETRIES ((uint8_t) 16)
 
 /**
  * @brief The frame header.
