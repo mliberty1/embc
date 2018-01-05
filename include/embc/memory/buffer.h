@@ -46,21 +46,33 @@ EMBC_CPP_GUARD_START
  */
 struct embc_buffer_allocator_s;
 
+// forward declaration.
+struct embc_buffer_s;
+
+/**
+ * @brief The buffer manager "class" for deallocation.
+ *
+ * Current owners of a buffer may free it at any time and return ownership
+ * back to the allocator, just like calling "free" for the heap.  This module
+ * provides a default allocator, but other modules may provide buffers using
+ * a custom allocator.  This buffer manager abstraction allows the current
+ * buffer owner to free the buffer without explicitly knowing the buffer
+ * allocator.
+ *
+ * A common buffer manager implementation uses EMBC_CONTAINER_OF to
+ * convert from this member struct to the allocator/deallocator struct.
+ */
+struct embc_buffer_manager_s {
+    void (*free)(struct embc_buffer_manager_s const * self, struct embc_buffer_s * buffer);
+};
+
 /**
  * @brief A memory safe buffer with support for safe mutable operations
  *      and fast dynamic allocation / deallocation.
  *
- * This module defines a buffer structure along with a fast memory manager
- * that performs constant-time allocation and deallocation.  The memory
- * manager is similar to a memory pool.  However, this memory manager
- * supports multiple buffer payload sizes in powers of 2 started with 32 bytes.
- * This approach shares many features with slab allocators.  The number
- * of blocks of each size are specified at initialization, and the system
- * memory manager only allocates once.
- *
- * Each buffer structure provides a memory safe implementation for writing
- * and reading the buffer.  The functions perform full bounds checking on
- * all operations.
+ * This module defines a buffer  which provides a memory safe implementation
+ * for writing and reading the buffer.  The functions perform full bounds
+ * checking on all operations.
  *
  * These buffers are normally used to hold dynamic data that needs to
  * passed through the system.  Buffers can easily be sent between tasks
@@ -72,10 +84,27 @@ struct embc_buffer_allocator_s;
  *
  * Ownership of memory is critical for networking stacks and data processing.
  * This implementation allows the consumer to take ownership of the buffer
- * and then free it without further communication with the producer.  However,
- * the consumer can also pass the buffer back to the producer so that the
- * producer can free it.  The later approach can save memory when
+ * and then free it without further directly communication with the producer.
+ * However, the consumer can also pass the buffer back to the producer so
+ * that the producer can free it.  The later approach can save memory when
  * retransmissions may be required.
+ *
+ * This buffer structure is really "overhead" with respect to the underlying
+ * data.  However, many C applications manually pass around this data as
+ * pointer, available length and current length.  The overhead by payload
+ * size is:
+ *
+ * <table class="doxtable message">
+ *  <tr><th>Index</th><th>Size</td><th>Actual</td><th>Overhead %</td></tr>
+ *  <tr><td>0</td><td>32</td><td>64</td><td>100.0%</td></tr>
+ *  <tr><td>1</td><td>64</td><td>96</td><td>50.0%</td></tr>
+ *  <tr><td>2</td><td>128</td><td>160</td><td>25.0%</td></tr>
+ *  <tr><td>3</td><td>256</td><td>288</td><td>12.5%</td></tr>
+ *  <tr><td>4</td><td>512</td><td>544</td><td>6.3%</td></tr>
+ *  <tr><td>5</td><td>1024</td><td>1056</td><td>3.1%</td></tr>
+ *  <tr><td>6</td><td>2048</td><td>2080</td><td>1.6%</td></tr>
+ *  <tr><td>7</td><td>4096</td><td>4128</td><td>0.8%</td></tr>
+ * </table>
  */
 struct embc_buffer_s {
     /**
@@ -148,6 +177,19 @@ struct embc_buffer_s {
     uint16_t flags;
 
     /**
+     * @brief The manager instance used to free this buffer.
+     *
+     * "Normal" buffer consumers should not modify this pointer.  However,
+     * buffer consumer may wrap the originating manager.  One common use case
+     * is when a module wants to know when a consumer is done with the buffer.
+     * The module can wrap the originating manager and replace this pointer
+     * with its own.  However, the wrapper must then call the originating
+     * manager.  The wrapper must store the originating manager pointer
+     * elsewhere.
+     */
+    struct embc_buffer_manager_s const * manager;
+
+    /**
      * @brief The list item pointers.
      *
      * This field is used to manage a linked list of buffer instances.
@@ -167,19 +209,14 @@ struct embc_buffer_s {
  * @param length The number of entries in sizes.
  * @return The buffer allocator instance which gets memory from embc_alloc().
  *
- * The overhead for each index in size are:
+ * This module also includes a fast buffer manager (memory manager)
+ * that performs constant-time allocation and deallocation.  The memory
+ * manager is similar to a memory pool.  However, this memory manager
+ * supports multiple buffer payload sizes in powers of 2 started with 32 bytes.
+ * This approach shares many features with slab allocators.  The number
+ * of blocks of each size are specified at initialization, and the system
+ * memory manager only allocates once.
  *
- * <table class="doxtable message">
- *  <tr><th>Index</th><th>Size</td><th>Actual</td><th>Overhead %</td></tr>
- *  <tr><td>0</td><td>32</td><td>64</td><td>100.0%</td></tr>
- *  <tr><td>1</td><td>64</td><td>96</td><td>50.0%</td></tr>
- *  <tr><td>2</td><td>128</td><td>160</td><td>25.0%</td></tr>
- *  <tr><td>3</td><td>256</td><td>288</td><td>12.5%</td></tr>
- *  <tr><td>4</td><td>512</td><td>544</td><td>6.3%</td></tr>
- *  <tr><td>5</td><td>1024</td><td>1056</td><td>3.1%</td></tr>
- *  <tr><td>6</td><td>2048</td><td>2080</td><td>1.6%</td></tr>
- *  <tr><td>7</td><td>4096</td><td>4128</td><td>0.8%</td></tr>
- * </table>
  */
 EMBC_API struct embc_buffer_allocator_s * embc_buffer_initialize(embc_size_t const * sizes, embc_size_t length);
 
@@ -220,7 +257,9 @@ EMBC_API struct embc_buffer_s * embc_buffer_alloc(struct embc_buffer_allocator_s
  * Note that the buffer knows what allocator it came from.  The allocator
  * information is stored opaquely in adjacent memory.
  */
-EMBC_API void embc_buffer_free(struct embc_buffer_s * buffer);
+static inline void embc_buffer_free(struct embc_buffer_s * buffer) {
+    buffer->manager->free(buffer->manager, buffer);
+}
 
 /**
  * @brief Get the total number of bytes that can be stored in the buffer.
@@ -304,7 +343,6 @@ static inline void embc_buffer_clear(struct embc_buffer_s * buffer) {
 }
 
 /**
- * @ingroup embc
  * @defgroup embc_buffer_write Write data to the buffer.
  *
  * @brief Write data to the buffer and update the cursor location.
@@ -426,7 +464,6 @@ EMBC_API void embc_buffer_write_u64_be(struct embc_buffer_s * buffer, uint64_t v
 /** @} */
 
 /**
- * @ingroup embc
  * @defgroup embc_buffer_read Read data from the buffer.
  *
  * @brief Read data to the buffer and update the cursor location.
@@ -553,6 +590,8 @@ EMBC_API void embc_buffer_erase(struct embc_buffer_s * buffer,
  * @{
  */
 
+extern const struct embc_buffer_manager_s embc_buffer_manager_static;
+
 /**
  * @brief Declare a new static buffer instance.
  *
@@ -587,6 +626,7 @@ EMBC_API void embc_buffer_erase(struct embc_buffer_s * buffer,
     (name).length = 0; \
     (name).buffer_id = 0; \
     (name).flags = 0; \
+    (name).manager = &embc_buffer_manager_static; \
     (name).item.next = &(name).item; \
     (name).item.prev = &(name).item;
 
@@ -613,6 +653,7 @@ EMBC_API void embc_buffer_erase(struct embc_buffer_s * buffer,
         .length = 0, \
         .buffer_id = 0, \
         .flags = 0, \
+        .manager = &embc_buffer_manager_static, \
         .item = {&(name).item, &(name).item} \
     }
 

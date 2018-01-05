@@ -25,6 +25,7 @@ struct embc_buffer_allocator_s {
 };
 
 struct pool_s {
+    const struct embc_buffer_manager_s manager;
     uint32_t magic;
     embc_size_t payload_size;
     embc_size_t alloc_current;
@@ -35,20 +36,17 @@ struct pool_s {
     struct embc_list_s buffers;
 };
 
-struct embc_buffer_container_s {
-    struct embc_buffer_s buffer;
-    struct pool_s * pool;
-};
-
 // Calculate the size to allocate for each structure, respecting platform
 // alignment concerns
 #define ALIGN (8)
 #define MGR_SZ EMBC_ROUND_UP_TO_MULTIPLE((embc_size_t) sizeof(struct embc_buffer_allocator_s), ALIGN)
 #define POOL_SZ EMBC_ROUND_UP_TO_MULTIPLE((embc_size_t) sizeof(struct pool_s), ALIGN)
-#define HDR_SZ EMBC_ROUND_UP_TO_MULTIPLE((embc_size_t) sizeof(struct embc_buffer_container_s), ALIGN)
+#define HDR_SZ EMBC_ROUND_UP_TO_MULTIPLE((embc_size_t) sizeof(struct embc_buffer_s), ALIGN)
 EMBC_STATIC_ASSERT((sizeof(intptr_t) == 4) ? (32 == HDR_SZ) : (48 == HDR_SZ), header_size);
 #define EMBC_BUFFER_MAGIC (0xb8392f19)
 
+
+static void embc_buffer_free_(struct embc_buffer_manager_s const * self, struct embc_buffer_s * buffer);
 
 static inline struct pool_s * pool_get(struct embc_buffer_allocator_s * self, embc_size_t index) {
     return (struct pool_s *) (((uint8_t *) self) + MGR_SZ + (POOL_SZ * index));
@@ -79,6 +77,8 @@ struct embc_buffer_allocator_s * embc_buffer_initialize(embc_size_t const * size
 
     for (embc_size_t i = 0; i < length; ++i) {
         struct pool_s * pool = pool_get(self, i);
+        struct embc_buffer_manager_s * m = (struct embc_buffer_manager_s *) &pool->manager;
+        m->free = embc_buffer_free_;
         pool->magic = EMBC_BUFFER_MAGIC;
         pool->payload_size = (32 << i);
         pool->alloc_current = 0;
@@ -87,9 +87,9 @@ struct embc_buffer_allocator_s * embc_buffer_initialize(embc_size_t const * size
         pool->memory_start = buffers_ptr;
         pool->memory_incr = (uint16_t) pool->payload_size + HDR_SZ;
         for (embc_size_t k = 0; k < sizes[i]; ++k) {
-            struct embc_buffer_container_s * c = (struct embc_buffer_container_s *) buffers_ptr;
-            c->pool = pool;
-            struct embc_buffer_s * b = &c->buffer;
+            struct embc_buffer_s * b = (struct embc_buffer_s *) buffers_ptr;
+            struct embc_buffer_manager_s ** m_ptr = (struct embc_buffer_manager_s **) &b->manager;
+            *m_ptr = m;
             uint8_t ** d = (uint8_t **) &b->data; // discard const
             *d = buffers_ptr + HDR_SZ;
             uint16_t * capacity = (uint16_t *) &b->capacity;  // discard const
@@ -101,6 +101,7 @@ struct embc_buffer_allocator_s * embc_buffer_initialize(embc_size_t const * size
         }
         pool->memory_end = buffers_ptr;
     }
+    EMBC_ASSERT(buffers_ptr == (memory + total_size));
     return self;
 }
 
@@ -135,12 +136,12 @@ struct embc_buffer_s * embc_buffer_alloc(
     return buffer;
 }
 
-void embc_buffer_free(struct embc_buffer_s * buffer) {
+static void embc_buffer_free_(struct embc_buffer_manager_s const * self, struct embc_buffer_s * buffer) {
+    DBC_NOT_NULL(self);
     DBC_NOT_NULL(buffer);
-    LOGF_DEBUG3("embc_buffer_free %p", (void *) buffer);
-    struct embc_buffer_container_s * b = (struct embc_buffer_container_s *) buffer;
-    struct pool_s * p = b->pool;
-    EMBC_ASSERT((0 != p) && (p->magic == EMBC_BUFFER_MAGIC));
+    LOGF_DEBUG3("embc_buffer_free_(%p, %p)", (void *) self, (void *) buffer);
+    struct pool_s * p = EMBC_CONTAINER_OF(self, struct pool_s, manager);
+    EMBC_ASSERT(p->magic == EMBC_BUFFER_MAGIC);
     uint8_t * b_ptr = (uint8_t *) buffer;
     EMBC_ASSERT((b_ptr >= p->memory_start) && (b_ptr < p->memory_end));
     embc_list_add_tail(&p->buffers, &buffer->item);
@@ -317,3 +318,12 @@ void embc_buffer_erase(struct embc_buffer_s * buffer,
 
     }
 }
+
+static void free_static_(struct embc_buffer_manager_s const * self, struct embc_buffer_s * buffer) {
+    (void) self;
+    (void) buffer;
+}
+
+const struct embc_buffer_manager_s embc_buffer_manager_static = {
+        .free = free_static_
+};

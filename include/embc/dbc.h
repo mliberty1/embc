@@ -57,7 +57,6 @@
  */
 #define DBC_ASSERT(condition, message) do { \
     if (!(condition)) { \
-        LOGF_ERROR("dbc_assert: %s", (message)); \
         embc_fatal(__FILENAME__, __LINE__, (message)); \
     } \
 } while (0);
