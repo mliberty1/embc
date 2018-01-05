@@ -14,6 +14,29 @@
  * limitations under the License.
  */
 
+/*
+ * Known issues:
+ *
+ * - 1.1: Throughput hindered by no frame prioritization:
+ *   Prioritization of transmit traffic.  The ACK frames should be sent before
+ *   data frames.  The current implementation does not do this.  Either the
+ *   number of outstanding TX frames needs to be 1 (performance hit) or the
+ *   HAL needs to support buffer prioritization.  The current workaround is
+ *   increased EMBC_FRAMER_TIMEOUT.
+ * - 1.2: Throughput hindered by excessive timeout:
+ *   The EMBC_FRAMER_TIMEOUT must currently include both UART transmit time and
+ *   ACK turnaround time.  Since multiple frames are queued in the UART, the
+ *   transmit time depends upon the number of enqueued frames.  Should reinit
+ *   data->ack timeout when HAL indicates data frame transmit completes.
+ * - 2.1: Frame id recovery is not fully robust:
+ *   On reset, frame synchronization should occur without requiring the full
+ *   number of frames to buffer.  The receiver should simply accept the first
+ *   frame after reset as the new rx frame_id and immediately indicate frame
+ *   receive to the higher level without buffering.  If an earlier frame is
+ *   received later, the receiver should NACK with ABORTED.
+ */
+
+
 //#define LOG_LEVEL LOG_LEVEL_ALL
 #include "embc/stream/framer.h"
 #include "embc/stream/framer_util.h"
@@ -28,7 +51,7 @@
 #define HEADER_SIZE ((uint16_t) EMBC_FRAMER_HEADER_SIZE)
 #define FOOTER_SIZE ((uint16_t) EMBC_FRAMER_FOOTER_SIZE)
 #define BITMAP_CURRENT ((uint16_t) 0x100)
-#define EMBC_FRAMER_TIMEOUT EMBC_MILLISECONDS_TO_TIME(100)
+#define EMBC_FRAMER_TIMEOUT EMBC_MILLISECONDS_TO_TIME(500)
 
 EMBC_STATIC_ASSERT(EMBC_FRAMER_FRAME_MAX_SIZE < 256, frame_size_too_big);
 

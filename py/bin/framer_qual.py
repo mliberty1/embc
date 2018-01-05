@@ -288,7 +288,7 @@ class MasterFramer:
     def open(self):
         self._serial.open()
         self._last_time = time.time()
-        #self._framer.resync()
+        self._framer.resync()
 
     def close(self):
         self._serial.close()
