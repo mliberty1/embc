@@ -200,14 +200,33 @@ struct embc_buffer_s {
 };
 
 /**
- * @brief Initialize the buffer allocator.
+ * @brief Get the buffer allocator instance.
  *
  * @param sizes The length 8 array of sizes to allocate to each
  *      buffer size.  sizes[0] (minimum size) determines
  *      how many 32 byte buffers to allocate.  See the table below
  *      for details on sizes and the overhead for each size.
  * @param length The number of entries in sizes.
+ * @return The size of the buffer allocator instance in bytes.
+ * @see embc_buffer_allocator_new()
+ * @see embc_buffer_allocator_initialize()
+ */
+EMBC_API embc_size_t embc_buffer_allocator_instance_size(
+        embc_size_t const * sizes, embc_size_t length);
+
+/**
+ * @brief Initialize the buffer allocator.
+ *
+ * @param self The instance to initialize which must be at least
+ *      embc_buffer_allocator_instance_size(sizes, length) bytes.
+ * @param sizes The length 8 array of sizes to allocate to each
+ *      buffer size.  sizes[0] (minimum size) determines
+ *      how many 32 byte buffers to allocate.  See the table below
+ *      for details on sizes and the overhead for each size.
+ * @param length The number of entries in sizes.
  * @return The buffer allocator instance which gets memory from embc_alloc().
+ * @see embc_buffer_allocator_new()
+ * @see embc_buffer_allocator_instance_size()
  *
  * This module also includes a fast buffer manager (memory manager)
  * that performs constant-time allocation and deallocation.  The memory
@@ -217,18 +236,44 @@ struct embc_buffer_s {
  * of blocks of each size are specified at initialization, and the system
  * memory manager only allocates once.
  *
+ * Reinitializing (calling this function after buffers have already been
+ * allocated) WILL corrupt any lists where the buffers may be located.
+ * Call this function with extreme care after self has been used!
  */
-EMBC_API struct embc_buffer_allocator_s * embc_buffer_initialize(embc_size_t const * sizes, embc_size_t length);
+EMBC_API void embc_buffer_allocator_initialize(
+        struct embc_buffer_allocator_s * self,
+        embc_size_t const * sizes, embc_size_t length);
 
 /**
- * @brief Finalize the buffer module and return all memory to the heap.
+ * @brief Allocate memory for a new buffer allocator and then initialize.
+ *
+ * @param sizes The length 8 array of sizes to allocate to each
+ *      buffer size.  sizes[0] (minimum size) determines
+ *      how many 32 byte buffers to allocate.  See the table below
+ *      for details on sizes and the overhead for each size.
+ * @param length The number of entries in sizes.
+ * @param self The buffer allocator instance.
+ *
+ * Equivalent to:
+ *     embc_size_t sz = embc_buffer_allocator_instance_size(sizes, length);
+ *     struct embc_buffer_allocator_s * s = embc_alloc(sz);
+ *     embc_buffer_allocator_initialize(s, sizes, length);
+ */
+EMBC_API struct embc_buffer_allocator_s * embc_buffer_allocator_new(
+        embc_size_t const * sizes, embc_size_t length);
+
+/**
+ * @brief Finalize the buffer module.
  *
  * @param self The instance to finalize.
  *
- * WARNING: all instances of all buffers must be returned first, or use after
- * free will be likely!
+ * This function does not free the memory used by self.  If self was
+ * dynamically allocated, call embc_free(self) to release the memory.
+ *
+ * WARNING: all instances of all buffers must be returned first to prevent
+ *      buffer and buffer list corruption.
  */
-EMBC_API void embc_buffer_finalize(struct embc_buffer_allocator_s * self);
+EMBC_API void embc_buffer_allocator_finalize(struct embc_buffer_allocator_s * self);
 
 /**
  * @brief Allocate a buffer.
@@ -245,6 +290,23 @@ EMBC_API void embc_buffer_finalize(struct embc_buffer_allocator_s * self);
  * if it is to be used from multiple tasks or ISRs.
  */
 EMBC_API struct embc_buffer_s * embc_buffer_alloc(struct embc_buffer_allocator_s * self, embc_size_t size);
+
+/**
+ * @brief Allocate a buffer - return NULL on empty.
+ *
+ * @param self The allocator instance for the buffer.
+ * @param size The desired size for the buffer.
+ * @return The new buffer whose total storage capacity is at least size or 0.
+ *      The caller takes ownership of the buffer.
+ *      The caller can use embc_buffer_free() to release ownership of
+ *      the buffer back to the allocator.
+ *
+ * This function is not thread-safe and must be protected by critical sections
+ * if it is to be used from multiple tasks or ISRs.
+ */
+EMBC_API struct embc_buffer_s * embc_buffer_alloc_unsafe(
+        struct embc_buffer_allocator_s * self,
+        embc_size_t size);
 
 /**
  * @brief Free the buffer and return ownership to the allocator.

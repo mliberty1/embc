@@ -132,7 +132,7 @@ static int setup(void ** state) {
     uint32_t sz = embc_framer_instance_size();
     //assert_int_equal(0x330, sz);
     self = (struct test_s *) test_calloc(1, sizeof(struct test_s));
-    self->buffer_allocator = embc_buffer_initialize(BUFFER_ALLOCATOR, EMBC_ARRAY_SIZE(BUFFER_ALLOCATOR));
+    self->buffer_allocator = embc_buffer_allocator_new(BUFFER_ALLOCATOR, EMBC_ARRAY_SIZE(BUFFER_ALLOCATOR));
     self->f1 = test_calloc(1, sz);
     embc_list_initialize(&self->tx);
 
@@ -154,7 +154,8 @@ static int teardown(void ** state) {
     struct test_s *self = (struct test_s *) *state;
     embc_framer_finalize(self->f1);
     test_free(self->f1);
-    embc_buffer_finalize(self->buffer_allocator);
+    embc_buffer_allocator_finalize(self->buffer_allocator);
+    embc_free(self->buffer_allocator);
     test_free(self);
     return 0;
 }

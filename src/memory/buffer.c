@@ -60,19 +60,32 @@ static inline void buffer_init(struct embc_buffer_s * b) {
     b->flags = 0;
 }
 
-struct embc_buffer_allocator_s * embc_buffer_initialize(embc_size_t const * sizes, embc_size_t length) {
+embc_size_t embc_buffer_allocator_instance_size(
+        embc_size_t const * sizes, embc_size_t length) {
+    DBC_NOT_NULL(sizes);
+    embc_size_t total_size = 0;
+    total_size = MGR_SZ + POOL_SZ * length;
+    for (embc_size_t i = 0; i < length; ++i) {
+        embc_size_t buffer_sz = (32 << i);
+        total_size += sizes[i] * (HDR_SZ + buffer_sz);
+    }
+    return total_size;
+}
+
+void embc_buffer_allocator_initialize(
+        struct embc_buffer_allocator_s * self,
+        embc_size_t const * sizes, embc_size_t length) {
     DBC_NOT_NULL(sizes);
     embc_size_t total_size = 0;
     total_size = MGR_SZ + POOL_SZ * length;
     embc_size_t header_size = total_size;
-    embc_size_t buffer_sz = 0;
     for (embc_size_t i = 0; i < length; ++i) {
-        buffer_sz = (32 << i);
+        embc_size_t buffer_sz = (32 << i);
         total_size += sizes[i] * (HDR_SZ + buffer_sz);
     }
-    uint8_t * memory = embc_alloc_clr(total_size);
-    struct embc_buffer_allocator_s * self = (struct embc_buffer_allocator_s *) memory;
-    self->size_max = buffer_sz; // largest buffer
+    embc_memset(self, 0, total_size);
+    uint8_t * memory = (uint8_t *) self;
+    self->size_max = total_size; // largest buffer
     uint8_t * buffers_ptr = memory + header_size;
 
     for (embc_size_t i = 0; i < length; ++i) {
@@ -102,11 +115,19 @@ struct embc_buffer_allocator_s * embc_buffer_initialize(embc_size_t const * size
         pool->memory_end = buffers_ptr;
     }
     EMBC_ASSERT(buffers_ptr == (memory + total_size));
-    return self;
 }
 
-void embc_buffer_finalize(struct embc_buffer_allocator_s * self) {
-    embc_free(self);
+EMBC_API struct embc_buffer_allocator_s * embc_buffer_allocator_new(
+        embc_size_t const * sizes, embc_size_t length) {
+    embc_size_t sz = embc_buffer_allocator_instance_size(sizes, length);
+    struct embc_buffer_allocator_s * s = embc_alloc(sz);
+    embc_buffer_allocator_initialize(s, sizes, length);
+    return s;
+}
+
+void embc_buffer_allocator_finalize(struct embc_buffer_allocator_s * self) {
+    (void) self;
+    // audit outstanding buffers?
 }
 
 static embc_size_t size_to_index_(struct embc_buffer_allocator_s * self, embc_size_t size) {
@@ -120,20 +141,38 @@ static embc_size_t size_to_index_(struct embc_buffer_allocator_s * self, embc_si
     return index;
 }
 
-struct embc_buffer_s * embc_buffer_alloc(
+static inline struct embc_buffer_s * alloc_(
         struct embc_buffer_allocator_s * self, embc_size_t size) {
     embc_size_t index = size_to_index_(self, size);
     struct pool_s * p = pool_get(self, index);
     struct embc_list_s * item = embc_list_remove_head(&p->buffers);
-    EMBC_ASSERT_ALLOC(item);
+    if (0 == item) {
+        return 0;
+    }
     struct embc_buffer_s * buffer = embc_list_entry(item, struct embc_buffer_s, item);
     ++p->alloc_current;
     if (p->alloc_current > p->alloc_max) {
         p->alloc_max = p->alloc_current;
     }
     buffer_init(buffer);
-    LOGF_DEBUG3("embc_buffer_alloc %p", (void *) buffer);
     return buffer;
+}
+
+
+struct embc_buffer_s * embc_buffer_alloc(
+        struct embc_buffer_allocator_s * self, embc_size_t size) {
+    struct embc_buffer_s * b = alloc_(self, size);
+    EMBC_ASSERT_ALLOC(b);
+    LOGF_DEBUG3("embc_buffer_alloc %p", (void *) b);
+    return b;
+}
+
+struct embc_buffer_s * embc_buffer_alloc_unsafe(
+        struct embc_buffer_allocator_s * self,
+        embc_size_t size) {
+    struct embc_buffer_s * b = alloc_(self, size);
+    LOGF_DEBUG3("embc_buffer_alloc_unsafe %p", (void *) b);
+    return b;
 }
 
 static void embc_buffer_free_(struct embc_buffer_manager_s const * self, struct embc_buffer_s * buffer) {
