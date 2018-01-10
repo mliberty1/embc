@@ -31,6 +31,7 @@ set(SOURCES
         collections/list.c
         cli.c
         crc.c
+        cstr.c
         ec.c
         fsm.c
         lfsr.c
