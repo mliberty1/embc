@@ -169,7 +169,7 @@ class Framer:
         self.time_offset = time.time()  # seconds
         self.timeout = None  # seconds
         self.hal_tx = lambda x: None
-        self._pyport = [None, None] * 256
+        self._pyport = [[None, None]] * 256
 
         # define HAL callbacks
         self.__hal_tx = HAL_TX_FN(self._hal_tx)
@@ -243,11 +243,17 @@ class Framer:
         rx, _ = self._pyport[port]
         data = buffer[0].read_remaining()
         buffer[0].free()
-        rx(port, message_id, port_def, data)
+        if rx is None:
+            log.warning('rx port=%d, but no registered callback', port)
+        else:
+            rx(port, message_id, port_def, data)
 
     def _port_tx_done(self, user_data, port, message_id, port_def, status):
         _, tx_done = self._pyport[port]
-        tx_done(port, message_id, port_def, status)
+        if tx_done is None:
+            log.warning('tx_done port=%d, but no registered callback', port)
+        else:
+            tx_done(port, message_id, port_def, status)
 
     def register_port(self, port, rx, tx_done):
         """Register callbacks for a port
