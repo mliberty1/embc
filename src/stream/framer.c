@@ -28,12 +28,11 @@
  *   ACK turnaround time.  Since multiple frames are queued in the UART, the
  *   transmit time depends upon the number of enqueued frames.  Should reinit
  *   data->ack timeout when HAL indicates data frame transmit completes.
- * - 2.1: Frame id recovery is not fully robust:
- *   On reset, frame synchronization should occur without requiring the full
- *   number of frames to buffer.  The receiver should simply accept the first
- *   frame after reset as the new rx frame_id and immediately indicate frame
- *   receive to the higher level without buffering.  If an earlier frame is
- *   received later, the receiver should NACK with ABORTED.
+ * - 2.1: Initial 2 frames after reset and recovery may be delayed:
+ *   The received frames are enqueued to ensure in-order delivery.  In the
+ *   cases where the queue was never full, the ACK occurs immediately but the
+ *   frames are not sent to the application until either the queue
+ *   fills or the received timeout expires.
  */
 
 
@@ -51,7 +50,8 @@
 #define HEADER_SIZE ((uint16_t) EMBC_FRAMER_HEADER_SIZE)
 #define FOOTER_SIZE ((uint16_t) EMBC_FRAMER_FOOTER_SIZE)
 #define BITMAP_CURRENT ((uint16_t) 0x100)
-#define EMBC_FRAMER_TIMEOUT EMBC_MILLISECONDS_TO_TIME(500)
+#define EMBC_FRAMER_TIMEOUT EMBC_MILLISECONDS_TO_TIME(250)
+#define EMBC_FRAMER_RX_TIMEOUT EMBC_MILLISECONDS_TO_TIME(800)
 
 EMBC_STATIC_ASSERT(EMBC_FRAMER_FRAME_MAX_SIZE < 256, frame_size_too_big);
 
@@ -103,6 +103,7 @@ struct embc_framer_s {
     struct embc_framer_status_s status;
 
     int64_t next_timeout;
+    int64_t rx_next_timeout;
     uint32_t timer_id;
     uint8_t rx_frame_id;
     uint16_t rx_frame_bitmask;
@@ -167,6 +168,8 @@ static void port0_rx(void *user_data,
             embc_framer_send(self, port_id, message_id, EMBC_FRAMER_PORT0_PING_RSP, buffer);
             break;
         case EMBC_FRAMER_PORT0_STATUS_REQ:
+            LOGF_DEBUG2("port0_rx status_req: frame_id=0x%02x, message_id=%d",
+                        (int) hdr->frame_id, (int) hdr->message_id);
             embc_buffer_write(buffer, &self->status, sizeof(self->status));
             embc_framer_send(self, port_id, message_id, EMBC_FRAMER_PORT0_STATUS_RSP, buffer);
             break;
@@ -220,6 +223,7 @@ void embc_framer_initialize(
     self->buffer_allocator = buffer_allocator;
     self->hal_cbk = *callbacks;
     self->next_timeout = EMBC_TIME_MAX;
+    self->rx_next_timeout = EMBC_TIME_MAX;
 
     for (int i = 0; i < EMBC_FRAMER_OUTSTANDING_FRAMES_MAX; ++i) {
         self->rx_frame_bitmask_outstanding = (BITMAP_CURRENT | self->rx_frame_bitmask_outstanding) >> 1;
@@ -290,7 +294,6 @@ void embc_framer_register_rx_hook(
     }
 }
 
-
 void embc_framer_finalize(struct embc_framer_s * self) {
     (void) self;
 }
@@ -336,14 +339,27 @@ static void rx_complete(struct embc_framer_s *self, struct embc_buffer_s * frame
 }
 
 static void rx_complete_queued(struct embc_framer_s *self) {
+    struct embc_list_s *item;
+    struct embc_buffer_s *b;
+    embc_list_foreach(&self->rx_pending, item) {
+        b = embc_list_entry(item, struct embc_buffer_s, item);
+        embc_list_remove(&b->item);
+        rx_complete(self, b);
+    }
+}
+
+static void rx_timeout_set(struct embc_framer_s * self) {
+    LOGS_DEBUG2("rx_timeout_set");
+    int64_t current_time = self->hal_cbk.time_get(self->hal_cbk.hal);
+    self->rx_next_timeout = EMBC_FRAMER_RX_TIMEOUT + current_time;
+}
+
+static void rx_complete_queued_or_set_timeout(struct embc_framer_s *self) {
     if ((self->rx_frame_bitmask & self->rx_frame_bitmask_outstanding) == self->rx_frame_bitmask_outstanding) {
-        struct embc_list_s *item;
-        struct embc_buffer_s *b;
-        embc_list_foreach(&self->rx_pending, item) {
-            b = embc_list_entry(item, struct embc_buffer_s, item);
-            embc_list_remove(&b->item);
-            rx_complete(self, b);
-        }
+        rx_complete_queued(self);
+    } else if (!embc_list_is_empty(&self->rx_pending)) {
+        rx_timeout_set(self);
+        timer_schedule(self);
     }
 }
 
@@ -498,6 +514,10 @@ static void timer_callback(void * user_data, uint32_t timer_id) {
     struct tx_buf_s * t;
     LOGF_DEBUG1("timer_callback %d", (int) timer_id);
     int64_t current_time = self->hal_cbk.time_get(self->hal_cbk.hal);
+    if (current_time >= self->rx_next_timeout) {
+        self->rx_next_timeout = EMBC_TIME_MAX;
+        rx_complete_queued(self);
+    }
     embc_list_foreach(&self->tx_buffers_active, item) {
         t = embc_list_entry(item, struct tx_buf_s, item);
         if ((TX_STATUS_ACKED != t->status) && (current_time >= t->timeout)) {
@@ -526,7 +546,7 @@ static void timer_cancel(struct embc_framer_s * self) {
 }
 
 static void timer_schedule(struct embc_framer_s * self) {
-    int64_t timeout = EMBC_TIME_MAX;
+    int64_t timeout = self->rx_next_timeout;
     struct embc_list_s * item;
     embc_list_foreach(&self->tx_buffers_active, item) {
         struct tx_buf_s *t = embc_list_entry(item, struct tx_buf_s, item);
@@ -707,7 +727,7 @@ static void rx_hook_fn(
 
     // WARNING: frame no longer available to this function (may have been freed)
     send_frame_ack(self, &hdr, ack_frame_bitmask, 0);
-    rx_complete_queued(self);
+    rx_complete_queued_or_set_timeout(self);
 }
 
 /**
@@ -760,7 +780,7 @@ static void framer_resync(struct embc_framer_s * self, int32_t status) {
     uint16_t i = 1;
     uint16_t length;
     if (0 == (self->rx_state & 0x80)) {
-        // not synchronized, no additional error
+        LOGS_DEBUG3("framer_resync not synchronized, no additional error.");
     } else {
         // create ack
         if (EMBC_ERROR_MESSAGE_INTEGRITY == status) {

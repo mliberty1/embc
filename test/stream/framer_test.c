@@ -48,6 +48,8 @@ struct test_s {
     int64_t current_time;
 };
 
+static void time_advance_to_timeout(struct test_s * self);
+
 void hal_tx_cbk(void *user_data, struct embc_buffer_s * buffer) {
     struct test_s * self = (struct test_s *) user_data;
     embc_list_add_tail(&self->tx, &buffer->item);
@@ -354,6 +356,13 @@ static void send_frame(struct test_s *self, int id, uint16_t mask, bool expect) 
     embc_framer_hal_rx_buffer(self->f1, b->data, b->length);
     check_ack(self, frame_id, 1, message_id, 0, mask);
     embc_buffer_free(b);
+}
+
+static void rx_first_complete(void **state) {
+    struct test_s *self = (struct test_s *) *state;
+    uint16_t mask = 0x0100;
+    send_frame(self, 0, mask, true);
+    time_advance_to_timeout(self);
 }
 
 static void rx_and_ack(void **state) {
@@ -733,6 +742,7 @@ int main(void) {
             cmocka_unit_test_setup_teardown(header_crc_bad, setup, teardown),
             cmocka_unit_test_setup_teardown(frame_crc_bad, setup, teardown),
             cmocka_unit_test_setup_teardown(rx_multiple, setup, teardown),
+            cmocka_unit_test_setup_teardown(rx_first_complete, setup, teardown),
             cmocka_unit_test_setup_teardown(rx_and_ack, setup, teardown),
             cmocka_unit_test_setup_teardown(rx_dedup_on_lost_ack, setup, teardown),
             cmocka_unit_test_setup_teardown(rx_out_of_order_1, setup, teardown),
