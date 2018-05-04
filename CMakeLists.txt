@@ -40,6 +40,9 @@ remove_definitions(-D__cplusplus)
 
 add_subdirectory(third-party)
 
+set(EMBC_SOURCE_PATH ${CMAKE_CURRENT_SOURCE_DIR}
+    CACHE INTERNAL "embc source path" FORCE
+)
 set(EMBC_INCLUDE
         ${CMAKE_CURRENT_SOURCE_DIR}/include
         ${THIRD_PARTY_INCLUDES}
