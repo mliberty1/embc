@@ -214,6 +214,7 @@ void embc_framer_initialize(
         struct embc_buffer_allocator_s * buffer_allocator,
         struct embc_framer_hal_callbacks_s * callbacks) {
     DBC_NOT_NULL(self);
+    DBC_NOT_NULL(buffer_allocator);
     DBC_NOT_NULL(callbacks);
     DBC_NOT_NULL(callbacks->tx_fn);
     DBC_NOT_NULL(callbacks->timer_set_fn);
