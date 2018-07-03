@@ -57,6 +57,22 @@ int embc_cstr_casecmp(const char * s1, const char * s2) {
     }
 }
 
+const char * embc_cstr_starts_with(const char * s, const char * prefix) {
+    if (!prefix || !s) {
+        return s;
+    }
+    while (1) {
+        if (*prefix == 0) {
+            return s;
+        }
+        if ((*s == 0) || (*prefix != *s)) {
+            return 0;
+        }
+        ++prefix;
+        ++s;
+    }
+}
+
 int embc_cstr_to_u32(const char * src, uint32_t * value) {
     uint32_t v = 0;
 

@@ -229,6 +229,16 @@ static void casecmp(void ** state) {
     assert_int_equal(0, embc_cstr_casecmp("hello", "HELLO"));
 }
 
+static void starts_with(void **state) {
+    (void) state;
+    const char * hello_world = "hello_world";
+    assert_ptr_equal(hello_world + 6, embc_cstr_starts_with(hello_world, "hello_"));
+    assert_null(embc_cstr_starts_with(hello_world, "world"));
+    assert_null(embc_cstr_starts_with(hello_world, "heLLo_"));
+    assert_null(embc_cstr_starts_with(0, "heLLo_"));
+    assert_ptr_equal(hello_world, embc_cstr_starts_with(hello_world, 0));
+}
+
 static void hex_chars(void ** state) {
     (void) state;
     char v_upper[] = "0123456789ABCDEF";
@@ -275,6 +285,7 @@ int main(void) {
         cmocka_unit_test(to_bool),
         cmocka_unit_test(to_bool_invalid),
         cmocka_unit_test(casecmp),
+        cmocka_unit_test(starts_with),
         cmocka_unit_test(hex_chars),
         cmocka_unit_test(hex_chars_invalid),
     };

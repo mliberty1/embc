@@ -73,6 +73,16 @@ EMBC_API int embc_cstr_copy(char * tgt, char const * src, embc_size_t tgt_size);
 EMBC_API int embc_cstr_casecmp(const char * s1, const char * s2);
 
 /**
+ * @brief Determine if a string starts with another string.
+ *
+ * @param s The string to search.
+ * @param prefix The case-sensitive string prefix to match in s.
+ * @return 0 on no match.  On match, return the pointer to s at the location of
+ *     the first character after the matching prefix.
+ */
+EMBC_API const char * embc_cstr_starts_with(const char * s, const char * prefix);
+
+/**
  * @brief Convert a string to an unsigned 32-bit integer.
  *
  * @param src The input source string containing an integer.  Strings that
@@ -179,6 +189,7 @@ EMBC_API uint8_t embc_cstr_hex_to_u4(char v);
 
 /**
  * @brief Convert a 4-bit nibble to a hex character.
+ *
  * @param v The 4-bit nibble value.
  * @return The ASCII character value or '0' on error.
  */
