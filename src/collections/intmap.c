@@ -193,6 +193,7 @@ int intmap_remove(struct intmap_s * self, embc_size_t key, void ** old_value) {
             item->value = 0;
             return 0;
         }
+        previous = &(item->next);
         item = item->next;
     }
     return EMBC_ERROR_NOT_FOUND;
