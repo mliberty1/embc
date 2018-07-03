@@ -29,6 +29,7 @@ set(SOURCES
         collections/hashmap.c
         collections/intmap.c
         collections/list.c
+        collections/strmap.c
         cli.c
         crc.c
         cstr.c
