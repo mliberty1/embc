@@ -71,6 +71,21 @@ EMBC_CPP_GUARD_START
 #define EMBC_TIME_MIN ((int64_t) 0x8000000000000000U)
 
 /**
+ * @brief The offset from the standard UNIX (POSIX) epoch.
+ *
+ * This offset allows translation between embc time and the 
+ * standard UNIX (POSIX) epoch of Jan 1, 1970.
+ *
+ * The value was computed using python3:
+ *
+ *     import dateutil.parser
+ *     dateutil.parser.parse('2018-01-01T00:00:00Z').timestamp()
+ *
+ * EMBC chooses a different epoch to advance "zero" by 48 years!
+ */
+#define EMBC_TIME_EPOCH_UNIX_OFFSET_SECONDS 1514764800
+
+/**
  * @brief The fixed-point representation for 1 second.
  */
 #define EMBC_TIME_SECOND (((int64_t) 1) << EMBC_TIME_Q)
