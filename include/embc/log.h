@@ -230,10 +230,10 @@ extern char const embc_log_level_char[EMBC_LOG_LEVEL_ALL + 1];
 // zero length variadic arguments are not allowed for macros
 // this hack ensures that LOG(message) and LOG(format, args...) are both supported.
 // https://stackoverflow.com/questions/5588855/standard-alternative-to-gccs-va-args-trick
-#define _EMBC_LOG_SELECT(PREFIX, _9, _8, _7, _6, _5, _4, _3, _2, _1, SUFFIX, ...) PREFIX ## _ ## SUFFIX
+#define _EMBC_LOG_SELECT(PREFIX, _11, _10, _9, _8, _7, _6, _5, _4, _3, _2, _1, SUFFIX, ...) PREFIX ## _ ## SUFFIX
 #define _EMBC_LOG_1(level, message) EMBC_LOG(level, "%s", message)
 #define _EMBC_LOG_N(level, format, ...) EMBC_LOG(level, format, __VA_ARGS__)
-#define _EMBC_LOG_DISPATCH(level, ...)  _EMBC_LOG_SELECT(_EMBC_LOG, __VA_ARGS__, N, N, N, N, N, N, N, N, 1, 0)(level, __VA_ARGS__)
+#define _EMBC_LOG_DISPATCH(level, ...)  _EMBC_LOG_SELECT(_EMBC_LOG, __VA_ARGS__, N, N, N, N, N, N, N, N, N, N, 1, 0)(level, __VA_ARGS__)
 
 
 /** Log a emergency using printf-style arguments. */
