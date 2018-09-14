@@ -20,8 +20,8 @@
  * \brief hashmap collection.
  */
 
-#ifndef EMBC_HASHMAP_H_
-#define EMBC_HASHMAP_H_
+#ifndef EMBC_EMBC_HASHMAP_H_
+#define EMBC_EMBC_HASHMAP_H_
 
 #include "embc/cmacro_inc.h"
 #include "embc/platform.h"
@@ -40,12 +40,12 @@ EMBC_CPP_GUARD_START
 /**
  * @brief The hashmap class (opaque).
  */
-struct hashmap_s;
+struct embc_hashmap_s;
 
 /**
  * @brief The hashmap iterator class (opaque).
  */
-struct hashmap_iterator_s;
+struct embc_hashmap_iterator_s;
 
 /**
  * @brief Hash a value.
@@ -53,7 +53,7 @@ struct hashmap_iterator_s;
  * @param value The value to hash.
  * @return The hash.
  */
-typedef embc_size_t (*hashmap_hash)(void * value);
+typedef embc_size_t (*embc_hashmap_hash)(void * value);
 
 /**
  * @brief Test two values for equivalence.
@@ -62,23 +62,23 @@ typedef embc_size_t (*hashmap_hash)(void * value);
  * @param other The other value to compare
  * @return True if equivalent, false otherwise.
  */
-typedef bool (*hashmap_equiv)(void * self, void * other);
+typedef bool (*embc_hashmap_equiv)(void * self, void * other);
 
 
-struct hashmap_s * hashmap_new(hashmap_hash hash, hashmap_equiv equiv);
-void hashmap_free(struct hashmap_s * self);
-embc_size_t hashmap_length(struct hashmap_s * self);
-int hashmap_put(struct hashmap_s * self, void * key, void * value, void ** old_value);
-int hashmap_get(struct hashmap_s * self, void * key, void ** value);
-int hashmap_remove(struct hashmap_s * self, void * key, void ** old_value);
+EMBC_API struct embc_hashmap_s * embc_hashmap_new(embc_hashmap_hash hash, embc_hashmap_equiv equiv);
+EMBC_API void embc_hashmap_free(struct embc_hashmap_s * self);
+EMBC_API embc_size_t embc_hashmap_length(struct embc_hashmap_s * self);
+EMBC_API int embc_hashmap_put(struct embc_hashmap_s * self, void * key, void * value, void ** old_value);
+EMBC_API int embc_hashmap_get(struct embc_hashmap_s * self, void * key, void ** value);
+EMBC_API int embc_hashmap_remove(struct embc_hashmap_s * self, void * key, void ** old_value);
 
-struct hashmap_iterator_s * hashmap_iterator_new(struct hashmap_s * self);
-int hashmap_iterator_next(struct hashmap_iterator_s * self, void ** key, void ** value);
-void hashmap_iterator_free(struct hashmap_iterator_s * self);
+EMBC_API struct embc_hashmap_iterator_s * embc_hashmap_iterator_new(struct embc_hashmap_s * self);
+EMBC_API int embc_hashmap_iterator_next(struct embc_hashmap_iterator_s * self, void ** key, void ** value);
+EMBC_API void embc_hashmap_iterator_free(struct embc_hashmap_iterator_s * self);
 
 /** @} */
 
 
 EMBC_CPP_GUARD_END
 
-#endif /* EMBC_HASHMAP_H_ */
+#endif /* EMBC_EMBC_HASHMAP_H_ */

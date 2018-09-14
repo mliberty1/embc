@@ -39,113 +39,113 @@ void dbc_assert(char const *file, unsigned line, const char * msg) {
 }
 
 /* A test case that does nothing and succeeds. */
-static void intmap_empty(void **state) {
+static void embc_intmap_empty(void **state) {
     (void) state; /* unused */
     embc_size_t value = 42;
-    struct intmap_s * h = intmap_new();
-    assert_int_equal(0, intmap_length(h));
-    assert_int_equal(EMBC_ERROR_NOT_FOUND, intmap_get(h, 10, (void **) &value));
+    struct embc_intmap_s * h = embc_intmap_new();
+    assert_int_equal(0, embc_intmap_length(h));
+    assert_int_equal(EMBC_ERROR_NOT_FOUND, embc_intmap_get(h, 10, (void **) &value));
     assert_int_equal(0, value);
-    intmap_free(h);
+    embc_intmap_free(h);
 }
 
-static void intmap_put_get_remove_get(void **state) {
+static void embc_intmap_put_get_remove_get(void **state) {
     (void) state; /* unused */
     embc_size_t value;
-    struct intmap_s * h = intmap_new();
-    assert_int_equal(0, intmap_put(h, 10, (void *) 20, (void **) &value));
-    assert_int_equal(1, intmap_length(h));
-    assert_int_equal(0, intmap_get(h, 10, (void **) &value));
+    struct embc_intmap_s * h = embc_intmap_new();
+    assert_int_equal(0, embc_intmap_put(h, 10, (void *) 20, (void **) &value));
+    assert_int_equal(1, embc_intmap_length(h));
+    assert_int_equal(0, embc_intmap_get(h, 10, (void **) &value));
     assert_int_equal(20, value);
-    assert_int_equal(0, intmap_remove(h, 10, (void **) &value));
-    assert_int_equal(0, intmap_length(h));
-    assert_int_equal(EMBC_ERROR_NOT_FOUND, intmap_get(h, 10, 0));
-    intmap_free(h);
+    assert_int_equal(0, embc_intmap_remove(h, 10, (void **) &value));
+    assert_int_equal(0, embc_intmap_length(h));
+    assert_int_equal(EMBC_ERROR_NOT_FOUND, embc_intmap_get(h, 10, 0));
+    embc_intmap_free(h);
 }
 
-static void intmap_resize(void **state) {
+static void embc_intmap_resize(void **state) {
     (void) state; /* unused */
     embc_size_t value_in;
     embc_size_t value_out;
-    struct intmap_s * h = intmap_new();
+    struct embc_intmap_s * h = embc_intmap_new();
     for (embc_size_t idx = 0; idx < 0x100; ++idx) {
         value_in = idx + 0x1000;
-        assert_int_equal(0, intmap_put(h, idx, (void *) value_in, 0));
-        assert_int_equal(idx + 1, intmap_length(h));
-        assert_int_equal(0, intmap_get(h, idx, (void **) &value_out));
+        assert_int_equal(0, embc_intmap_put(h, idx, (void *) value_in, 0));
+        assert_int_equal(idx + 1, embc_intmap_length(h));
+        assert_int_equal(0, embc_intmap_get(h, idx, (void **) &value_out));
         assert_int_equal(value_in, value_out);
     }
     for (embc_size_t idx = 0; idx < 0x100; ++idx) {
-        assert_int_equal(0, intmap_get(h, idx, (void **) &value_out));
+        assert_int_equal(0, embc_intmap_get(h, idx, (void **) &value_out));
         assert_int_equal(idx + 0x1000, value_out);
     }
-    intmap_free(h);
+    embc_intmap_free(h);
 }
 
-static void intmap_iterator(void **state) {
+static void embc_intmap_iterator(void **state) {
     (void) state; /* unused */
     embc_size_t key;
     embc_size_t value;
-    struct intmap_iterator_s * iter = 0;
-    struct intmap_s * h = intmap_new();
-    assert_int_equal(0, intmap_put(h, 1, (void *) 1, 0));
-    assert_int_equal(0, intmap_put(h, 0x100001, (void *) 2, 0));
-    assert_int_equal(0, intmap_put(h, 3, (void *) 3, 0));
-    iter = intmap_iterator_new(h);
-    assert_int_equal(0, intmap_iterator_next(iter, &key, (void **) &value));
+    struct embc_intmap_iterator_s * iter = 0;
+    struct embc_intmap_s * h = embc_intmap_new();
+    assert_int_equal(0, embc_intmap_put(h, 1, (void *) 1, 0));
+    assert_int_equal(0, embc_intmap_put(h, 0x100001, (void *) 2, 0));
+    assert_int_equal(0, embc_intmap_put(h, 3, (void *) 3, 0));
+    iter = embc_intmap_iterator_new(h);
+    assert_int_equal(0, embc_intmap_iterator_next(iter, &key, (void **) &value));
     assert_int_equal(1, value);
-    assert_int_equal(0, intmap_iterator_next(iter, &key, (void **) &value));
+    assert_int_equal(0, embc_intmap_iterator_next(iter, &key, (void **) &value));
     assert_int_equal(2, value);
-    assert_int_equal(0, intmap_iterator_next(iter, &key, (void **) &value));
+    assert_int_equal(0, embc_intmap_iterator_next(iter, &key, (void **) &value));
     assert_int_equal(3, value);
-    intmap_iterator_free(iter);
-    intmap_free(h);
+    embc_intmap_iterator_free(iter);
+    embc_intmap_free(h);
 }
 
-static void intmap_iterator_remove_current(void **state) {
+static void embc_intmap_iterator_remove_current(void **state) {
     (void) state; /* unused */
     embc_size_t key;
     embc_size_t value;
-    struct intmap_iterator_s * iter = 0;
-    struct intmap_s * h = intmap_new();
-    assert_int_equal(0, intmap_put(h, 1, (void *) 1, 0));
-    assert_int_equal(0, intmap_put(h, 0x100001, (void *) 2, 0));
-    assert_int_equal(0, intmap_put(h, 3, (void *) 3, 0));
-    iter = intmap_iterator_new(h);
-    assert_int_equal(0, intmap_iterator_next(iter, &key, (void **) &value));
+    struct embc_intmap_iterator_s * iter = 0;
+    struct embc_intmap_s * h = embc_intmap_new();
+    assert_int_equal(0, embc_intmap_put(h, 1, (void *) 1, 0));
+    assert_int_equal(0, embc_intmap_put(h, 0x100001, (void *) 2, 0));
+    assert_int_equal(0, embc_intmap_put(h, 3, (void *) 3, 0));
+    iter = embc_intmap_iterator_new(h);
+    assert_int_equal(0, embc_intmap_iterator_next(iter, &key, (void **) &value));
     assert_int_equal(1, value);
-    assert_int_equal(0, intmap_remove(h, 1, (void **) &value));
-    assert_int_equal(0, intmap_iterator_next(iter, &key, (void **) &value));
+    assert_int_equal(0, embc_intmap_remove(h, 1, (void **) &value));
+    assert_int_equal(0, embc_intmap_iterator_next(iter, &key, (void **) &value));
     assert_int_equal(2, value);
-    assert_int_equal(0, intmap_iterator_next(iter, &key, (void **) &value));
+    assert_int_equal(0, embc_intmap_iterator_next(iter, &key, (void **) &value));
     assert_int_equal(3, value);
-    intmap_iterator_free(iter);
-    intmap_free(h);
+    embc_intmap_iterator_free(iter);
+    embc_intmap_free(h);
 }
 
-static void intmap_iterator_remove_next(void **state) {
+static void embc_intmap_iterator_remove_next(void **state) {
     (void) state; /* unused */
     embc_size_t key;
     embc_size_t value;
-    struct intmap_iterator_s * iter = 0;
-    struct intmap_s * h = intmap_new();
-    assert_int_equal(0, intmap_put(h, 1, (void *) 1, 0));
-    assert_int_equal(0, intmap_put(h, 0x100001, (void *) 2, 0));
-    assert_int_equal(0, intmap_put(h, 3, (void *) 3, 0));
-    iter = intmap_iterator_new(h);
-    assert_int_equal(0, intmap_iterator_next(iter, &key, (void **) &value));
+    struct embc_intmap_iterator_s * iter = 0;
+    struct embc_intmap_s * h = embc_intmap_new();
+    assert_int_equal(0, embc_intmap_put(h, 1, (void *) 1, 0));
+    assert_int_equal(0, embc_intmap_put(h, 0x100001, (void *) 2, 0));
+    assert_int_equal(0, embc_intmap_put(h, 3, (void *) 3, 0));
+    iter = embc_intmap_iterator_new(h);
+    assert_int_equal(0, embc_intmap_iterator_next(iter, &key, (void **) &value));
     assert_int_equal(1, value);
-    assert_int_equal(0, intmap_remove(h, 0x100001, (void **) &value));
+    assert_int_equal(0, embc_intmap_remove(h, 0x100001, (void **) &value));
     assert_int_equal(2, value);
-    assert_int_equal(0, intmap_iterator_next(iter, &key, (void **) &value));
+    assert_int_equal(0, embc_intmap_iterator_next(iter, &key, (void **) &value));
     assert_int_equal(3, value);
-    intmap_iterator_free(iter);
-    intmap_free(h);
+    embc_intmap_iterator_free(iter);
+    embc_intmap_free(h);
 }
 
-INTMAP_DECLARE(mysym, embc_size_t)
-INTMAP_DEFINE_STRUCT(mysym)
-INTMAP_DEFINE(mysym, embc_size_t)
+EMBC_INTMAP_DECLARE(mysym, embc_size_t)
+EMBC_INTMAP_DEFINE_STRUCT(mysym)
+EMBC_INTMAP_DEFINE(mysym, embc_size_t)
 
 static void mysym(void **state) {
     (void) state; /* unused */
@@ -172,12 +172,12 @@ static void mysym(void **state) {
 int main(void) {
     embc_allocator_set((embc_alloc_fn) malloc, free);
     const struct CMUnitTest tests[] = {
-        cmocka_unit_test(intmap_empty),
-        cmocka_unit_test(intmap_put_get_remove_get),
-        cmocka_unit_test(intmap_resize),
-        cmocka_unit_test(intmap_iterator),
-        cmocka_unit_test(intmap_iterator_remove_current),
-        cmocka_unit_test(intmap_iterator_remove_next),
+        cmocka_unit_test(embc_intmap_empty),
+        cmocka_unit_test(embc_intmap_put_get_remove_get),
+        cmocka_unit_test(embc_intmap_resize),
+        cmocka_unit_test(embc_intmap_iterator),
+        cmocka_unit_test(embc_intmap_iterator_remove_current),
+        cmocka_unit_test(embc_intmap_iterator_remove_next),
         cmocka_unit_test(mysym),
     };
 

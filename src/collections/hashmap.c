@@ -25,9 +25,9 @@ struct entry_s {
     struct entry_s * next;
 };
 
-struct hashmap_s {
-    hashmap_hash hash;
-    hashmap_equiv equiv;
+struct embc_hashmap_s {
+    embc_hashmap_hash hash;
+    embc_hashmap_equiv equiv;
     /**
      * @brief The allocated hash table.
      *
@@ -42,17 +42,17 @@ struct hashmap_s {
     embc_size_t length;
 };
 
-struct hashmap_iterator_s {
-    struct hashmap_s * hashmap;
+struct embc_hashmap_iterator_s {
+    struct embc_hashmap_s * hashmap;
     struct entry_s ** previous;
     struct entry_s * next;
 };
 
-struct hashmap_s * hashmap_new(hashmap_hash hash, hashmap_equiv equiv) {
+struct embc_hashmap_s * embc_hashmap_new(embc_hashmap_hash hash, embc_hashmap_equiv equiv) {
     if (!hash || !equiv) {
         return 0;
     }
-    struct hashmap_s * hashmap = embc_alloc_clr(sizeof(struct hashmap_s));
+    struct embc_hashmap_s * hashmap = embc_alloc_clr(sizeof(struct embc_hashmap_s));
     hashmap->hash = hash;
     hashmap->equiv = equiv;
     hashmap->hashtable_mask = 0x7;
@@ -61,14 +61,14 @@ struct hashmap_s * hashmap_new(hashmap_hash hash, hashmap_equiv equiv) {
     return hashmap;
 }
 
-void hashmap_free(struct hashmap_s * self) {
+void embc_hashmap_free(struct embc_hashmap_s * self) {
     if (self) {
         // free everything
         embc_free(self);
     }
 }
 
-embc_size_t hashmap_length(struct hashmap_s * self) {
+embc_size_t embc_hashmap_length(struct embc_hashmap_s * self) {
     if (self) {
         return self->length;
     } else {
@@ -76,7 +76,7 @@ embc_size_t hashmap_length(struct hashmap_s * self) {
     }
 }
 
-int hashmap_put(struct hashmap_s * self, void * key, void * value, void ** old_value) {
+int embc_hashmap_put(struct embc_hashmap_s * self, void * key, void * value, void ** old_value) {
     embc_size_t hash;
     struct entry_s **previous;
     struct entry_s *item;
@@ -110,7 +110,7 @@ int hashmap_put(struct hashmap_s * self, void * key, void * value, void ** old_v
     return 0;
 }
 
-int hashmap_get(struct hashmap_s * self, void * key, void ** value) {
+int embc_hashmap_get(struct embc_hashmap_s * self, void * key, void ** value) {
     embc_size_t hash;
     struct entry_s *item;
     EMBC_DBC_NOT_NULL(self);
@@ -132,10 +132,10 @@ int hashmap_get(struct hashmap_s * self, void * key, void ** value) {
 }
 
 #if 0
-int hashmap_remove(struct hashmap_s * self, void * key);
-embc_size_t hashmap_length(struct hashmap_s * self);
+int embc_hashmap_remove(struct embc_hashmap_s * self, void * key);
+embc_size_t embc_hashmap_length(struct embc_hashmap_s * self);
 
-struct hashmap_iterator_s * hashmap_iterator_new(struct hashmap_s * self);
-int hashmap_iterator_next(struct hashmap_iterator_s * self, void ** key, void ** value);
-void hashmap_iterator_free(struct hashmap_iterator_s * self);
+struct embc_hashmap_iterator_s * embc_hashmap_iterator_new(struct embc_hashmap_s * self);
+int embc_hashmap_iterator_next(struct embc_hashmap_iterator_s * self, void ** key, void ** value);
+void embc_hashmap_iterator_free(struct embc_hashmap_iterator_s * self);
 #endif

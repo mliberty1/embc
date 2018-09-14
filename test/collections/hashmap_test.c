@@ -48,34 +48,34 @@ bool mycompare(void * self, void * other) {
 
 
 /* A test case that does nothing and succeeds. */
-static void hashmap_empty(void **state) {
+static void embc_hashmap_empty(void **state) {
     (void) state; /* unused */
     embc_size_t value = 42;
-    struct hashmap_s * h = hashmap_new(myhash, mycompare);
-    assert_int_equal(0, hashmap_length(h));
-    assert_int_equal(EMBC_ERROR_NOT_FOUND, hashmap_get(h, (void *) 10, (void **) &value));
+    struct embc_hashmap_s * h = embc_hashmap_new(myhash, mycompare);
+    assert_int_equal(0, embc_hashmap_length(h));
+    assert_int_equal(EMBC_ERROR_NOT_FOUND, embc_hashmap_get(h, (void *) 10, (void **) &value));
     assert_int_equal(0, value);
-    hashmap_free(h);
+    embc_hashmap_free(h);
 }
 
-static void hashmap_put_get_remove_get(void **state) {
+static void embc_hashmap_put_get_remove_get(void **state) {
     (void) state; /* unused */
     embc_size_t value;
-    struct hashmap_s * h = hashmap_new(myhash, mycompare);
-    assert_int_equal(0, hashmap_put(h, (void *) 10, (void *) 20, (void **) &value));
-    assert_int_equal(1, hashmap_length(h));
-    assert_int_equal(0, hashmap_get(h, (void *) 10, (void **) &value));
+    struct embc_hashmap_s * h = embc_hashmap_new(myhash, mycompare);
+    assert_int_equal(0, embc_hashmap_put(h, (void *) 10, (void *) 20, (void **) &value));
+    assert_int_equal(1, embc_hashmap_length(h));
+    assert_int_equal(0, embc_hashmap_get(h, (void *) 10, (void **) &value));
     assert_int_equal(20, value);
-    //todo: assert_int_equal(0, hashmap_remove(h, (void *) 10));
-    //todo: assert_int_equal(JETLEX_ERROR_NOT_FOUND, hashmap_get(h, (void *) 10, 0));
-    hashmap_free(h);
+    //todo: assert_int_equal(0, embc_hashmap_remove(h, (void *) 10));
+    //todo: assert_int_equal(JETLEX_ERROR_NOT_FOUND, embc_hashmap_get(h, (void *) 10, 0));
+    embc_hashmap_free(h);
 }
 
 int main(void) {
     embc_allocator_set((embc_alloc_fn) malloc, free);
     const struct CMUnitTest tests[] = {
-        cmocka_unit_test(hashmap_empty),
-        cmocka_unit_test(hashmap_put_get_remove_get),
+        cmocka_unit_test(embc_hashmap_empty),
+        cmocka_unit_test(embc_hashmap_put_get_remove_get),
     };
 
     embc_log_initialize(app_printf);

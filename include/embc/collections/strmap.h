@@ -42,12 +42,12 @@ EMBC_CPP_GUARD_START
  */
 struct embc_strmap_s;
 
-struct embc_strmap_s * embc_strmap_new();
-void embc_strmap_free(struct embc_strmap_s *self);
-embc_size_t embc_strmap_length(struct embc_strmap_s *self);
-int embc_strmap_put(struct embc_strmap_s *self, const char *key, void *value, void **old_value);
-int embc_strmap_get(struct embc_strmap_s *self, const char *key, void **value);
-int embc_strmap_remove(struct embc_strmap_s *self, const char *key, void **old_value);
+EMBC_API struct embc_strmap_s * embc_strmap_new();
+EMBC_API void embc_strmap_free(struct embc_strmap_s *self);
+EMBC_API embc_size_t embc_strmap_length(struct embc_strmap_s *self);
+EMBC_API int embc_strmap_put(struct embc_strmap_s *self, const char *key, void *value, void **old_value);
+EMBC_API int embc_strmap_get(struct embc_strmap_s *self, const char *key, void **value);
+EMBC_API int embc_strmap_remove(struct embc_strmap_s *self, const char *key, void **old_value);
 
 
 /** @} */
