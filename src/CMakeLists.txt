@@ -34,6 +34,7 @@ set(SOURCES
         crc.c
         cstr.c
         ec.c
+        event_manager.c
         fsm.c
         lfsr.c
         log.c
