@@ -106,7 +106,7 @@ static inline void embc_memset(void * ptr, int value, embc_size_t num);
  * @param source The source buffer.
  * @param num The number of bytes to copy.
  *
- * The buffers destionation and source must not overlap or the buffers may
+ * The buffers destination and source must not overlap or the buffers may
  * be corrupted by this function!
  */
 static inline void embc_memcpy(void * destination, void const * source, embc_size_t num);
