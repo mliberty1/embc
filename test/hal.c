@@ -45,7 +45,7 @@ void app_log_printf_(const char *format, ...) {
 
 void hal_test_initialize() {
     embc_allocator_set(hal_alloc, hal_free);
-    log_initialize(app_log_printf_);
+    embc_log_initialize(app_log_printf_);
 }
 
 void embc_fatal(char const * file, int line, char const * msg) {

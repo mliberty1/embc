@@ -32,6 +32,18 @@
  * @{
  */
 
+
+/* Set global log level */
+/* #define EMBC_LOG_GLOBAL_LEVEL EMBC_LOG_LEVEL_ALL */
+
+/* Override the log format */
+/*
+#define EMBC_LOG_PRINTF(level, format, ...) \
+   embc_log_printf_("%c %s:%d: " format "\n", embc_log_level_char[level], __FILENAME__, __LINE__, __VA_ARGS__);
+#endif
+*/
+
+
 #define EMBC_PLATFORM_@EMBC_PLATFORM@ 1
 
 #define @PROJECT_PREFIX@_VERSION_MAJOR   @PROJECT_VERSION_MAJOR@

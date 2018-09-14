@@ -51,6 +51,10 @@ set(SOURCES
         ${PLATFORM_SRC}
 )
 
+foreach(f IN LISTS SOURCES)
+    SET_FILENAME("${f}")
+endforeach()
+
 add_library(embc_objlib OBJECT ${SOURCES})
 
 if(${EMBC_TOPLEVEL})

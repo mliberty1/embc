@@ -36,7 +36,7 @@ void lfsr_seed_u16(struct lfsr_s * self, uint16_t seed) {
 static inline void value_guard(struct lfsr_s * self) {
     DBC_NOT_NULL(self);
     if (self->value == 0) {
-        LOGS_WARN("Invalid lfsr value");
+        EMBC_LOG_WARNING("Invalid lfsr value");
         self->value = 1;
     }
 }

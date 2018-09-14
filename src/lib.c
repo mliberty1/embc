@@ -40,7 +40,7 @@ void embc_lib_fatal_set(embc_lib_fatal_fn fn, void * user_data) {
 void embc_lib_print_set(embc_lib_print_fn fn, void * user_data) {
     print_fn_ = fn;
     print_user_data_ = user_data;
-    log_initialize(embc_lib_printf_);
+    embc_log_initialize(embc_lib_printf_);
 }
 
 static void embc_lib_printf_(const char *format, ...) {

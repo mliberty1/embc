@@ -70,7 +70,7 @@ EMBC_CPP_GUARD_START
  */
 #define ARGCHK_ASSERT(condition, message) do { \
     if (!(condition)) { \
-        LOGF_INFO("chk_assert: %s", (message)); \
+        EMBC_LOGI("chk_assert: %s", (message)); \
         return ARGCHK_FAIL_RETURN_CODE; \
     } \
 } while (0)
@@ -143,11 +143,11 @@ EMBC_CPP_GUARD_START
     int x_min__ = (x_min); \
     int x_max__ = (x_max); \
     if (x__ < x_min__) { \
-        LOGF_INFO("chk_assert: %s [%d] < %d", #x, x__, x_min__); \
+        EMBC_LOGI("chk_assert: %s [%d] < %d", #x, x__, x_min__); \
         return ARGCHK_FAIL_RETURN_CODE; \
     } \
     if (x__ > x_max__) { \
-        LOGF_INFO("chk_assert: %s [%d] > %d", #x, x__, x_max__); \
+        EMBC_LOGI("chk_assert: %s [%d] > %d", #x, x__, x_max__); \
         return ARGCHK_FAIL_RETURN_CODE; \
     } \
 } while (0)

@@ -26,10 +26,11 @@ set(dependencies
         test_objlib
         cmocka)
 include_directories(${CMOCKA_INCLUDE})
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
+#include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
 
 function (ADD_CMOCKA_TEST _testName)
     set(TARGET ${_testName})
+    SET_FILENAME("${_testName}.c")
     add_executable(${_testName} "${_testName}.c" ${objects})
     add_dependencies(${TARGET} embc_objlib test_objlib cmocka)
     target_link_libraries(${_testName} cmocka)

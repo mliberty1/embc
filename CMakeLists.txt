@@ -31,6 +31,13 @@ option(EMBC_DOCS "Use Doxygen to create the HTML based Host API documentation" O
 option(EMBC_UNIT_TEST "Build the embc unit tests" ON)
 option(EMBC_EXAMPLES "Build the embc examples" ON)
 
+function (SET_FILENAME _filename)
+    get_filename_component(b ${_filename} NAME)
+    set_source_files_properties(${_filename} PROPERTIES
+        COMPILE_DEFINITIONS "__FILENAME__=\"${b}\"")
+endfunction (SET_FILENAME)
+
+
 if (EMBC_TOPLEVEL AND CMAKE_COMPILER_IS_GNUCC)
     add_definitions(-Wall -Werror -Wpedantic -Wextra -fPIC)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")

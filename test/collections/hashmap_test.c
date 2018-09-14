@@ -78,6 +78,6 @@ int main(void) {
         cmocka_unit_test(hashmap_put_get_remove_get),
     };
 
-    log_initialize(app_printf);
+    embc_log_initialize(app_printf);
     return cmocka_run_group_tests(tests, NULL, NULL);
 }

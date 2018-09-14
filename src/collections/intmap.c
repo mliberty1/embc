@@ -100,7 +100,7 @@ static void resize(struct intmap_s * self) {
     embc_size_t length = (self->hash_mask + 1) << 2;
     self->bins = embc_alloc_clr(length * sizeof(struct entry_s *));
     self->hash_mask = length - 1;
-    LOGF_DEBUG("intmap.resize -> %d", (int) length);
+    EMBC_LOGD("intmap.resize -> %d", (int) length);
     for (idx = 0; idx <= mask_old; ++idx) {
         next = bins_old[idx];
         while (next) {

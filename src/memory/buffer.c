@@ -163,7 +163,7 @@ struct embc_buffer_s * embc_buffer_alloc(
         struct embc_buffer_allocator_s * self, embc_size_t size) {
     struct embc_buffer_s * b = alloc_(self, size);
     EMBC_ASSERT_ALLOC(b);
-    LOGF_DEBUG3("embc_buffer_alloc %p", (void *) b);
+    EMBC_LOGD3("embc_buffer_alloc %p", (void *) b);
     return b;
 }
 
@@ -171,14 +171,14 @@ struct embc_buffer_s * embc_buffer_alloc_unsafe(
         struct embc_buffer_allocator_s * self,
         embc_size_t size) {
     struct embc_buffer_s * b = alloc_(self, size);
-    LOGF_DEBUG3("embc_buffer_alloc_unsafe %p", (void *) b);
+    EMBC_LOGD3("embc_buffer_alloc_unsafe %p", (void *) b);
     return b;
 }
 
 static void embc_buffer_free_(struct embc_buffer_manager_s const * self, struct embc_buffer_s * buffer) {
     DBC_NOT_NULL(self);
     DBC_NOT_NULL(buffer);
-    LOGF_DEBUG3("embc_buffer_free_(%p, %p)", (void *) self, (void *) buffer);
+    EMBC_LOGD3("embc_buffer_free_(%p, %p)", (void *) self, (void *) buffer);
     struct pool_s * p = EMBC_CONTAINER_OF(self, struct pool_s, manager);
     EMBC_ASSERT(p->magic == EMBC_BUFFER_MAGIC);
     uint8_t * b_ptr = (uint8_t *) buffer;

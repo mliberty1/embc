@@ -133,7 +133,7 @@ static void rx_default(void *user_data,
     (void) port;
     (void) message_id;
     (void) port_def;
-    LOGF_DEBUG2("rx_default free %p", (void *) buffer);
+    EMBC_LOGD2("rx_default free %p", (void *) buffer);
     embc_buffer_free(buffer);
 }
 
@@ -163,13 +163,13 @@ static void port0_rx(void *user_data,
     struct embc_framer_header_s * hdr = buffer_hdr(buffer);
     switch (cmd) {
         case EMBC_FRAMER_PORT0_PING_REQ:
-            LOGF_DEBUG2("port0_rx ping_req: frame_id=0x%02x, message_id=%d",
-                      (int) hdr->frame_id, (int) hdr->message_id);
+            EMBC_LOGD2("port0_rx ping_req: frame_id=0x%02x, message_id=%d",
+                       (int) hdr->frame_id, (int) hdr->message_id);
             embc_framer_send(self, port_id, message_id, EMBC_FRAMER_PORT0_PING_RSP, buffer);
             break;
         case EMBC_FRAMER_PORT0_STATUS_REQ:
-            LOGF_DEBUG2("port0_rx status_req: frame_id=0x%02x, message_id=%d",
-                        (int) hdr->frame_id, (int) hdr->message_id);
+            EMBC_LOGD2("port0_rx status_req: frame_id=0x%02x, message_id=%d",
+                       (int) hdr->frame_id, (int) hdr->message_id);
             embc_buffer_write(buffer, &self->status, sizeof(self->status));
             embc_framer_send(self, port_id, message_id, EMBC_FRAMER_PORT0_STATUS_RSP, buffer);
             break;
@@ -191,12 +191,12 @@ static void port0_tx_done(
     switch (cmd) {
         case EMBC_FRAMER_PORT0_PING_RSP:
             if (status) {
-                LOGF_INFO("port0_tx_done ping_rsp error %d", (int) status);
+                EMBC_LOGI("port0_tx_done ping_rsp error %d", (int) status);
             }
             break;
         case EMBC_FRAMER_PORT0_STATUS_RSP:
             if (status) {
-                LOGF_INFO("port0_tx_done status_rsp error %d", (int) status);
+                EMBC_LOGI("port0_tx_done status_rsp error %d", (int) status);
             }
             break;
         default:
@@ -230,13 +230,13 @@ void embc_framer_initialize(
         self->rx_frame_bitmask_outstanding = (BITMAP_CURRENT | self->rx_frame_bitmask_outstanding) >> 1;
     }
 
-    LOGS_DEBUG3("initialize the RX messages");
+    EMBC_LOGD3("initialize the RX messages");
     embc_list_initialize(&self->rx_pending);
     self->rx_buffer = embc_buffer_alloc(self->buffer_allocator, EMBC_FRAMER_FRAME_MAX_SIZE);
     self->rx_hook_fn = rx_hook_fn;
     self->rx_hook_user_data = self;
 
-    LOGS_DEBUG3("initialize the TX messages");
+    EMBC_LOGD3("initialize the TX messages");
     embc_list_initialize(&self->tx_buffers_free);
     embc_list_initialize(&self->tx_buffers_active);
     embc_list_initialize(&self->tx_queue);
@@ -328,7 +328,7 @@ static void rx_complete(struct embc_framer_s *self, struct embc_buffer_s * frame
     struct embc_framer_header_s *hdr = buffer_hdr(frame);
     ++self->status.rx_data_count;
     uint16_t port_def = hdr_port_def(hdr);
-    LOGF_DEBUG3("rx_complete port=%d message_id=%d port_def=%d frame=%p",
+    EMBC_LOGD3("rx_complete port=%d message_id=%d port_def=%d frame=%p",
                 (int) hdr->port, (int) hdr->message_id, (int) port_def,
                 (void *) frame);
     self->port_cbk[hdr->port].rx_fn(
@@ -350,7 +350,7 @@ static void rx_complete_queued(struct embc_framer_s *self) {
 }
 
 static void rx_timeout_set(struct embc_framer_s * self) {
-    LOGS_DEBUG2("rx_timeout_set");
+    EMBC_LOGD2("rx_timeout_set");
     int64_t current_time = self->hal_cbk.time_get(self->hal_cbk.hal);
     self->rx_next_timeout = EMBC_FRAMER_RX_TIMEOUT + current_time;
 }
@@ -370,7 +370,7 @@ static void rx_purge_queued(struct embc_framer_s *self) {
     embc_list_foreach(&self->rx_pending, item) {
         b = embc_list_entry(item, struct embc_buffer_s, item);
         embc_list_remove(&b->item);
-        LOGF_DEBUG2("rx_purge_queued %p", (void *) b);
+        EMBC_LOGD2("rx_purge_queued %p", (void *) b);
         embc_buffer_free(b);
     }
 }
@@ -411,7 +411,7 @@ static inline void send_frame_ack(
         struct embc_framer_header_s * hdr,
         uint16_t mask,
         uint8_t status) {
-    LOGF_DEBUG1("send_frame_ack frame_id=0x%02x status=%d",
+    EMBC_LOGD("send_frame_ack frame_id=0x%02x status=%d",
               (int) hdr->frame_id, (int) status);
     struct embc_buffer_s * ack = embc_framer_construct_ack_from_header(self, hdr, mask, status);
     self->hal_cbk.tx_fn(self->hal_cbk.hal, ack);
@@ -442,7 +442,7 @@ static struct tx_buf_s * find_tx(struct embc_framer_s * self, uint8_t frame_id) 
 
 static void tx_complete(struct embc_framer_s * self, struct tx_buf_s * t, uint8_t status) {
     struct embc_framer_header_s hdr = *buffer_hdr(t->b);
-    LOGF_DEBUG2("tx_complete %p, port=%d, status=%d", (void *) t->b, (int) hdr.port, (int) status);
+    EMBC_LOGD2("tx_complete %p, port=%d, status=%d", (void *) t->b, (int) hdr.port, (int) status);
     ++self->status.tx_count;
     embc_buffer_free(t->b);
     t->b = 0;
@@ -458,7 +458,7 @@ static void tx_complete(struct embc_framer_s * self, struct tx_buf_s * t, uint8_
                 status
         );
     } else {
-        LOGF_WARN("invalid port %d", (int) hdr.port);
+        EMBC_LOGW("invalid port %d", (int) hdr.port);
     }
 }
 
@@ -513,7 +513,7 @@ static void timer_callback(void * user_data, uint32_t timer_id) {
     (void) timer_id;
     struct embc_list_s * item;
     struct tx_buf_s * t;
-    LOGF_DEBUG1("timer_callback %d", (int) timer_id);
+    EMBC_LOGD("timer_callback %d", (int) timer_id);
     int64_t current_time = self->hal_cbk.time_get(self->hal_cbk.hal);
     if (current_time >= self->rx_next_timeout) {
         self->rx_next_timeout = EMBC_TIME_MAX;
@@ -565,7 +565,7 @@ static void timer_schedule(struct embc_framer_s * self) {
 
 static void transmit_tx_buf(struct embc_framer_s * self, struct tx_buf_s * t) {
     struct embc_framer_header_s * hdr = buffer_hdr(t->b);
-    LOGF_DEBUG2("tx 0x%02x, 0x%04x %p", hdr->frame_id, hdr_port_def(hdr), (void *) t->b);
+    EMBC_LOGD2("tx 0x%02x, 0x%04x %p", hdr->frame_id, hdr_port_def(hdr), (void *) t->b);
     t->status = TX_STATUS_TRANSMITTING;
     int64_t current_time = self->hal_cbk.time_get(self->hal_cbk.hal);
     t->timeout = EMBC_FRAMER_TIMEOUT + current_time;
@@ -574,10 +574,10 @@ static void transmit_tx_buf(struct embc_framer_s * self, struct tx_buf_s * t) {
 }
 
 static void transmit_queued(struct embc_framer_s * self) {
-    if (LOG_CHECK_STATIC(LOG_LEVEL_DEBUG1)) {
+    if (EMBC_LOG_CHECK_STATIC(EMBC_LOG_LEVEL_DEBUG1)) {
         embc_size_t sz = embc_list_length(&self->tx_queue);
         sz += embc_list_length(&self->tx_buffers_active);
-        LOGF_DEBUG1("transmit_queued total length = %d", (int) sz);
+        EMBC_LOGD("transmit_queued total length = %d", (int) sz);
     }
     while (!embc_list_is_empty(&self->tx_buffers_free) && !embc_list_is_empty(&self->tx_queue)) {
         struct embc_list_s * item =  embc_list_remove_head(&self->tx_queue);
@@ -595,9 +595,9 @@ static void tx_confirmed(struct embc_framer_s * self, struct embc_framer_header_
     uint8_t frame_id = hdr_frame_id(ack_hdr);
     struct tx_buf_s * t_match = find_tx(self, frame_id);
     if (0 == t_match) {
-        LOGF_WARN("ack unknown_frame_id=0x%02x", (int) frame_id);
+        EMBC_LOGW("ack unknown_frame_id=0x%02x", (int) frame_id);
     } else {
-        LOGF_DEBUG("ack frame_id=%d", (int) frame_id);
+        EMBC_LOGD("ack frame_id=%d", (int) frame_id);
         // update current item status.
         t_match->status = TX_STATUS_ACKED;
         uint16_t mask = hdr_port_def(ack_hdr);
@@ -627,7 +627,7 @@ static void handle_ack(struct embc_framer_s *self, struct embc_buffer_s * ack) {
     uint8_t status = ack->data[EMBC_FRAMER_HEADER_SIZE];  // ok, since at least CRC
     embc_buffer_free(ack);
     if (1 != hdr.length) {
-        LOGF_WARN("ack invalid length: %d", (int) hdr.length);
+        EMBC_LOGW("ack invalid length: %d", (int) hdr.length);
         return;
     }
     uint16_t port_def = hdr_port_def(&hdr);
@@ -635,17 +635,17 @@ static void handle_ack(struct embc_framer_s *self, struct embc_buffer_s * ack) {
     if (0 == status) { // success!
         tx_confirmed(self, &hdr);
     } else if (0 == port_def) {
-        LOGF_INFO("handle_ack general nack, status=%d", (int) status);
+        EMBC_LOGI("handle_ack general nack, status=%d", (int) status);
         // todo
     } else {
         // specific nack for a frame (usually message integrity error).
         uint8_t frame_id = hdr_frame_id(&hdr);
-        LOGF_INFO("handle_ack nack, status=%d, frame_id=%d", (int) status, (int) frame_id);
+        EMBC_LOGI("handle_ack nack, status=%d, frame_id=%d", (int) status, (int) frame_id);
         struct tx_buf_s * t = find_tx(self, frame_id);
         if (t) {
             tx_error(self, t, EMBC_ERROR_MESSAGE_INTEGRITY);
         } else {
-            LOGF_WARN("handle_ack nack: frame_id=%d not found", (int) frame_id);
+            EMBC_LOGW("handle_ack nack: frame_id=%d not found", (int) frame_id);
         }
     }
 }
@@ -659,7 +659,7 @@ static void rx_hook_fn(
     struct embc_framer_s *self = (struct embc_framer_s *) user_data;
     struct embc_framer_header_s hdr = *buffer_hdr(frame);
     if (hdr.port >= EMBC_FRAMER_PORTS) {
-        LOGF_WARN("invalid port %d", (int) hdr.port);
+        EMBC_LOGW("invalid port %d", (int) hdr.port);
         return;
     }
     EMBC_ASSERT(frame->length == (hdr.length + EMBC_FRAMER_HEADER_SIZE + EMBC_FRAMER_FOOTER_SIZE));
@@ -669,17 +669,17 @@ static void rx_hook_fn(
     uint16_t port_def = hdr_port_def(&hdr);
 
     if (EMBC_FRAMER_TYPE_ACK == (hdr.frame_id & EMBC_FRAMER_TYPE_MASK)) { // ack frame
-        LOGF_DEBUG3("rx_hook_fn ack  0x%02x 0x%04x %p",
+        EMBC_LOGD3("rx_hook_fn ack  0x%02x 0x%04x %p",
                     (int) hdr.frame_id, (int) port_def, (void *) frame);
         ++self->status.rx_ack_count;
         handle_ack(self, frame);
         return;
     }
 
-    LOGF_DEBUG3("rx_hook_fn data 0x%02x 0x%04x %p",
+    EMBC_LOGD3("rx_hook_fn data 0x%02x 0x%04x %p",
                 (int) hdr.frame_id, (int) port_def, (void *) frame);
     if ((0 == hdr.port) && (EMBC_FRAMER_PORT0_RESYNC == port_def)) {
-        LOGS_DEBUG("rx_hook_fn resync command");
+        EMBC_LOGD("rx_hook_fn resync command");
         rx_purge_queued(self);
         self->rx_frame_id = frame_id_incr(frame_id);
         self->rx_frame_bitmask = EMBC_FRAMER_ACK_MASK_SYNC >> 1;
@@ -692,12 +692,12 @@ static void rx_hook_fn(
         self->rx_frame_bitmask = (BITMAP_CURRENT | self->rx_frame_bitmask) >> 1;
         embc_list_add_tail(&self->rx_pending, &frame->item);
     } else {
-        LOGF_DEBUG("rx_hook_fn unexpected_frame_id %d (expected %d)", (int) frame_id, (int) self->rx_frame_id);
+        EMBC_LOGD("rx_hook_fn unexpected_frame_id %d (expected %d)", (int) frame_id, (int) self->rx_frame_id);
         uint8_t delta = (frame_id - self->rx_frame_id) & EMBC_FRAMER_ID_MASK;
         int frame_delta = (delta > 8) ? (((int) delta - (EMBC_FRAMER_ID_MASK + 1))) : (int) delta;
 
         if ((frame_delta > 0) && (frame_delta < EMBC_FRAMER_OUTSTANDING_FRAMES_MAX)) {
-            LOGS_DEBUG("rx_hook_fn skipped frame(s), store this frame.");
+            EMBC_LOGD("rx_hook_fn skipped frame(s), store this frame.");
             // will receive skipped frames on retransmit
             ack_frame_bitmask = BITMAP_CURRENT | (self->rx_frame_bitmask >> frame_delta);
             self->rx_frame_id = (self->rx_frame_id + frame_delta + 1) & EMBC_FRAMER_ID_MASK;
@@ -706,17 +706,17 @@ static void rx_hook_fn(
         } else if ((frame_delta < 0) && (frame_delta >= -EMBC_FRAMER_OUTSTANDING_FRAMES_MAX)) {
             uint16_t mask = BITMAP_CURRENT >> (-frame_delta);
             if (self->rx_frame_bitmask & mask) {
-                LOGS_DEBUG("rx_hook_fn frame_old: duplicate discard");
+                EMBC_LOGD("rx_hook_fn frame_old: duplicate discard");
                 embc_buffer_free(frame);
                 ++self->status.rx_deduplicate_count;
             } else {
-                LOGS_DEBUG("rx_hook_fn frame_old: new");
+                EMBC_LOGD("rx_hook_fn frame_old: new");
                 self->rx_frame_bitmask |= mask;
                 rx_insert(self, frame);
             }
             ack_frame_bitmask = self->rx_frame_bitmask << (-frame_delta);
         } else {
-            LOGS_DEBUG("rx_hook_fn completely out of order: assume resync required.");
+            EMBC_LOGD("rx_hook_fn completely out of order: assume resync required.");
             rx_purge_queued(self);
             ack_frame_bitmask = BITMAP_CURRENT;
             self->rx_frame_id = frame_id_incr(frame_id);
@@ -781,16 +781,16 @@ static void framer_resync(struct embc_framer_s * self, int32_t status) {
     uint16_t i = 1;
     uint16_t length;
     if (0 == (self->rx_state & 0x80)) {
-        LOGS_DEBUG3("framer_resync not synchronized, no additional error.");
+        EMBC_LOGD3("framer_resync not synchronized, no additional error.");
     } else {
         // create ack
         if (EMBC_ERROR_MESSAGE_INTEGRITY == status) {
             ++self->status.rx_mic_error;
-            LOGS_DEBUG1("framer_resync MIC");
+            EMBC_LOGD1("framer_resync MIC");
             struct embc_framer_header_s * hdr = buffer_hdr(self->rx_buffer);
             send_frame_ack(self, hdr, EMBC_FRAMER_ACK_MASK_CURRENT, status);
         } else {
-            LOGS_DEBUG1("framer_resync sync");
+            EMBC_LOGD1("framer_resync sync");
             ++self->status.rx_synchronization_error;
             struct embc_buffer_s * ack = construct_nack(self, status);
             self->hal_cbk.tx_fn(self->hal_cbk.hal, ack);
@@ -817,7 +817,7 @@ static void framer_resync(struct embc_framer_s * self, int32_t status) {
                 break;  // consume & keep trying
             case EMBC_SUCCESS: {
                 self->rx_state = ST_SOF;
-                LOGS_DEBUG3("rx_buffer may contain more data than just the frame, copy");
+                EMBC_LOGD3("rx_buffer may contain more data than just the frame, copy");
                 struct embc_buffer_s * f = embc_buffer_alloc(self->buffer_allocator, EMBC_FRAMER_FRAME_MAX_SIZE);
                 embc_buffer_write(f, b, length);
                 embc_buffer_cursor_set(f, 0);
@@ -884,7 +884,7 @@ void embc_framer_hal_rx_byte(struct embc_framer_s * self, uint8_t byte) {
                     ++self->status.rx_count;
                     embc_buffer_cursor_set(self->rx_buffer, 0);
                     struct embc_buffer_s * b = self->rx_buffer;
-                    LOGS_DEBUG3("transfer rx_buffer ownership, create new rx_buffer");
+                    EMBC_LOGD3("transfer rx_buffer ownership, create new rx_buffer");
                     self->rx_buffer = embc_buffer_alloc(self->buffer_allocator, EMBC_FRAMER_FRAME_MAX_SIZE);
                     self->rx_state = ST_SOF;
                     self->rx_hook_fn(self->rx_hook_user_data, b);
@@ -915,10 +915,10 @@ void embc_framer_hal_tx_done(
     struct embc_list_s * item;
     struct embc_framer_header_s * hdr = buffer_hdr(buffer);
     if (EMBC_FRAMER_TYPE_ACK == (hdr->frame_id & EMBC_FRAMER_TYPE_MASK)) {
-        LOGF_DEBUG3("embc_framer_hal_tx_done ack %d %p", hdr->frame_id, (void *) buffer);
+        EMBC_LOGD3("embc_framer_hal_tx_done ack %d %p", hdr->frame_id, (void *) buffer);
         embc_buffer_free(buffer);
     } else {
-        LOGF_DEBUG3("embc_framer_hal_tx_done data %d %p", hdr->frame_id, (void *) buffer);
+        EMBC_LOGD3("embc_framer_hal_tx_done data %d %p", hdr->frame_id, (void *) buffer);
         embc_list_foreach(&self->tx_buffers_active, item) {
             struct tx_buf_s *t = embc_list_entry(item, struct tx_buf_s, item);
             if (t->b == buffer) {
@@ -935,7 +935,7 @@ struct embc_buffer_s * embc_framer_construct_frame(
     DBC_NOT_NULL(self);
     DBC_RANGE_INT(port, 0, (EMBC_FRAMER_PORTS - 1));
     uint32_t frame_crc = 0;
-    LOGS_DEBUG3("embc_framer_construct_frame");
+    EMBC_LOGD3("embc_framer_construct_frame");
     struct embc_buffer_s * b = embc_buffer_alloc(self->buffer_allocator, length + HEADER_SIZE + FOOTER_SIZE);
     struct embc_framer_header_s * hdr = buffer_hdr(b);
     hdr->sof = SOF;
@@ -961,7 +961,7 @@ struct embc_buffer_s * embc_framer_construct_ack(
         uint8_t status) {
     DBC_NOT_NULL(self);
     uint32_t frame_crc = 0;
-    LOGS_DEBUG3("embc_framer_construct_ack");
+    EMBC_LOGD3("embc_framer_construct_ack");
     struct embc_buffer_s * b = embc_buffer_alloc(self->buffer_allocator, 1 + HEADER_SIZE + FOOTER_SIZE);
     struct embc_framer_header_s * hdr = buffer_hdr(b);
     hdr->sof = SOF;
@@ -992,7 +992,7 @@ void embc_framer_send(
     embc_size_t length = embc_buffer_length(buffer);
 
     if (buffer->reserve < EMBC_FRAMER_FOOTER_SIZE) {
-        LOGF_DEBUG1("embc_framer_send buffer copy %p", (void *) buffer);
+        EMBC_LOGD("embc_framer_send buffer copy %p", (void *) buffer);
         EMBC_ASSERT(length < EMBC_FRAMER_PAYLOAD_MAX_SIZE);
         struct embc_buffer_s * b = embc_framer_alloc(self);
         embc_buffer_write(b, buffer->data, length);
@@ -1027,7 +1027,7 @@ void embc_framer_send_payload(
         uint8_t port, uint8_t message_id, uint16_t port_def,
         uint8_t const * data, uint8_t length) {
     DBC_RANGE_INT(length, 0, EMBC_FRAMER_PAYLOAD_MAX_SIZE);
-    LOGS_DEBUG3("embc_framer_send_payload");
+    EMBC_LOGD3("embc_framer_send_payload");
     struct embc_buffer_s * b = embc_framer_alloc(self);
     embc_buffer_write(b, data, length);
     embc_framer_send(self, port, message_id, port_def, b);

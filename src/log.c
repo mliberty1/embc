@@ -18,7 +18,7 @@
 #include <stdio.h>
 
 
-char const * const log_level_str[LOG_LEVEL_ALL + 1] = {
+char const * const embc_log_level_str[EMBC_LOG_LEVEL_ALL + 1] = {
         "EMERGENCY",
         "ALERT",
         "CRITICAL",
@@ -32,31 +32,26 @@ char const * const log_level_str[LOG_LEVEL_ALL + 1] = {
         "ALL"
 };
 
-char const log_level_char[LOG_LEVEL_ALL + 1] = {
+char const embc_log_level_char[EMBC_LOG_LEVEL_ALL + 1] = {
         '!', 'A', 'C', 'E', 'W', 'N', 'I', 'D', 'D', 'D', '.'
 };
 
 
-void log_printf_default(const char * fmt, ...) {
+void embc_log_printf_default(const char * fmt, ...) {
     (void) fmt;
 }
 
-volatile log_printf EMBC_USED log_printf_ = log_printf_default;
+volatile embc_log_printf EMBC_USED embc_log_printf_ = embc_log_printf_default;
 
-int log_initialize(log_printf handler) {
+int embc_log_initialize(embc_log_printf handler) {
     if (NULL == handler) {
-        log_printf_ = log_printf_default;
+        embc_log_printf_ = embc_log_printf_default;
     } else {
-        log_printf_ = handler;
+        embc_log_printf_ = handler;
     }
     return 0;
 }
 
-/**
- * @brief Finalize the logging feature.
- *
- * This is equivalent to calling log_initialize(0).
- */
-void log_finalize() {
-    log_initialize(0);
+void embc_log_finalize() {
+    embc_log_initialize(0);
 }

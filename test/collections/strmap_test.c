@@ -82,6 +82,6 @@ int main(void) {
         cmocka_unit_test(strmap_overwrite),
     };
 
-    log_initialize(app_printf);
+    embc_log_initialize(app_printf);
     return cmocka_run_group_tests(tests, NULL, NULL);
 }

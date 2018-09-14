@@ -95,7 +95,7 @@
 #define EMBC_RETURN_ON_ERROR_MSG(x, msg) do { \
     int32_t rc__ = (x); \
     if (rc__) {\
-        LOGF_ERROR("[%d:%s] %s", rc__, embc_error_code_name(rc__), msg); \
+        EMBC_LOGE("[%d:%s] %s", rc__, embc_error_code_name(rc__), msg); \
         return rc__; \
     } \
 } while (0)

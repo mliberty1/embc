@@ -69,7 +69,7 @@ static void send(struct embc_stream_consumer_s * self,
             }
             if (s->dst_buffer) {
                 if (s->dst_length < (s->offset + transaction->length)) {
-                    LOGS_WARN("async_sink buffer overflow");
+                    EMBC_LOGW("async_sink buffer overflow");
                 } else {
                     embc_memcpy(s->dst_buffer + s->offset,
                            transaction->data.ioctl_write.ptr,

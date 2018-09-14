@@ -14,16 +14,16 @@
  * limitations under the License.
  */
 
-#ifndef LOG_GLOBAL_LEVEL
-#define LOG_GLOBAL_LEVEL LOG_LEVEL_ALL
+#ifndef EMBC_LOG_GLOBAL_LEVEL
+#define EMBC_LOG_GLOBAL_LEVEL EMBC_LOG_LEVEL_ALL
 #endif
 
-#ifndef LOG_LEVEL
-#define LOG_LEVEL LOG_LEVEL_ALL
+#ifndef EMBC_LOG_LEVEL
+#define EMBC_LOG_LEVEL EMBC_LOG_LEVEL_ALL
 #endif
 
-#define LOG_PRINTF(level, format, ...) \
-    log_printf_("%c " format "\n", log_level_char[level], __VA_ARGS__);
+#define EMBC_LOG_PRINTF(level, format, ...) \
+    embc_log_printf_("%c " format "\n", embc_log_level_char[level], __VA_ARGS__);
 
 #include <stdarg.h>
 #include <stddef.h>
@@ -45,108 +45,81 @@ void my_printf(const char * format, ...) {
 
 static void test_logf(void **state) {
     (void) state;
-    log_initialize(my_printf);
+    embc_log_initialize(my_printf);
     expect_string(my_printf, str, "C hello world\n");
-    LOGF_CRITICAL("%s %s", "hello", "world");
+    EMBC_LOG_CRITICAL("%s %s", "hello", "world");
     expect_string(my_printf, str, "E hello world\n");
-    LOGF_ERROR("%s %s", "hello", "world");
+    EMBC_LOG_ERROR("%s %s", "hello", "world");
     expect_string(my_printf, str, "W hello world\n");
-    LOGF_WARNING("%s %s", "hello", "world");
+    EMBC_LOG_WARNING("%s %s", "hello", "world");
     expect_string(my_printf, str, "N hello world\n");
-    LOGF_NOTICE("%s %s", "hello", "world");
+    EMBC_LOG_NOTICE("%s %s", "hello", "world");
     expect_string(my_printf, str, "I hello world\n");
-    LOGF_INFO("%s %s", "hello", "world");
+    EMBC_LOG_INFO("%s %s", "hello", "world");
     expect_string(my_printf, str, "D hello world\n");
-    LOGF_DEBUG1("%s %s", "hello", "world");
+    EMBC_LOG_DEBUG1("%s %s", "hello", "world");
     expect_string(my_printf, str, "D hello world\n");
-    LOGF_DEBUG2("%s %s", "hello", "world");
+    EMBC_LOG_DEBUG2("%s %s", "hello", "world");
     expect_string(my_printf, str, "D hello world\n");
-    LOGF_DEBUG3("%s %s", "hello", "world");
+    EMBC_LOG_DEBUG3("%s %s", "hello", "world");
 }
 
 static void test_logs(void **state) {
     (void) state;
-    log_initialize(my_printf);
+    embc_log_initialize(my_printf);
     expect_string(my_printf, str, "C hello\n");
-    LOGS_CRITICAL("hello");
+    EMBC_LOG_CRITICAL("hello");
     expect_string(my_printf, str, "E hello\n");
-    LOGS_ERROR("hello");
+    EMBC_LOG_ERROR("hello");
     expect_string(my_printf, str, "W hello\n");
-    LOGS_WARNING("hello");
+    EMBC_LOG_WARNING("hello");
     expect_string(my_printf, str, "N hello\n");
-    LOGS_NOTICE("hello");
+    EMBC_LOG_NOTICE("hello");
     expect_string(my_printf, str, "I hello\n");
-    LOGS_INFO("hello");
+    EMBC_LOG_INFO("hello");
     expect_string(my_printf, str, "D hello\n");
-    LOGS_DEBUG1("hello");
+    EMBC_LOG_DEBUG1("hello");
     expect_string(my_printf, str, "D hello\n");
-    LOGS_DEBUG2("hello");
+    EMBC_LOG_DEBUG2("hello");
     expect_string(my_printf, str, "D hello\n");
-    LOGS_DEBUG3("hello");
+    EMBC_LOG_DEBUG3("hello");
 }
 
-static void test_logc(void **state) {
-    (void) state;
-    log_initialize(my_printf);
-    expect_string(my_printf, str, "C h\n");
-    LOGC_CRITICAL('h');
-    expect_string(my_printf, str, "E h\n");
-    LOGC_ERROR('h');
-    expect_string(my_printf, str, "W h\n");
-    LOGC_WARNING('h');
-    expect_string(my_printf, str, "N h\n");
-    LOGC_NOTICE('h');
-    expect_string(my_printf, str, "I h\n");
-    LOGC_INFO('h');
-    expect_string(my_printf, str, "D h\n");
-    LOGC_DEBUG1('h');
-    expect_string(my_printf, str, "D h\n");
-    LOGC_DEBUG2('h');
-    expect_string(my_printf, str, "D h\n");
-    LOGC_DEBUG3('h');
-}
 
 static void test_local_levels(void **state) {
     (void) state;
-#undef LOG_LEVEL
-#define LOG_LEVEL LOG_LEVEL_DEBUG
-    log_initialize(my_printf);
+#undef EMBC_LOG_LEVEL
+#define EMBC_LOG_LEVEL EMBC_LOG_LEVEL_DEBUG
+    embc_log_initialize(my_printf);
     expect_string(my_printf, str, "D hello\n");
-    LOGF_DEBUG("%s", "hello");
-    LOGF_DEBUG2("%s", "hello");
+    EMBC_LOG_DEBUG("%s", "hello");
+    EMBC_LOG_DEBUG2("%s", "hello");
     expect_string(my_printf, str, "D hello\n");
-    LOGS_DEBUG("hello");
-    LOGS_DEBUG2("hello");
-    expect_string(my_printf, str, "D h\n");
-    LOGC_DEBUG('h');
-    LOGC_DEBUG2('h');
-#undef LOG_LEVEL
-#define LOG_LEVEL LOG_LEVEL_ALL
+    EMBC_LOG_DEBUG("hello");
+    EMBC_LOG_DEBUG2("hello");
+#undef EMBC_LOG_LEVEL
+#define EMBC_LOG_LEVEL EMBC_LOG_LEVEL_ALL
 }
 
 static void test_global_levels(void **state) {
     (void) state;
-#undef LOG_GLOBAL_LEVEL
-#define LOG_GLOBAL_LEVEL LOG_LEVEL_DEBUG
-    log_initialize(my_printf);
+#undef EMBC_LOG_GLOBAL_LEVEL
+#define EMBC_LOG_GLOBAL_LEVEL EMBC_LOG_LEVEL_DEBUG
+    embc_log_initialize(my_printf);
     expect_string(my_printf, str, "D hello\n");
-    LOGF_DEBUG("%s", "hello");
-    LOGF_DEBUG2("%s", "hello");
+    EMBC_LOG_DEBUG("%s", "hello");
+    EMBC_LOG_DEBUG2("%s", "hello");
     expect_string(my_printf, str, "D hello\n");
-    LOGS_DEBUG("hello");
-    LOGS_DEBUG2("hello");
-    expect_string(my_printf, str, "D h\n");
-    LOGC_DEBUG('h');
-    LOGC_DEBUG2('h');
-#undef LOG_GLOBAL_LEVEL
-#define LOG_GLOBAL_LEVEL LOG_LEVEL_ALL
+    EMBC_LOG_DEBUG("hello");
+    EMBC_LOG_DEBUG2("hello");
+#undef EMBC_LOG_GLOBAL_LEVEL
+#define EMBC_LOG_GLOBAL_LEVEL LOG_LEVEL_ALL
 }
 
 int main(void) {
     const struct CMUnitTest tests[] = {
             cmocka_unit_test(test_logf),
             cmocka_unit_test(test_logs),
-            cmocka_unit_test(test_logc),
             cmocka_unit_test(test_local_levels),
             cmocka_unit_test(test_global_levels),
     };

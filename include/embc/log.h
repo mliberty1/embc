@@ -24,6 +24,7 @@
 #define EMBC_LOG_H_
 
 #include "cmacro_inc.h"
+#include "embc/config.h"
 
 EMBC_CPP_GUARD_START
 
@@ -34,42 +35,36 @@ EMBC_CPP_GUARD_START
  *
  * @brief Generic console logging with compile-time levels.
  *
- * To use this module, call log_initialize() with the appropriate
+ * To use this module, call embc_log_initialize() with the appropriate
  * handler for your application.
  *
  * @{
  */
 
 /**
- * @def LOG_GLOBAL_LEVEL
+ * @def EMBC_LOG_GLOBAL_LEVEL
  *
  * @brief The global logging level.
  *
  * The maximum level to compile regardless of the individual module level.
  * This value should be defined in the project CMake (makefile).
  */
-#ifndef LOG_GLOBAL_LEVEL
-#define LOG_GLOBAL_LEVEL LOG_LEVEL_ALL
+#ifndef EMBC_LOG_GLOBAL_LEVEL
+#define EMBC_LOG_GLOBAL_LEVEL EMBC_LOG_LEVEL_ALL
 #endif
 
 /**
- * @def LOG_LEVEL
+ * @def EMBC_LOG_LEVEL
  *
  * @brief The module logging level.
  *
- * Typical usage 1 (simpler):
+ * Typical usage 1:  (not MISRA C compliant, but safe)
  *
- *      #define LOG_LEVEL LOG_LEVEL_WARNING
+ *      #define EMBC_LOG_LEVEL EMBC_LOG_LEVEL_WARNING
  *      #include "log.h"
- *
- * Typical usage 2 (MISRA C compliant):
- *
- *      #include "log.h"
- *      #undef LOG_LEVEL
- *      #define LOG_LEVEL LOG_LEVEL_WARNING
  */
-#ifndef LOG_LEVEL
-#define LOG_LEVEL LOG_LEVEL_INFO
+#ifndef EMBC_LOG_LEVEL
+#define EMBC_LOG_LEVEL EMBC_LOG_LEVEL_INFO
 #endif
 
 /**
@@ -90,9 +85,9 @@ EMBC_CPP_GUARD_START
 
 #ifdef __GNUC__
 /* https://gcc.gnu.org/onlinedocs/gcc-4.7.2/gcc/Function-Attributes.html */
-#define LOG_PRINTF_FORMAT __attribute__((format (printf, 1, 2)))
+#define EMBC_LOG_PRINTF_FORMAT __attribute__((format (printf, 1, 2)))
 #else
-#define LOG_PRINTF_FORMAT
+#define EMBC_LOG_PRINTF_FORMAT
 #endif
 
 /**
@@ -107,7 +102,7 @@ EMBC_CPP_GUARD_START
  *     #include <stdarg.h>
  *     #include <stdio.h>
  *
- *     void log_printf(const char * format, ...) {
+ *     void embc_log_printf(const char * format, ...) {
  *         va_list arg;
  *         va_start(arg, format);
  *         vprintf(format, arg);
@@ -115,88 +110,90 @@ EMBC_CPP_GUARD_START
  *     }
  *
  * If your application calls the LOG* macros from multiple threads, then
- * the log_printf implementation must be thread-safe and reentrant.
+ * the embc_log_printf implementation must be thread-safe and reentrant.
  */
-typedef void(*log_printf)(const char * format, ...) LOG_PRINTF_FORMAT;
+typedef void(*embc_log_printf)(const char * format, ...) EMBC_LOG_PRINTF_FORMAT;
 
-extern volatile log_printf log_printf_;
+extern volatile embc_log_printf embc_log_printf_;
 
 /**
  * @brief Initialize the logging feature.
  *
- * @param handler The log handler.  Pass NULL or call log_finalize() to
+ * @param handler The log handler.  Pass NULL or call embc_log_finalize() to
  *      restore the default log handler.
  *
  * @return 0 or error code.
  *
  * The library initializes with a default null log handler so that logging
- * which occurs before log_initialize will not cause a fault.  This function
+ * which occurs before embc_log_initialize will not cause a fault.  This function
  * may be safely called at any time, even without finalize.
  */
-EMBC_API int log_initialize(log_printf handler);
+EMBC_API int embc_log_initialize(embc_log_printf handler);
 
 /**
  * @brief Finalize the logging feature.
  *
- * This is equivalent to calling log_initialize(0).
+ * This is equivalent to calling embc_log_initialize(0).
  */
-EMBC_API void log_finalize();
+EMBC_API void embc_log_finalize();
 
 /**
- * @def LOG_PRINTF
+ * @def EMBC_LOG_PRINTF
  * @brief The printf function including log formatting.
  *
- * Although unusual, individual modules may override this definition.
+ * @param level The level for this log message
+ * @param format The formatting string
+ * @param ... The arguments for the formatting string
  */
-#ifndef LOG_PRINTF
-#define LOG_PRINTF(level, format, ...) \
-    log_printf_("%c %s:%d: " format "\n", log_level_char[level], __FILENAME__, __LINE__, __VA_ARGS__);
+#ifndef EMBC_LOG_PRINTF
+#define EMBC_LOG_PRINTF(level, format, ...) \
+    embc_log_printf_("%c %s:%d: " format "\n", embc_log_level_char[level], __FILENAME__, __LINE__, __VA_ARGS__);
 #endif
 
 /**
  * @brief The available logging levels.
  */
-enum log_level_e {
+enum embc_log_level_e {
     /** Logging functionality is disabled. */
-    LOG_LEVEL_OFF         = -1,
+    EMBC_LOG_LEVEL_OFF         = -1,
     /** A "panic" condition that may result in significant harm. */
-    LOG_LEVEL_EMERGENCY   = 0,
+    EMBC_LOG_LEVEL_EMERGENCY   = 0,
     /** A condition requiring immediate action. */
-    LOG_LEVEL_ALERT       = 1,
+    EMBC_LOG_LEVEL_ALERT       = 1,
     /** A critical error which prevents further functions. */
-    LOG_LEVEL_CRITICAL    = 2,
+    EMBC_LOG_LEVEL_CRITICAL    = 2,
     /** An error which prevents the current operation from completing or
      *  will adversely effect future functionality. */
-    LOG_LEVEL_ERROR       = 3,
+    EMBC_LOG_LEVEL_ERROR       = 3,
     /** A warning which may adversely affect the current operation or future
      *  operations. */
-    LOG_LEVEL_WARN        = 4,
+    EMBC_LOG_LEVEL_WARNING     = 4,
     /** A notification for interesting events. */
-    LOG_LEVEL_NOTICE      = 5,
+    EMBC_LOG_LEVEL_NOTICE      = 5,
     /** An informative message. */
-    LOG_LEVEL_INFO        = 6,
+    EMBC_LOG_LEVEL_INFO        = 6,
     /** Detailed messages for the software developer. */
-    LOG_LEVEL_DEBUG1      = 7,
+    EMBC_LOG_LEVEL_DEBUG1      = 7,
     /** Very detailed messages for the software developer. */
-    LOG_LEVEL_DEBUG2      = 8,
+    EMBC_LOG_LEVEL_DEBUG2      = 8,
     /** Insanely detailed messages for the software developer. */
-    LOG_LEVEL_DEBUG3      = 9,
+    EMBC_LOG_LEVEL_DEBUG3      = 9,
     /** All logging functionality is enabled. */
-    LOG_LEVEL_ALL         = 10,
+    EMBC_LOG_LEVEL_ALL         = 10,
 };
 
 /** Detailed messages for the software developer. */
-#define LOG_LEVEL_DEBUG LOG_LEVEL_DEBUG1
+#define EMBC_LOG_LEVEL_DEBUG EMBC_LOG_LEVEL_DEBUG1
 
 /**
  * @brief Map log level to a string name.
  */
-extern char const * const log_level_str[LOG_LEVEL_ALL + 1];
+extern char const * const embc_log_level_str[EMBC_LOG_LEVEL_ALL + 1];
 
 /**
  * @brief Map log level to a single character.
  */
-extern char const log_level_char[LOG_LEVEL_ALL + 1];
+extern char const embc_log_level_char[EMBC_LOG_LEVEL_ALL + 1];
 
 /**
  * @brief Check the current level against the static logging configuration.
@@ -204,7 +201,7 @@ extern char const log_level_char[LOG_LEVEL_ALL + 1];
  * @param level The level to query.
  * @return True if logging at level is permitted.
  */
-#define LOG_CHECK_STATIC(level) ((level <= LOG_GLOBAL_LEVEL) && (level <= LOG_LEVEL) && (level >= 0))
+#define EMBC_LOG_CHECK_STATIC(level) ((level <= EMBC_LOG_GLOBAL_LEVEL) && (level <= EMBC_LOG_LEVEL) && (level >= 0))
 
 /**
  * @brief Check a log level against a configured level.
@@ -213,123 +210,70 @@ extern char const log_level_char[LOG_LEVEL_ALL + 1];
  * @param cfg_level The configured logging level.
  * @return True if level is permitted given cfg_level.
  */
-#define LOG_LEVEL_CHECK(level, cfg_level) (level <= cfg_level)
+#define EMBC_LOG_LEVEL_CHECK(level, cfg_level) (level <= cfg_level)
 
 /*!
  * \brief Macro to log a printf-compatible formatted string.
  *
- * \param level The log_level_e.
+ * \param level The embc_log_level_e.
  * \param format The printf-compatible formatting string.
  * \param ... The arguments to the formatting string.
  */
-#define LOGF(level, format, ...) \
+#define EMBC_LOG(level, format, ...) \
     do { \
-        if (LOG_CHECK_STATIC(level)) { \
-            LOG_PRINTF(level, format, __VA_ARGS__); \
-        } \
-    } while (0)
-
-/*!
- * \brief Macro to log a string.
- *
- * \param level The log_level_e.
- * \param msg The string to log.
- */
-#define LOGS(level, msg) \
-    do { \
-        if (LOG_CHECK_STATIC(level)) { \
-            LOG_PRINTF(level, "%s", msg); \
-        } \
-    } while (0)
-
-/*!
- * \brief Macro to log a character.
- *
- * \param level The log_level_e.
- * \param c The character to log.
- */
-#define LOGC(level, c) \
-    do { \
-        if (LOG_CHECK_STATIC(level)) { \
-            LOG_PRINTF(level, "%c", c); \
+        if (EMBC_LOG_CHECK_STATIC(level)) { \
+            EMBC_LOG_PRINTF(level, format, __VA_ARGS__); \
         } \
     } while (0)
 
 
+// zero length variadic arguments are not allowed for macros
+// this hack ensures that LOG(message) and LOG(format, args...) are both supported.
+// https://stackoverflow.com/questions/5588855/standard-alternative-to-gccs-va-args-trick
+#define _EMBC_LOG_SELECT(PREFIX, _9, _8, _7, _6, _5, _4, _3, _2, _1, SUFFIX, ...) PREFIX ## _ ## SUFFIX
+#define _EMBC_LOG_1(level, message) EMBC_LOG(level, "%s", message)
+#define _EMBC_LOG_N(level, format, ...) EMBC_LOG(level, format, __VA_ARGS__)
+#define _EMBC_LOG_DISPATCH(level, ...)  _EMBC_LOG_SELECT(_EMBC_LOG, __VA_ARGS__, N, N, N, N, N, N, N, N, 1, 0)(level, __VA_ARGS__)
+
+
+/** Log a emergency using printf-style arguments. */
+#define EMBC_LOG_EMERGENCY(...)  _EMBC_LOG_DISPATCH(EMBC_LOG_LEVEL_EMERGENCY, __VA_ARGS__)
+/** Log a alert using printf-style arguments. */
+#define EMBC_LOG_ALERT(...)  _EMBC_LOG_DISPATCH(EMBC_LOG_LEVEL_ALERT, format, __VA_ARGS__)
 /** Log a critical failure using printf-style arguments. */
-#define LOGF_CRITICAL(format, ...)  LOGF(LOG_LEVEL_CRITICAL, format, __VA_ARGS__)
+#define EMBC_LOG_CRITICAL(...)  _EMBC_LOG_DISPATCH(EMBC_LOG_LEVEL_CRITICAL, __VA_ARGS__)
 /** Log an error using printf-style arguments. */
-#define LOGF_ERROR(format, ...)     LOGF(LOG_LEVEL_ERROR,    format, __VA_ARGS__)
-/** Log an error using printf-style arguments.  Alias for LOGF_ERROR. */
-#define LOGF_ERR LOGF_ERROR
+#define EMBC_LOG_ERROR(...)     _EMBC_LOG_DISPATCH(EMBC_LOG_LEVEL_ERROR, __VA_ARGS__)
+/** Log an error using printf-style arguments.  Alias for EMBC_LOG_ERROR. */
+#define EMBC_LOG_ERR EMBC_LOG_ERROR
 /** Log a warning using printf-style arguments. */
-#define LOGF_WARNING(format, ...)      LOGF(LOG_LEVEL_WARN,     format, __VA_ARGS__)
-/** Log a warning using printf-style arguments.  Alias for LOGF_WARNING. */
-#define LOGF_WARN LOGF_WARNING
+#define EMBC_LOG_WARNING(...)      _EMBC_LOG_DISPATCH(EMBC_LOG_LEVEL_WARNING, __VA_ARGS__)
+/** Log a warning using printf-style arguments.  Alias for EMBC_LOG_WARNING. */
+#define EMBC_LOG_WARN EMBC_LOG_WARNING
 /** Log a notice using printf-style arguments. */
-#define LOGF_NOTICE(format, ...)    LOGF(LOG_LEVEL_NOTICE,   format, __VA_ARGS__)
+#define EMBC_LOG_NOTICE(...)    _EMBC_LOG_DISPATCH(EMBC_LOG_LEVEL_NOTICE,   __VA_ARGS__)
 /** Log an informative message using printf-style arguments. */
-#define LOGF_INFO(format, ...)      LOGF(LOG_LEVEL_INFO,     format, __VA_ARGS__)
+#define EMBC_LOG_INFO(...)      _EMBC_LOG_DISPATCH(EMBC_LOG_LEVEL_INFO,     __VA_ARGS__)
 /** Log a detailed debug message using printf-style arguments. */
-#define LOGF_DEBUG1(format, ...)    LOGF(LOG_LEVEL_DEBUG,    format, __VA_ARGS__)
-/** Log a detailed debug message using printf-style arguments.  Alias for LOGF_DEBUG1. */
-#define LOGF_DEBUG LOGF_DEBUG1
-/** Log a detailed debug message using printf-style arguments.  Alias for LOGF_DEBUG1. */
-#define LOGF_DBG LOGF_DEBUG1
+#define EMBC_LOG_DEBUG1(...)    _EMBC_LOG_DISPATCH(EMBC_LOG_LEVEL_DEBUG1,    __VA_ARGS__)
+/** Log a detailed debug message using printf-style arguments.  Alias for EMBC_LOG_DEBUG1. */
+#define EMBC_LOG_DEBUG EMBC_LOG_DEBUG1
+/** Log a detailed debug message using printf-style arguments.  Alias for EMBC_LOG_DEBUG1. */
+#define EMBC_LOG_DBG EMBC_LOG_DEBUG1
 /** Log a very detailed debug message using printf-style arguments. */
-#define LOGF_DEBUG2(format, ...)    LOGF(LOG_LEVEL_DEBUG2,  format, __VA_ARGS__)
+#define EMBC_LOG_DEBUG2(...)    _EMBC_LOG_DISPATCH(EMBC_LOG_LEVEL_DEBUG2,  __VA_ARGS__)
 /** Log an insanely detailed debug message using printf-style arguments. */
-#define LOGF_DEBUG3(format, ...)    LOGF(LOG_LEVEL_DEBUG3,  format, __VA_ARGS__)
+#define EMBC_LOG_DEBUG3(...)    _EMBC_LOG_DISPATCH(EMBC_LOG_LEVEL_DEBUG3,  __VA_ARGS__)
 
-/** Log a critical failure string. */
-#define LOGS_CRITICAL(msg)  LOGS(LOG_LEVEL_CRITICAL, msg)
-/** Log an error string. */
-#define LOGS_ERROR(msg)     LOGS(LOG_LEVEL_ERROR,    msg)
-/** Log an error string. Alias for LOGS_ERROR. */
-#define LOGS_ERR LOGS_ERROR
-/** Log an warning string. */
-#define LOGS_WARNING(msg)   LOGS(LOG_LEVEL_WARN,     msg)
-/** Log an warning string.  Alias for LOGS_WARNING. */
-#define LOGS_WARN LOGS_WARNING
-/** Log a notice string. */
-#define LOGS_NOTICE(msg)    LOGS(LOG_LEVEL_NOTICE,   msg)
-/** Log an informative message string. */
-#define LOGS_INFO(msg)      LOGS(LOG_LEVEL_INFO,     msg)
-/** Log a detailed debug message string. */
-#define LOGS_DEBUG1(msg)    LOGS(LOG_LEVEL_DEBUG,    msg)
-/** Log a detailed debug message string. Alias for LOGS_DEBUG1 */
-#define LOGS_DEBUG LOGS_DEBUG1
-/** Log a detailed debug message string. Alias for LOGS_DEBUG1 */
-#define LOGS_DBG LOGS_DEBUG1
-/** Log a very detailed debug message string. */
-#define LOGS_DEBUG2(msg)     LOGS(LOG_LEVEL_DEBUG2,  msg)
-/** Log an insanely detailed debug message string. */
-#define LOGS_DEBUG3(msg)     LOGS(LOG_LEVEL_DEBUG3,  msg)
 
-/** Log a critical failure character. */
-#define LOGC_CRITICAL(c)    LOGC(LOG_LEVEL_CRITICAL, c)
-/** Log an error character. */
-#define LOGC_ERROR(c)       LOGC(LOG_LEVEL_ERROR,    c)
-/** Log an error character. Alias for LOGC_ERROR. */
-#define LOGC_ERR LOGC_ERROR
-/** Log a warning character. */
-#define LOGC_WARNING(c)     LOGC(LOG_LEVEL_WARN,     c)
-/** Log a warning character.  Alias for LOGC_WARNING. */
-#define LOGC_WARN LOGC_WARNING
-/** Log a notice character. */
-#define LOGC_NOTICE(c)      LOGC(LOG_LEVEL_NOTICE,   c)
-/** Log an informative character. */
-#define LOGC_INFO(c)        LOGC(LOG_LEVEL_INFO,     c)
-/** Log a debug character. */
-#define LOGC_DEBUG1(c)      LOGC(LOG_LEVEL_DEBUG,    c)
-/** Log a debug character.  Alias for LOGC_DEBUG1. */
-#define LOGC_DEBUG LOGC_DEBUG1
-/** Log a debug character.  Alias for LOGC_DEBUG1. */
-#define LOGC_DBG LOGC_DEBUG1
-/** Log a very detailed debug character. */
-#define LOGC_DEBUG2(c)       LOGC(LOG_LEVEL_DEBUG2,  c)
-/** Log an insanely detailed debug character. */
-#define LOGC_DEBUG3(c)       LOGC(LOG_LEVEL_DEBUG3,  c)
+#define EMBC_LOGE EMBC_LOG_ERROR
+#define EMBC_LOGW EMBC_LOG_WARNING
+#define EMBC_LOGN EMBC_LOG_NOTICE
+#define EMBC_LOGI EMBC_LOG_INFO
+#define EMBC_LOGD EMBC_LOG_DEBUG1
+#define EMBC_LOGD1 EMBC_LOG_DEBUG1
+#define EMBC_LOGD2 EMBC_LOG_DEBUG2
+#define EMBC_LOGD3 EMBC_LOG_DEBUG3
 
 /** @} */
 
