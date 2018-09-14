@@ -19,7 +19,7 @@
 
 static void send(struct embc_stream_producer_s * self,
                  struct embc_stream_transaction_s * transaction) {
-    DBC_NOT_NULL(self);
+    EMBC_DBC_NOT_NULL(self);
     struct embc_stream_source_s * s = EMBC_CONTAINER_OF(self, struct embc_stream_source_s, producer);
     switch (transaction->type) {
         case EMBC_STREAM_IOCTL_OPEN:
@@ -80,7 +80,7 @@ void embc_stream_source_initialize(
         struct embc_stream_source_s * self,
         uint8_t * transaction_buffer,
         uint16_t transaction_length) {
-    DBC_NOT_NULL(self);
+    EMBC_DBC_NOT_NULL(self);
     EMBC_STRUCT_PTR_INIT(self);
     self->transaction_buffer = transaction_buffer;
     self->transaction_length = transaction_length;
@@ -90,13 +90,13 @@ void embc_stream_source_initialize(
 void embc_stream_source_set_consumer(
         struct embc_stream_source_s * self,
         struct embc_stream_consumer_s * consumer) {
-    DBC_NOT_NULL(self);
+    EMBC_DBC_NOT_NULL(self);
     self->consumer = consumer;
 }
 
 struct embc_stream_producer_s * embc_stream_source_get_producer(
         struct embc_stream_source_s * self) {
-    DBC_NOT_NULL(self);
+    EMBC_DBC_NOT_NULL(self);
     return &self->producer;
 }
 
@@ -106,9 +106,9 @@ void embc_stream_source_configure(
         uint32_t length,
         void (*done_fn)(void *, uint8_t),
         void * done_user_data) {
-    DBC_NOT_NULL(self);
-    DBC_NOT_NULL(buffer);
-    DBC_GT_ZERO(length);
+    EMBC_DBC_NOT_NULL(self);
+    EMBC_DBC_NOT_NULL(buffer);
+    EMBC_DBC_GT_ZERO(length);
     self->source_buffer = buffer;
     self->source_length = length;
     self->done_fn = done_fn;

@@ -42,44 +42,44 @@ const char LINE_TOO_LONG[] = "Maximum command line length reached";
 #define KEY_ESC 27
 
 
-static inline void cli_print(cli_t * self, char const * str) {
+static inline void embc_cli_print(embc_cli_t * self, char const * str) {
     if (self->print) {
         self->print(self->print_cookie, str);
     }
 }
 
-static inline void print_prompt(cli_t * self) {
-    cli_print(self, self->prompt);
+static inline void print_prompt(embc_cli_t * self) {
+    embc_cli_print(self, self->prompt);
 }
 
-static inline void print_char(cli_t * self, char ch) {
+static inline void print_char(embc_cli_t * self, char ch) {
     char s[2];
     s[0] = ch;
     s[1] = 0;
-    cli_print(self, s);
+    embc_cli_print(self, s);
 }
 
-static inline void print_newline(cli_t * self) {
+static inline void print_newline(embc_cli_t * self) {
     print_char(self, KEY_LF);
 }
 
-static void cli_backspace(cli_t * self) {
+static void embc_cli_backspace(embc_cli_t * self) {
     if (self->cmdlen <= 0) {
         return;
     }
-    if (self->cmdlen >= CLI_LINE_LENGTH) {
+    if (self->cmdlen >= EMBC_CLI_LINE_LENGTH) {
         self->cmdlen--;
     } else if (self->cmdlen > 0) {
         self->cmdline[self->cmdlen - 1] = '\0';
         self->cmdlen--;
     }
-    if (self->echo_mode != CLI_ECHO_OFF) {
-        cli_print(self, "\b \b");
+    if (self->echo_mode != EMBC_CLI_ECHO_OFF) {
+        embc_cli_print(self, "\b \b");
     }
 }
 
-static void cli_process_char(cli_t * self, char ch) {
-    if (self->cmdlen >= CLI_LINE_LENGTH) {
+static void embc_cli_process_char(embc_cli_t * self, char ch) {
+    if (self->cmdlen >= EMBC_CLI_LINE_LENGTH) {
         self->cmdlen++;
     } else {
         self->cmdline[self->cmdlen] = ch;
@@ -87,9 +87,9 @@ static void cli_process_char(cli_t * self, char ch) {
         self->cmdline[self->cmdlen] = '\0';
     }
     switch (self->echo_mode) {
-        case CLI_ECHO_OFF: break;
-        case CLI_ECHO_ON: print_char(self, ch); break;
-        case CLI_ECHO_USER_CHAR: print_char(self, self->echo_user_char); break;
+        case EMBC_CLI_ECHO_OFF: break;
+        case EMBC_CLI_ECHO_ON: print_char(self, ch); break;
+        case EMBC_CLI_ECHO_USER_CHAR: print_char(self, self->echo_user_char); break;
         default: break;
     }
 }
@@ -108,12 +108,12 @@ static bool isCommentStart(char const * s) {
     return false;
 }
 
-static void cli_compact(cli_t * self) {
+static void embc_cli_compact(embc_cli_t * self) {
     embc_size_t i = 0;
     int offset = 0;
     bool isWhite = true;
     for (i = 0; i < self->cmdlen; ++i) {
-        if (i >= CLI_LINE_LENGTH) {
+        if (i >= EMBC_CLI_LINE_LENGTH) {
             // line too long - do not compact.
             break;
         }
@@ -140,25 +140,25 @@ static void cli_compact(cli_t * self) {
     self->cmdline[self->cmdlen] = '\0';
 }
 
-static void cli_process_line(cli_t * self) {
+static void embc_cli_process_line(embc_cli_t * self) {
     print_newline(self);
-    cli_compact(self);
+    embc_cli_compact(self);
     if (self->cmdlen == 0) {
         // empty line or only comment
-    } else if (self->cmdlen >= CLI_LINE_LENGTH) {
-        cli_print(self, LINE_TOO_LONG);
+    } else if (self->cmdlen >= EMBC_CLI_LINE_LENGTH) {
+        embc_cli_print(self, LINE_TOO_LONG);
         print_newline(self);
     } else { // valid command
-        int rc = CLI_SUCCESS;
+        int rc = EMBC_CLI_SUCCESS;
         if (self->execute_line) {
             rc = self->execute_line(self->execute_cookie, self->cmdline);
         }
-        if (rc != CLI_SUCCESS_PROMPT_ONLY) {
-            if (self->verbose == CLI_VERBOSE_FULL) {
-                cli_print(self, self->cmdline);
+        if (rc != EMBC_CLI_SUCCESS_PROMPT_ONLY) {
+            if (self->verbose == EMBC_CLI_VERBOSE_FULL) {
+                embc_cli_print(self, self->cmdline);
                 print_newline(self);
             }
-            cli_print(self, (CLI_SUCCESS == rc) ? self->response_success : self->response_error);
+            embc_cli_print(self, (EMBC_CLI_SUCCESS == rc) ? self->response_success : self->response_error);
         }
     }
     self->cmdline[0] = '\0';
@@ -166,40 +166,40 @@ static void cli_process_line(cli_t * self) {
     print_prompt(self);
 }
 
-void cli_initialize(cli_t * self) {
-    DBC_NOT_NULL(self);
+void embc_cli_initialize(embc_cli_t * self) {
+    EMBC_DBC_NOT_NULL(self);
     embc_memset(self->cmdline, 0, sizeof(self->cmdline));
     self->cmdlen = 0;
     if (self->execute_args) {
-        self->execute_line = cli_line_parser;
+        self->execute_line = embc_cli_line_parser;
         self->execute_cookie = self;
     }
     print_prompt(self);
 }
 
-void cli_set_echo(cli_t * self, enum cli_echo_mode_e mode, char ch) {
-    DBC_NOT_NULL(self);
+void embc_cli_set_echo(embc_cli_t * self, enum embc_cli_echo_mode_e mode, char ch) {
+    EMBC_DBC_NOT_NULL(self);
     self->echo_mode = mode;
     self->echo_user_char = ch;
 }
 
-void cli_set_verbose(cli_t * self, enum cli_verbose_mode_e mode) {
-    DBC_NOT_NULL(self);
+void embc_cli_set_verbose(embc_cli_t * self, enum embc_cli_verbose_mode_e mode) {
+    EMBC_DBC_NOT_NULL(self);
     self->verbose = mode;
 }
 
-void cli_insert_char(cli_t * self, char ch) {
-    DBC_NOT_NULL(self);
+void embc_cli_insert_char(embc_cli_t * self, char ch) {
+    EMBC_DBC_NOT_NULL(self);
     switch (ch) {
-        case KEY_BS:   cli_backspace(self); break;
-        case KEY_DEL:  cli_backspace(self); break;
+        case KEY_BS:   embc_cli_backspace(self); break;
+        case KEY_DEL:  embc_cli_backspace(self); break;
         case KEY_LF:
             if (self->last_char != KEY_CR) {
-                cli_process_line(self);
+                embc_cli_process_line(self);
             }
             break;
-        case KEY_CR:   cli_process_line(self); break;
-        default:       cli_process_char(self, ch); break;
+        case KEY_CR:   embc_cli_process_line(self); break;
+        default:       embc_cli_process_char(self, ch); break;
     }
     self->last_char = ch;
 }
@@ -213,13 +213,13 @@ static bool _is_delimiter(char ch, const char * delim) {
     return false;
 }
 
-int cli_line_parser(void * self, const char * cmdline) {
-    DBC_NOT_NULL(self);
-    cli_t const * p = (cli_t const *) self;
+int embc_cli_line_parser(void * self, const char * cmdline) {
+    EMBC_DBC_NOT_NULL(self);
+    embc_cli_t const * p = (embc_cli_t const *) self;
     const char delimiters[] = " \t,";
-    char line[CLI_LINE_LENGTH + 2];
+    char line[EMBC_CLI_LINE_LENGTH + 2];
     int argc = 0;
-    char * argv[CLI_MAX_ARGS];
+    char * argv[EMBC_CLI_MAX_ARGS];
     char * lineptr = line;
     embc_memset(&argv, 0, sizeof(argv));
     embc_memcpy(line, cmdline, sizeof(line));
@@ -232,8 +232,8 @@ int cli_line_parser(void * self, const char * cmdline) {
         if (*lineptr == 0) {
             break;
         }
-        if (argc >= CLI_MAX_ARGS) {
-            return CLI_ERROR_PARAMETER_VALUE;
+        if (argc >= EMBC_CLI_MAX_ARGS) {
+            return EMBC_CLI_ERROR_PARAMETER_VALUE;
         }
         argv[argc++] = lineptr; // start of token
         // consume token
@@ -247,10 +247,10 @@ int cli_line_parser(void * self, const char * cmdline) {
     }
 
     if (argc == 0) { // blank line!
-        return CLI_SUCCESS;
+        return EMBC_CLI_SUCCESS;
     } else if (p->execute_args) {
         return p->execute_args(p->execute_cookie, argc, argv);
     } else { // not really valid...
-        return CLI_ERROR_PARAMETER_VALUE;
+        return EMBC_CLI_ERROR_PARAMETER_VALUE;
     }
 }

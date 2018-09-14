@@ -24,7 +24,7 @@
 #include <string.h>
 
 
-cli_t cli;
+embc_cli_t cli;
 EMBC_BUFFER_STATIC_DEFINE(myprint_str, 256);
 
 
@@ -64,20 +64,20 @@ int setup(void ** state) {
     cli.response_success = "OK\n";
     cli.response_error = "ERROR\n";
     embc_buffer_clear(&myprint_str);
-    cli_initialize(&cli);
+    embc_cli_initialize(&cli);
     embc_buffer_clear(&myprint_str);
     return 0;
 }
 
 void insert_str(const char * str) {
     while (str && *str) {
-        cli_insert_char(&cli, *str++);
+        embc_cli_insert_char(&cli, *str++);
     }
 }
 
 void initialize(void ** state) {
     (void) state;
-    assert_int_equal(CLI_ECHO_OFF, cli.echo_mode);
+    assert_int_equal(EMBC_CLI_ECHO_OFF, cli.echo_mode);
     assert_int_equal('\0', cli.echo_user_char);
     assert_string_equal("", cli.prompt);
     assert_int_equal(0, cli.cmdlen);
@@ -85,17 +85,17 @@ void initialize(void ** state) {
 
 void execute_single_char(void ** state) {
     (void) state;
-    cli_insert_char(&cli, 'h');
+    embc_cli_insert_char(&cli, 'h');
     expect_string(myexec, cmdline, "h");
-    will_return(myexec, CLI_SUCCESS);
-    cli_insert_char(&cli, '\r');
+    will_return(myexec, EMBC_CLI_SUCCESS);
+    embc_cli_insert_char(&cli, '\r');
     assert_string_equal("\nOK\n", myprint_str.data);
 }
 
-void execute_CLI_SUCCESS(void ** state) {
+void execute_EMBC_CLI_SUCCESS(void ** state) {
     (void) state;
     expect_string(myexec, cmdline, "hello world!");
-    will_return(myexec, CLI_SUCCESS);
+    will_return(myexec, EMBC_CLI_SUCCESS);
     insert_str("hello world!\r");
     assert_string_equal("\nOK\n", myprint_str.data);
 }
@@ -103,35 +103,35 @@ void execute_CLI_SUCCESS(void ** state) {
 void execute_backspace(void ** state) {
     (void) state;
     expect_string(myexec, cmdline, "hello world");
-    will_return(myexec, CLI_SUCCESS);
+    will_return(myexec, EMBC_CLI_SUCCESS);
     insert_str("hello world!\b\r");
     assert_string_equal("\nOK\n", myprint_str.data);
 }
 
 void execute_echo_on(void ** state) {
     (void) state;
-    cli_set_echo(&cli, CLI_ECHO_ON, 0);
+    embc_cli_set_echo(&cli, EMBC_CLI_ECHO_ON, 0);
     expect_string(myexec, cmdline, "hello world!");
-    will_return(myexec, CLI_SUCCESS);
+    will_return(myexec, EMBC_CLI_SUCCESS);
     insert_str("hello world!\r");
     assert_string_equal("hello world!\nOK\n", myprint_str.data);
 }
 
-void execute_CLI_SUCCESS_with_prompt_and_echo(void ** state) {
+void execute_EMBC_CLI_SUCCESS_with_prompt_and_echo(void ** state) {
     (void) state;
     strcpy(cli.prompt, "PROMPT> ");
-    cli.echo_mode = CLI_ECHO_ON;
+    cli.echo_mode = EMBC_CLI_ECHO_ON;
     expect_string(myexec, cmdline, "hello world!");
-    will_return(myexec, CLI_SUCCESS);
+    will_return(myexec, EMBC_CLI_SUCCESS);
     insert_str("hello world!\r");
     assert_string_equal("hello world!\nOK\nPROMPT> ", myprint_str.data);
 }
 
 void execute_echo_user_char(void ** state) {
     (void) state;
-    cli_set_echo(&cli, CLI_ECHO_USER_CHAR, '*');
+    embc_cli_set_echo(&cli, EMBC_CLI_ECHO_USER_CHAR, '*');
     expect_string(myexec, cmdline, "hello world!");
-    will_return(myexec, CLI_SUCCESS);
+    will_return(myexec, EMBC_CLI_SUCCESS);
     insert_str("hello world!\r");
     assert_string_equal("************\nOK\n", myprint_str.data);
 }
@@ -139,7 +139,7 @@ void execute_echo_user_char(void ** state) {
 void execute_error(void ** state) {
     (void) state;
     expect_string(myexec, cmdline, "hello world!");
-    will_return(myexec, CLI_ERROR_PARAMETER_VALUE);
+    will_return(myexec, EMBC_CLI_ERROR_PARAMETER_VALUE);
     insert_str("hello world!\r");
     assert_string_equal("\nERROR\n", myprint_str.data);
 }
@@ -147,16 +147,16 @@ void execute_error(void ** state) {
 void execute_whitespace(void ** state) {
     (void) state;
     expect_string(myexec, cmdline, "hello world!");
-    will_return(myexec, CLI_SUCCESS);
+    will_return(myexec, EMBC_CLI_SUCCESS);
     insert_str("    hello    \t world!   \r");
     assert_string_equal("\nOK\n", myprint_str.data);
 }
 
 void execute_whitespace_verbose(void ** state) {
     (void) state;
-    cli_set_verbose(&cli, CLI_VERBOSE_FULL);
+    embc_cli_set_verbose(&cli, EMBC_CLI_VERBOSE_FULL);
     expect_string(myexec, cmdline, "hello world!");
-    will_return(myexec, CLI_SUCCESS);
+    will_return(myexec, EMBC_CLI_SUCCESS);
     insert_str("    hello    \t world!   \r");
     assert_string_equal("\nhello world!\nOK\n", myprint_str.data);
 }
@@ -164,7 +164,7 @@ void execute_whitespace_verbose(void ** state) {
 void comment(void ** state) {
     (void) state;
     cli.prompt[0] = '>';
-    cli_set_verbose(&cli, CLI_VERBOSE_FULL);
+    embc_cli_set_verbose(&cli, EMBC_CLI_VERBOSE_FULL);
     insert_str("  #  hello    \t world!   \r");
     assert_string_equal("\n>", myprint_str.data);
 }
@@ -187,17 +187,17 @@ void two_commands(void ** state) {
     (void) state;
     cli.prompt[0] = '>';
     expect_string(myexec, cmdline, "hello");
-    will_return(myexec, CLI_SUCCESS);
+    will_return(myexec, EMBC_CLI_SUCCESS);
     expect_string(myexec, cmdline, "world");
-    will_return(myexec, CLI_SUCCESS);
+    will_return(myexec, EMBC_CLI_SUCCESS);
     insert_str("hello\rworld\r");
     assert_string_equal("\nOK\n>\nOK\n>", myprint_str.data);
 }
 
 void line_parser_empty(void ** state) {
     (void) state;
-    assert_int_equal(0, cli_line_parser(&cli, ""));
-    assert_int_equal(0, cli_line_parser(&cli, "    \t  "));
+    assert_int_equal(0, embc_cli_line_parser(&cli, ""));
+    assert_int_equal(0, embc_cli_line_parser(&cli, "    \t  "));
 }
 
 void line_parser_command_only(void ** state) {
@@ -205,8 +205,8 @@ void line_parser_command_only(void ** state) {
     cli.execute_args = exec_args1;
     expect_value(exec_args1, argc, 1);
     expect_string(exec_args1, argv[0], "mycommand");
-    will_return(exec_args1, CLI_SUCCESS);
-    assert_int_equal(0, cli_line_parser(&cli, "mycommand"));
+    will_return(exec_args1, EMBC_CLI_SUCCESS);
+    assert_int_equal(0, embc_cli_line_parser(&cli, "mycommand"));
 }
 
 void line_parser_command_only_with_whitespace(void ** state) {
@@ -214,8 +214,8 @@ void line_parser_command_only_with_whitespace(void ** state) {
     cli.execute_args = exec_args1;
     expect_value(exec_args1, argc, 1);
     expect_string(exec_args1, argv[0], "mycommand");
-    will_return(exec_args1, CLI_SUCCESS);
-    assert_int_equal(0, cli_line_parser(&cli, "    mycommand   \t "));
+    will_return(exec_args1, EMBC_CLI_SUCCESS);
+    assert_int_equal(0, embc_cli_line_parser(&cli, "    mycommand   \t "));
 }
 
 void line_parser_with_args(void ** state) {
@@ -226,18 +226,18 @@ void line_parser_with_args(void ** state) {
     expect_string(exec_args4, argv[1], "1");
     expect_string(exec_args4, argv[2], "2");
     expect_string(exec_args4, argv[3], "my_string");
-    will_return(exec_args4, CLI_SUCCESS);
-    assert_int_equal(0, cli_line_parser(&cli, "    mycommand\t1,2,my_string"));
+    will_return(exec_args4, EMBC_CLI_SUCCESS);
+    assert_int_equal(0, embc_cli_line_parser(&cli, "    mycommand\t1,2,my_string"));
 }
 
 int main(void) {
     const struct CMUnitTest tests[] = {
             cmocka_unit_test_setup(initialize, setup),
             cmocka_unit_test_setup(execute_single_char, setup),
-            cmocka_unit_test_setup(execute_CLI_SUCCESS, setup),
+            cmocka_unit_test_setup(execute_EMBC_CLI_SUCCESS, setup),
             cmocka_unit_test_setup(execute_backspace, setup),
             cmocka_unit_test_setup(execute_echo_on, setup),
-            cmocka_unit_test_setup(execute_CLI_SUCCESS_with_prompt_and_echo, setup),
+            cmocka_unit_test_setup(execute_EMBC_CLI_SUCCESS_with_prompt_and_echo, setup),
             cmocka_unit_test_setup(execute_echo_user_char, setup),
             cmocka_unit_test_setup(execute_error, setup),
             cmocka_unit_test_setup(execute_whitespace, setup),

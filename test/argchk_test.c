@@ -22,11 +22,11 @@
 #include "embc.h"
 
 
-#define F ARGCHK_FAIL_RETURN_CODE
+#define F EMBC_ARGCHK_FAIL_RETURN_CODE
 
 #define FUNC(argchk_macro, arg_type) \
 static int (fn_ ## argchk_macro) (arg_type x) { \
-    ARGCHK_ ## argchk_macro(x); \
+    EMBC_ARGCHK_ ## argchk_macro(x); \
     return 0; \
 }
 
@@ -39,7 +39,7 @@ FUNC(LTE_ZERO, int)
 FUNC(LT_ZERO, int)
 
 static int fn_RANGE_INT(int x) {
-    ARGCHK_RANGE_INT(x, -10, 20);
+    EMBC_ARGCHK_RANGE_INT(x, -10, 20);
     return 0;
 }
 

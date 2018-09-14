@@ -119,7 +119,7 @@ static void resize(struct intmap_s * self) {
 int intmap_put(struct intmap_s * self, embc_size_t key, void * value, void ** old_value) {
     struct entry_s **previous;
     struct entry_s *item;
-    DBC_NOT_NULL(self);
+    EMBC_DBC_NOT_NULL(self);
     if ((!self->iterators) && (self->length >= (2 * self->hash_mask))) {
         resize(self);
     }
@@ -153,7 +153,7 @@ int intmap_put(struct intmap_s * self, embc_size_t key, void * value, void ** ol
 
 int intmap_get(struct intmap_s * self, embc_size_t key, void ** value) {
     struct entry_s *item;
-    DBC_NOT_NULL(self);
+    EMBC_DBC_NOT_NULL(self);
     item = self->bins[compute_bin(self, key)];
     while (item) {
         if (item->key == key) {
@@ -174,7 +174,7 @@ int intmap_remove(struct intmap_s * self, embc_size_t key, void ** old_value) {
     struct entry_s **previous;
     struct entry_s *item;
     struct intmap_iterator_s * iter;
-    DBC_NOT_NULL(self);
+    EMBC_DBC_NOT_NULL(self);
     previous = &self->bins[compute_bin(self, key)];
     item = *previous;
     while (item) {
@@ -219,7 +219,7 @@ static void itermap_iterator_next_advance(struct intmap_iterator_s * self) {
 }
 
 struct intmap_iterator_s * intmap_iterator_new(struct intmap_s * self) {
-    DBC_NOT_NULL(self);
+    EMBC_DBC_NOT_NULL(self);
     struct intmap_iterator_s * iter = embc_alloc_clr(sizeof(struct intmap_iterator_s));
     iter->intmap = self;
     iter->next_item = 0;
@@ -229,9 +229,9 @@ struct intmap_iterator_s * intmap_iterator_new(struct intmap_s * self) {
 }
 
 int intmap_iterator_next(struct intmap_iterator_s * self, embc_size_t * key, void ** value) {
-    DBC_NOT_NULL(self);
-    DBC_NOT_NULL(key);
-    DBC_NOT_NULL(value);
+    EMBC_DBC_NOT_NULL(self);
+    EMBC_DBC_NOT_NULL(key);
+    EMBC_DBC_NOT_NULL(value);
     if (!self->next_item) {
         return EMBC_ERROR_NOT_FOUND;
     }

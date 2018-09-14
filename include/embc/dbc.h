@@ -20,8 +20,8 @@
  * @brief Design by contract macros.
  */
 
-#ifndef EMBC_DBC_H_
-#define EMBC_DBC_H_
+#ifndef EMBC_EMBC_DBC_H_
+#define EMBC_EMBC_DBC_H_
 
 
 #include "log.h"
@@ -55,7 +55,7 @@
  *      when true.  When false, an error has occurred.
  * @param message The message to display when condition is false.
  */
-#define DBC_ASSERT(condition, message) do { \
+#define EMBC_DBC_ASSERT(condition, message) do { \
     if (!(condition)) { \
         embc_fatal(__FILENAME__, __LINE__, (message)); \
     } \
@@ -66,21 +66,21 @@
  *
  * @param x The expression which should not be null.
  */
-#define DBC_TRUE(x) DBC_ASSERT((x), #x " is false")
+#define EMBC_DBC_TRUE(x) EMBC_DBC_ASSERT((x), #x " is false")
 
 /**
  * @brief Check for a "false" value.
  *
  * @param x The expression which should not be null.
  */
-#define DBC_FALSE(x) DBC_ASSERT(!(x), #x " is true")
+#define EMBC_DBC_FALSE(x) EMBC_DBC_ASSERT(!(x), #x " is true")
 
 /**
  * @brief Assert on a null value.
  *
  * @param x The expression which should not be null.
  */
-#define DBC_NOT_NULL(x) DBC_ASSERT((x) != 0, #x " is null")
+#define EMBC_DBC_NOT_NULL(x) EMBC_DBC_ASSERT((x) != 0, #x " is null")
 
 /**
  * @brief Assert that two values are strictly equal.
@@ -88,7 +88,7 @@
  * @param a The first value.
  * @param b The second value.
  */
-#define DBC_EQUAL(a, b) DBC_ASSERT((a) == (b), #a " != " #b)
+#define EMBC_DBC_EQUAL(a, b) EMBC_DBC_ASSERT((a) == (b), #a " != " #b)
 
 /**
  * @brief Assert that a first value is greater than a second value.
@@ -96,7 +96,7 @@
  * @param x The first value.
  * @param y The second value.
  */
-#define DBC_GT(x, y) DBC_ASSERT((x) > (y), #x " !> " #y)
+#define EMBC_DBC_GT(x, y) EMBC_DBC_ASSERT((x) > (y), #x " !> " #y)
 
 /**
  * @brief Assert that a first value is greater than or equal to a second value.
@@ -104,7 +104,7 @@
  * @param x The first value.
  * @param y The second value.
  */
-#define DBC_GTE(x, y) DBC_ASSERT((x) >= (y), #x " !>= " #y)
+#define EMBC_DBC_GTE(x, y) EMBC_DBC_ASSERT((x) >= (y), #x " !>= " #y)
 
 /**
  * @brief Assert that two values are not equal.
@@ -112,7 +112,7 @@
  * @param x The first value.
  * @param y The second value.
  */
-#define DBC_NE(x, y) DBC_ASSERT((x) != (y), #x " != " #y)
+#define EMBC_DBC_NE(x, y) EMBC_DBC_ASSERT((x) != (y), #x " != " #y)
 
 /**
  * @brief Assert that a first value is less than a second value.
@@ -120,7 +120,7 @@
  * @param x The first value.
  * @param y The second value.
  */
-#define DBC_LT(x, y) DBC_ASSERT((x) < (y), #x " !< " #y)
+#define EMBC_DBC_LT(x, y) EMBC_DBC_ASSERT((x) < (y), #x " !< " #y)
 
 /**
  * @brief Assert that a first value is less than or equal to a second value.
@@ -128,42 +128,42 @@
  * @param x The first value.
  * @param y The second value.
  */
-#define DBC_LTE(x, y) DBC_ASSERT((x) <= (y), #x " !<= " #y)
+#define EMBC_DBC_LTE(x, y) EMBC_DBC_ASSERT((x) <= (y), #x " !<= " #y)
 
 /**
  * @brief Assert that a value is greater than zero.
  *
  * @param x The function argument to check.
  */
-#define DBC_GT_ZERO(x) DBC_GT(x, 0)
+#define EMBC_DBC_GT_ZERO(x) EMBC_DBC_GT(x, 0)
 
 /**
  * @brief Assert that a value is greater than or equal to zero.
  *
  * @param x The function argument to check.
  */
-#define DBC_GTE_ZERO(x) DBC_GTE(x, 0)
+#define EMBC_DBC_GTE_ZERO(x) EMBC_DBC_GTE(x, 0)
 
 /**
  * @brief Assert that a value is not equal to zero.
  *
  * @param x The function argument to check.
  */
-#define DBC_NE_ZERO(x) DBC_NE(x, 0)
+#define EMBC_DBC_NE_ZERO(x) EMBC_DBC_NE(x, 0)
 
 /**
  * @brief Assert that a value is less than zero.
  *
  * @param x The function argument to check.
  */
-#define DBC_LT_ZERO(x) DBC_LT(x, 0)
+#define EMBC_DBC_LT_ZERO(x) EMBC_DBC_LT(x, 0)
 
 /**
  * @brief Assert that a value is less than or equal to zero.
  *
  * @param x The function argument to check.
  */
-#define DBC_LTE_ZERO(x) DBC_LTE(x, 0)
+#define EMBC_DBC_LTE_ZERO(x) EMBC_DBC_LTE(x, 0)
 
 /**
  * @brief Assert that a value is less than or equal to zero.
@@ -172,12 +172,12 @@
  * @param xmin The minimum value, inclusive.
  * @param xmax The maximum value, inclusive.
  */
-#define DBC_RANGE_INT(x, x_min, x_max)  do { \
+#define EMBC_DBC_RANGE_INT(x, x_min, x_max)  do { \
     int x__ = (x); \
     int x_min__ = (x_min); \
     int x_max__ = (x_max); \
-    DBC_ASSERT(x__ >= x_min__, #x " too small"); \
-    DBC_ASSERT(x__ <= x_max__, #x " too big"); \
+    EMBC_DBC_ASSERT(x__ >= x_min__, #x " too small"); \
+    EMBC_DBC_ASSERT(x__ <= x_max__, #x " too big"); \
 } while(0)
 
 /**
@@ -185,10 +185,10 @@
  *
  * @param x The function argument or condition to check.
  *
- * Alias for DBC_ASSERT().
+ * Alias for EMBC_DBC_ASSERT().
  */
-#define DBC_REQUIRE(x) DBC_ASSERT((x), #x)
+#define EMBC_DBC_REQUIRE(x) EMBC_DBC_ASSERT((x), #x)
 
 /** @} */
 
-#endif /* EMBC_DBC_H_ */
+#endif /* EMBC_EMBC_DBC_H_ */

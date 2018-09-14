@@ -26,7 +26,7 @@ static const uint16_t LFSR16_U16[] = {0x4722, 0xc437, 0xe39d, 0x8815, 0xef52, 0x
 static const uint32_t LFSR16_U32[] = {0x4722c437, 0xe39d8815};
 
 
-struct lfsr_s lfsr;
+struct embc_lfsr_s lfsr;
 
 
 static int setup(void ** state) {
@@ -36,11 +36,11 @@ static int setup(void ** state) {
 }
 
 /*
-static void lfsr_display_u8(void **state) {
+static void embc_lfsr_display_u8(void **state) {
     (void) state;
     int i;
     uint8_t v;
-    assert_int_equal(0, lfsr_initialize(&lfsr));
+    assert_int_equal(0, embc_lfsr_initialize(&lfsr));
     printf("static const uint8_t LFSR16_U8[] = {");
     for (int i = 0; i < LFSR16_LENGTH * 2; ++i) {
         if (i) {
@@ -49,7 +49,7 @@ static void lfsr_display_u8(void **state) {
         if (0 == (i & 0xf)) {
             printf("\n    ");
         }
-        v = lfsr_next_u8(&lfsr);
+        v = embc_lfsr_next_u8(&lfsr);
         printf("0x%02x", v);
     }
     printf("\n};\n");
@@ -57,11 +57,11 @@ static void lfsr_display_u8(void **state) {
 */
 
 /*
-static void lfsr_display_u16(void **state) {
+static void embc_lfsr_display_u16(void **state) {
     (void) state;
     int i;
     uint16_t v;
-    assert_int_equal(0, lfsr_initialize(&lfsr));
+    assert_int_equal(0, embc_lfsr_initialize(&lfsr));
     printf("static const uint8_t LFSR16_U16[] = {");
     for (int i = 0; i < LFSR16_LENGTH; ++i) {
         if (i) {
@@ -70,116 +70,116 @@ static void lfsr_display_u16(void **state) {
         if (0 == (i & 0x7)) {
             printf("\n    ");
         }
-        v = lfsr_next_u16(&lfsr);
+        v = embc_lfsr_next_u16(&lfsr);
         printf("0x%04x", v);
     }
     printf("\n};\n");
 }
 */
 
-static void test_lfsr_invalid(void **state) {
+static void test_embc_lfsr_invalid(void **state) {
     (void) state;
-    lfsr_initialize(&lfsr);
-    expect_assert_failure(lfsr_next_u16(0));
+    embc_lfsr_initialize(&lfsr);
+    expect_assert_failure(embc_lfsr_next_u16(0));
 }
 
-static void test_lfsr_next_u8(void **state) {
+static void test_embc_lfsr_next_u8(void **state) {
     (void) state;
     uint8_t value;
-    lfsr_initialize(&lfsr);
-    value = lfsr_next_u8(&lfsr);
+    embc_lfsr_initialize(&lfsr);
+    value = embc_lfsr_next_u8(&lfsr);
     assert_int_equal(LFSR16_U8[0], value);
-    value = lfsr_next_u8(&lfsr);
+    value = embc_lfsr_next_u8(&lfsr);
     assert_int_equal(LFSR16_U8[1], value);
 
     assert_int_equal(LFSR16_U16[0], lfsr.value);
 }
 
-static void test_lfsr_next_u16(void **state) {
+static void test_embc_lfsr_next_u16(void **state) {
     (void) state;
     uint16_t value;
-    lfsr_initialize(&lfsr);
-    value = lfsr_next_u16(&lfsr);
+    embc_lfsr_initialize(&lfsr);
+    value = embc_lfsr_next_u16(&lfsr);
     assert_int_equal(LFSR16_U16[0], value);
     assert_int_equal(LFSR16_U16[0], lfsr.value);
-    value = lfsr_next_u16(&lfsr);
+    value = embc_lfsr_next_u16(&lfsr);
     assert_int_equal(LFSR16_U16[1], value);
     assert_int_equal(LFSR16_U16[1], lfsr.value);
 }
 
-static void test_lfsr_next_u32(void **state) {
+static void test_embc_lfsr_next_u32(void **state) {
     (void) state;
     uint32_t value;
-    lfsr_initialize(&lfsr);
-    value = lfsr_next_u32(&lfsr);
+    embc_lfsr_initialize(&lfsr);
+    value = embc_lfsr_next_u32(&lfsr);
     assert_int_equal(LFSR16_U32[0], value);
-    value = lfsr_next_u32(&lfsr);
+    value = embc_lfsr_next_u32(&lfsr);
     assert_int_equal(LFSR16_U32[1], value);
 }
 
-static void test_lfsr_seed_u16(void **state) {
+static void test_embc_lfsr_seed_u16(void **state) {
     (void) state;
     uint16_t value;
-    lfsr_initialize(&lfsr);
-    lfsr_seed_u16(&lfsr, 26625);
-    value = lfsr_next_u16(&lfsr);
+    embc_lfsr_initialize(&lfsr);
+    embc_lfsr_seed_u16(&lfsr, 26625);
+    value = embc_lfsr_next_u16(&lfsr);
     assert_int_equal(5185, value);
 }
 
-static void test_lfsr_u16_wrap(void **state) {
+static void test_embc_lfsr_u16_wrap(void **state) {
     (void) state;
     int i;
     uint16_t v1;
     uint16_t v2;
 
-    lfsr_initialize(&lfsr);
-    v1 = lfsr_next_u16(&lfsr);
+    embc_lfsr_initialize(&lfsr);
+    v1 = embc_lfsr_next_u16(&lfsr);
     for (i = 0; i < 65535; ++i) {
-        v2 = lfsr_next_u16(&lfsr);
+        v2 = embc_lfsr_next_u16(&lfsr);
     }
     assert_int_equal(v1, v2);
 }
 
-static void test_lfsr_follow(void **state) {
+static void test_embc_lfsr_follow(void **state) {
     (void) state;
     int i;
-    struct lfsr_s s1;
-    struct lfsr_s s2;
+    struct embc_lfsr_s s1;
+    struct embc_lfsr_s s2;
     uint8_t v;
 
-    lfsr_initialize(&s1);
-    lfsr_initialize(&s2);
+    embc_lfsr_initialize(&s1);
+    embc_lfsr_initialize(&s2);
     for (i = 0; i < 65535 * 2; ++i) {
-        v = lfsr_next_u8(&s1);
-        assert_int_equal(0, lfsr_follow_u8(&s2, v));
+        v = embc_lfsr_next_u8(&s1);
+        assert_int_equal(0, embc_lfsr_follow_u8(&s2, v));
     }
 }
 
-static void test_lfsr_follow_valid(void **state) {
+static void test_embc_lfsr_follow_valid(void **state) {
     (void) state;
     int i;
     int v;
-    lfsr_initialize(&lfsr);
-    expect_assert_failure(lfsr_follow_u8(0, 1));
+    embc_lfsr_initialize(&lfsr);
+    expect_assert_failure(embc_lfsr_follow_u8(0, 1));
     for (i = 0; i < 8; ++i) {
-        v = lfsr_follow_u8(&lfsr, LFSR16_U8[i]);
+        v = embc_lfsr_follow_u8(&lfsr, LFSR16_U8[i]);
         assert_int_equal(0, v);
     }
-    v = lfsr_follow_u8(&lfsr, LFSR16_U8[10]);
+    v = embc_lfsr_follow_u8(&lfsr, LFSR16_U8[10]);
     assert_int_equal(-1, v);
     for (int i = 11; i < 16; ++i) {
-        v = lfsr_follow_u8(&lfsr, LFSR16_U8[i]);
+        v = embc_lfsr_follow_u8(&lfsr, LFSR16_U8[i]);
         assert_int_equal(0, v);
     }
 }
 
-static void test_lfsr_follow_valid_sync(void **state) {
+static void test_embc_lfsr_follow_valid_sync(void **state) {
     (void) state;
     int i;
     int v;
-    lfsr_initialize(&lfsr);
+    embc_lfsr_initialize(&lfsr);
     for (i = 11; i < 16; ++i) {
-        v = lfsr_follow_u8(&lfsr, LFSR16_U8[i]);
+        v = embc_lfsr_follow_u8(&lfsr, LFSR16_U8[i]);
         assert_int_equal(0, v);
     }
 }
@@ -187,15 +187,15 @@ static void test_lfsr_follow_valid_sync(void **state) {
 
 int main(void) {
     const struct CMUnitTest tests[] = {
-            cmocka_unit_test_setup(test_lfsr_invalid, setup),
-            cmocka_unit_test_setup(test_lfsr_next_u8, setup),
-            cmocka_unit_test_setup(test_lfsr_next_u16, setup),
-            cmocka_unit_test_setup(test_lfsr_next_u32, setup),
-            cmocka_unit_test_setup(test_lfsr_seed_u16, setup),
-            cmocka_unit_test_setup(test_lfsr_u16_wrap, setup),
-            cmocka_unit_test_setup(test_lfsr_follow, setup),
-            cmocka_unit_test_setup(test_lfsr_follow_valid, setup),
-            cmocka_unit_test_setup(test_lfsr_follow_valid_sync, setup),
+            cmocka_unit_test_setup(test_embc_lfsr_invalid, setup),
+            cmocka_unit_test_setup(test_embc_lfsr_next_u8, setup),
+            cmocka_unit_test_setup(test_embc_lfsr_next_u16, setup),
+            cmocka_unit_test_setup(test_embc_lfsr_next_u32, setup),
+            cmocka_unit_test_setup(test_embc_lfsr_seed_u16, setup),
+            cmocka_unit_test_setup(test_embc_lfsr_u16_wrap, setup),
+            cmocka_unit_test_setup(test_embc_lfsr_follow, setup),
+            cmocka_unit_test_setup(test_embc_lfsr_follow_valid, setup),
+            cmocka_unit_test_setup(test_embc_lfsr_follow_valid_sync, setup),
     };
 
     return cmocka_run_group_tests(tests, NULL, NULL);

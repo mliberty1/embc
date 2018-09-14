@@ -12,8 +12,8 @@ struct mblock_s {
 };
 
 int32_t embc_mblock_instance_size(int32_t mem_size, int32_t block_size) {
-    DBC_GT_ZERO(mem_size);
-    DBC_GT_ZERO(block_size);
+    EMBC_DBC_GT_ZERO(mem_size);
+    EMBC_DBC_GT_ZERO(block_size);
     int32_t blocks_count = mem_size / block_size;
     int32_t bytes_count = (blocks_count + 7) / 8;
     int32_t bitmap_size = EMBC_ROUND_UP_TO_MULTIPLE(bytes_count, 4);
@@ -28,10 +28,10 @@ int32_t embc_mblock_initialize(
         void * mem,
         int32_t mem_size,
         int32_t block_size) {
-    DBC_NOT_NULL(self);
-    DBC_NOT_NULL(mem);
-    DBC_GT_ZERO(mem_size);
-    DBC_GT_ZERO(block_size);
+    EMBC_DBC_NOT_NULL(self);
+    EMBC_DBC_NOT_NULL(mem);
+    EMBC_DBC_GT_ZERO(mem_size);
+    EMBC_DBC_GT_ZERO(block_size);
     struct mblock_s * s = (struct mblock_s *) self;
     int32_t sz = embc_mblock_instance_size(mem_size, block_size);
     embc_memset(s, 0, sz);
@@ -53,8 +53,8 @@ static inline int32_t size_to_blocks(struct mblock_s * s, int32_t size) {
 void * embc_mblock_alloc_unsafe(struct embc_mblock_s * self, int32_t size) {
     // greedy allocator: take first space large enough
     struct mblock_s * s = (struct mblock_s *) self;
-    DBC_NOT_NULL(s);
-    DBC_GT_ZERO(size);
+    EMBC_DBC_NOT_NULL(s);
+    EMBC_DBC_GT_ZERO(size);
     int32_t blocks = size_to_blocks(s, size);
     int32_t idx_invalid = s->block_count + 1;
     int32_t idx_start = idx_invalid;

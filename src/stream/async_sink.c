@@ -48,7 +48,7 @@ static void send_event(struct embc_stream_sink_s * self, uint8_t ev) {
 
 static void send(struct embc_stream_consumer_s * self,
                  struct embc_stream_transaction_s * transaction) {
-    DBC_NOT_NULL(self);
+    EMBC_DBC_NOT_NULL(self);
     struct embc_stream_sink_s * s = EMBC_CONTAINER_OF(self, struct embc_stream_sink_s, consumer);
     switch (transaction->type) {
         case EMBC_STREAM_IOCTL_OPEN: {
@@ -98,7 +98,7 @@ void embc_stream_sink_initialize(
         struct embc_stream_sink_s * self,
         uint8_t * transaction_buffer,
         uint16_t transaction_length) {
-    DBC_NOT_NULL(self);
+    EMBC_DBC_NOT_NULL(self);
     EMBC_STRUCT_PTR_INIT(self);
     self->transaction_buffer = transaction_buffer;
     self->transaction_length = transaction_length;
@@ -107,14 +107,14 @@ void embc_stream_sink_initialize(
 
 struct embc_stream_consumer_s * embc_stream_sink_get_consumer(
         struct embc_stream_sink_s * self) {
-    DBC_NOT_NULL(self);
+    EMBC_DBC_NOT_NULL(self);
     return &self->consumer;
 }
 
 void embc_stream_sink_set_producer(
         struct embc_stream_sink_s * self,
         struct embc_stream_producer_s * producer) {
-    DBC_NOT_NULL(self);
+    EMBC_DBC_NOT_NULL(self);
     self->producer = producer;
 }
 
@@ -122,7 +122,7 @@ void embc_stream_sink_set_write_fn(
         struct embc_stream_sink_s * self,
         embc_stream_sink_data_fn fn,
         void * user_data) {
-    DBC_NOT_NULL(self);
+    EMBC_DBC_NOT_NULL(self);
     self->write_fn = fn;
     self->write_user_data = user_data;
 }
@@ -133,7 +133,7 @@ void embc_stream_sink_receive(
         uint32_t dst_length,
         embc_stream_sink_data_fn done_fn,
         void * done_user_data) {
-    DBC_NOT_NULL(self);
+    EMBC_DBC_NOT_NULL(self);
     if (self->dst_buffer && !dst_buffer) {
         send_event(self, EMBC_STREAM_EVENT_DISCONNECT);
     }

@@ -25,64 +25,64 @@
 
 static void test_true(void **state) {
     (void) state;
-    DBC_TRUE(1);
-    expect_assert_failure(DBC_TRUE(0));
+    EMBC_DBC_TRUE(1);
+    expect_assert_failure(EMBC_DBC_TRUE(0));
 }
 
 static void test_false(void **state) {
     (void) state;
-    DBC_FALSE(0);
-    expect_assert_failure(DBC_FALSE(1));
+    EMBC_DBC_FALSE(0);
+    expect_assert_failure(EMBC_DBC_FALSE(1));
 }
 
 static void test_not_null(void **state) {
     (void) state;
     int x = 0;
     int * p = &x;
-    DBC_NOT_NULL(p);
-    expect_assert_failure(DBC_NOT_NULL(0));
+    EMBC_DBC_NOT_NULL(p);
+    expect_assert_failure(EMBC_DBC_NOT_NULL(0));
 }
 
 static void test_equal(void **state) {
     (void) state;
-    DBC_EQUAL(42, 42);
-    expect_assert_failure(DBC_EQUAL(1, 2));
+    EMBC_DBC_EQUAL(42, 42);
+    expect_assert_failure(EMBC_DBC_EQUAL(1, 2));
 }
 
 static void test_gte_zero(void **state) {
     (void) state;
-    DBC_GTE_ZERO(0);
-    DBC_GTE_ZERO(100);
-    expect_assert_failure(DBC_GTE_ZERO(-1));
+    EMBC_DBC_GTE_ZERO(0);
+    EMBC_DBC_GTE_ZERO(100);
+    expect_assert_failure(EMBC_DBC_GTE_ZERO(-1));
 }
 
 static void test_gt_zero(void **state) {
     (void) state;
-    DBC_GT_ZERO(1);
-    DBC_GT_ZERO(100);
-    expect_assert_failure(DBC_GT_ZERO(0));
+    EMBC_DBC_GT_ZERO(1);
+    EMBC_DBC_GT_ZERO(100);
+    expect_assert_failure(EMBC_DBC_GT_ZERO(0));
 }
 
 static void test_lte_zero(void **state) {
     (void) state;
-    DBC_LTE_ZERO(0);
-    DBC_LTE_ZERO(-100);
-    expect_assert_failure(DBC_LTE_ZERO(1));
+    EMBC_DBC_LTE_ZERO(0);
+    EMBC_DBC_LTE_ZERO(-100);
+    expect_assert_failure(EMBC_DBC_LTE_ZERO(1));
 }
 
 static void test_lt_zero(void **state) {
     (void) state;
-    DBC_LT_ZERO(-1);
-    DBC_LT_ZERO(-100);
-    expect_assert_failure(DBC_LT_ZERO(0));
+    EMBC_DBC_LT_ZERO(-1);
+    EMBC_DBC_LT_ZERO(-100);
+    expect_assert_failure(EMBC_DBC_LT_ZERO(0));
 }
 
 static void test_range_int(void **state) {
     (void) state;
-    DBC_RANGE_INT(-10, -10, 20);
-    DBC_RANGE_INT(20, -10, 20);
-    expect_assert_failure(DBC_RANGE_INT(-11, -10, 20));
-    expect_assert_failure(DBC_RANGE_INT(21, -10, 20));
+    EMBC_DBC_RANGE_INT(-10, -10, 20);
+    EMBC_DBC_RANGE_INT(20, -10, 20);
+    expect_assert_failure(EMBC_DBC_RANGE_INT(-11, -10, 20));
+    expect_assert_failure(EMBC_DBC_RANGE_INT(21, -10, 20));
 }
 
 int main(void) {

@@ -80,7 +80,7 @@ int hashmap_put(struct hashmap_s * self, void * key, void * value, void ** old_v
     embc_size_t hash;
     struct entry_s **previous;
     struct entry_s *item;
-    DBC_NOT_NULL(self);
+    EMBC_DBC_NOT_NULL(self);
     hash = self->hash(key);
     previous = &self->hashtable[hash & self->hashtable_mask];
     if (*previous) {
@@ -113,7 +113,7 @@ int hashmap_put(struct hashmap_s * self, void * key, void * value, void ** old_v
 int hashmap_get(struct hashmap_s * self, void * key, void ** value) {
     embc_size_t hash;
     struct entry_s *item;
-    DBC_NOT_NULL(self);
+    EMBC_DBC_NOT_NULL(self);
     hash = self->hash(key);
     item = self->hashtable[hash & self->hashtable_mask];
     while (item) {

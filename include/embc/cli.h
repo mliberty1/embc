@@ -20,8 +20,8 @@
  * @brief Provide a simple command line interface.
  */
 
-#ifndef EMBC_CLI_H_
-#define EMBC_CLI_H_
+#ifndef EMBC_EMBC_CLI_H_
+#define EMBC_EMBC_CLI_H_
 
 #include "embc/cmacro_inc.h"
 #include "embc/platform.h"
@@ -40,54 +40,54 @@ EMBC_CPP_GUARD_START
 /**
  * @brief The supported character echo modes.
  */
-enum cli_echo_mode_e {
-    CLI_ECHO_OFF,           ///< No echo.
-    CLI_ECHO_ON,            ///< Echo each character.
-    CLI_ECHO_USER_CHAR      ///< Echo a user-specified character.
+enum embc_cli_echo_mode_e {
+    EMBC_CLI_ECHO_OFF,           ///< No echo.
+    EMBC_CLI_ECHO_ON,            ///< Echo each character.
+    EMBC_CLI_ECHO_USER_CHAR      ///< Echo a user-specified character.
 };
 
 /**
  * @brief The supported verbose levels.
  */
-enum cli_verbose_mode_e {
-    CLI_VERBOSE_NORMAL,     ///< Display details and results.
-    CLI_VERBOSE_FULL,       ///< Echo command just before result.
+enum embc_cli_verbose_mode_e {
+    EMBC_CLI_VERBOSE_NORMAL,     ///< Display details and results.
+    EMBC_CLI_VERBOSE_FULL,       ///< Echo command just before result.
 };
 
 /**
  * @brief The command line status.
  */
-enum cli_status_e {
-    CLI_SUCCESS_PROMPT_ONLY = -1,
-    CLI_SUCCESS = 0,
-    CLI_ERROR = 1,
-    CLI_ERROR_PARAMETER_COUNT = 2,
-    CLI_ERROR_PARAMETER_VALUE = 3
+enum embc_cli_status_e {
+    EMBC_CLI_SUCCESS_PROMPT_ONLY = -1,
+    EMBC_CLI_SUCCESS = 0,
+    EMBC_CLI_ERROR = 1,
+    EMBC_CLI_ERROR_PARAMETER_COUNT = 2,
+    EMBC_CLI_ERROR_PARAMETER_VALUE = 3
 };
 
 /**
  * @brief The maximum line length.
  */
-#define CLI_LINE_LENGTH 64
+#define EMBC_CLI_LINE_LENGTH 64
 
 /**
  * @brief The maximum number of characters in the prompt.
  */
-#define CLI_PROMPT_LENGTH 16
+#define EMBC_CLI_PROMPT_LENGTH 16
 
 /**
  * @brief The maximum number of command-line arguments.
  */
-#define CLI_MAX_ARGS 16
+#define EMBC_CLI_MAX_ARGS 16
 
 /**
  * @brief The command to execute for each line.
  *
  * @param cookie The execute cookie.
  * @param cmdline The command line to handle.
- * @return CLI_SUCCESS, CLI_SUCCESS_PROMPT_ONLY or error code.
+ * @return EMBC_CLI_SUCCESS, EMBC_CLI_SUCCESS_PROMPT_ONLY or error code.
  */
-typedef int (*cli_execute_line)(void * cookie, const char * cmdline);
+typedef int (*embc_cli_execute_line)(void * cookie, const char * cmdline);
 
 /**
  * @brief The command to execute for each line.
@@ -95,27 +95,27 @@ typedef int (*cli_execute_line)(void * cookie, const char * cmdline);
  * @param cookie The execute cookie.
  * @param argc The number of arguments including the command.
  * @param argv The list of arguments.  argv[0] is the command.
- * @return CLI_SUCCESS, CLI_SUCCESS_PROMPT_ONLY or error code.
+ * @return EMBC_CLI_SUCCESS, EMBC_CLI_SUCCESS_PROMPT_ONLY or error code.
  */
-typedef int (*cli_execute_args)(void * cookie, int argc, char *argv[]);
+typedef int (*embc_cli_execute_args)(void * cookie, int argc, char *argv[]);
 
 /**
  * @brief The CLI instance structure.
  */
-typedef struct cli_s {
+typedef struct embc_cli_s {
     /**
      * @brief The command line echo mode.
      */
-    enum cli_echo_mode_e echo_mode;
+    enum embc_cli_echo_mode_e echo_mode;
 
     /**
-     * @brief The echo character for echo_mode CLI_ECHO_USER_CHAR.
+     * @brief The echo character for echo_mode EMBC_CLI_ECHO_USER_CHAR.
      */
     char echo_user_char;
 
     /**
      * @brief The text to display following a command execution that
-     *      returned CLI_SUCCESS.
+     *      returned EMBC_CLI_SUCCESS.
      */
     char const * response_success;
 
@@ -128,12 +128,12 @@ typedef struct cli_s {
     /**
      * @brief The prompt to display after each command.
      */
-    char prompt[CLI_PROMPT_LENGTH];
+    char prompt[EMBC_CLI_PROMPT_LENGTH];
 
     /**
      * @brief The command line buffer for the current command.
      */
-    char cmdline[CLI_LINE_LENGTH + 2];
+    char cmdline[EMBC_CLI_LINE_LENGTH + 2];
 
     /**
      * @brief The current size of cmdline in bytes.
@@ -145,7 +145,7 @@ typedef struct cli_s {
      *
      * If execute_args is specified, set execute_line to NULL.
      */
-    cli_execute_line execute_line;
+    embc_cli_execute_line execute_line;
 
     /**
      * @brief The command to execute for parsed arguments.
@@ -153,7 +153,7 @@ typedef struct cli_s {
      * If execute_line is specified, set execute_args to NULL.  When execute_args
      * is not NULL, any value provided to execute_line will be ignored.
      */
-    cli_execute_args execute_args;
+    embc_cli_execute_args execute_args;
 
     /**
      * @brief The user data passed to the execute function.
@@ -176,13 +176,13 @@ typedef struct cli_s {
     /**
      * @brief The command line verboseness level.
      */
-    enum cli_verbose_mode_e verbose;
+    enum embc_cli_verbose_mode_e verbose;
 
     /**
      * @brief Hold internal state for managing line endings.
      */
     char last_char;
-} cli_t;
+} embc_cli_t;
 
 /**
  * @brief Initialize a CLI instance.
@@ -192,7 +192,7 @@ typedef struct cli_s {
  *
  * This function may be called repeatedly on the same instance.
  */
-EMBC_API void cli_initialize(cli_t * self);
+EMBC_API void embc_cli_initialize(embc_cli_t * self);
 
 /**
  * @brief Set the echo mode.
@@ -200,9 +200,9 @@ EMBC_API void cli_initialize(cli_t * self);
  * @param self The CLI instance.
  * @param mode The echo mode.
  * @param ch The user echo character which is only necessary for
- *      CLI_ECHO_USER_CHAR.  All other modes should pass 0.
+ *      EMBC_CLI_ECHO_USER_CHAR.  All other modes should pass 0.
  */
-EMBC_API void cli_set_echo(cli_t * self, enum cli_echo_mode_e mode, char ch);
+EMBC_API void embc_cli_set_echo(embc_cli_t * self, enum embc_cli_echo_mode_e mode, char ch);
 
 /**
  * @brief Set the verbose level.
@@ -210,7 +210,7 @@ EMBC_API void cli_set_echo(cli_t * self, enum cli_echo_mode_e mode, char ch);
  * @param self The CLI instance.
  * @param mode The verbose level.
  */
-EMBC_API void cli_set_verbose(cli_t * self, enum cli_verbose_mode_e mode);
+EMBC_API void embc_cli_set_verbose(embc_cli_t * self, enum embc_cli_verbose_mode_e mode);
 
 /**
  * @brief Insert the next character in the CLI.
@@ -218,7 +218,7 @@ EMBC_API void cli_set_verbose(cli_t * self, enum cli_verbose_mode_e mode);
  * @param self The CLI instance.
  * @param ch The next character entered by the user.
  */
-EMBC_API void cli_insert_char(cli_t * self, char ch);
+EMBC_API void embc_cli_insert_char(embc_cli_t * self, char ch);
 
 /**
  * @brief The default command line parser used to parse a command line into
@@ -227,14 +227,14 @@ EMBC_API void cli_insert_char(cli_t * self, char ch);
  * @param self The CLI instance passed as void to be compatible with the
  *      execute_line function pointer.
  * @param cmdline The command line string to parse.
- * @return CLI_SUCCESS, CLI_SUCCESS_PROMPT_ONLY or error code.
+ * @return EMBC_CLI_SUCCESS, EMBC_CLI_SUCCESS_PROMPT_ONLY or error code.
  *
  * Calling this function will call execute_args on success.
  */
-EMBC_API int cli_line_parser(void * self, const char * cmdline);
+EMBC_API int embc_cli_line_parser(void * self, const char * cmdline);
 
 /** @} */
 
 EMBC_CPP_GUARD_END
 
-#endif /* EMBC_CLI_H_ */
+#endif /* EMBC_EMBC_CLI_H_ */

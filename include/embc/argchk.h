@@ -20,8 +20,8 @@
  * @brief Argument checking.
  */
 
-#ifndef ARGCHK_H_
-#define ARGCHK_H_
+#ifndef EMBC_ARGCHK_H_
+#define EMBC_ARGCHK_H_
 
 #include "log.h"
 
@@ -45,17 +45,17 @@ EMBC_CPP_GUARD_START
  *
  * This default value is guaranteed to be EMBC_ERROR_PARAMETER_INVALID.
  */
-#define ARGCHK_FAIL_RETURN_CODE_DEFAULT 5
+#define EMBC_ARGCHK_FAIL_RETURN_CODE_DEFAULT 5
 
 /**
- * @def ARGCHK_FAIL_RETURN_CODE
+ * @def EMBC_ARGCHK_FAIL_RETURN_CODE
  *
  * @brief The return code for argument check failure.
  *
- * Defaults to ARGCHK_FAIL_RETURN_CODE_DEFAULT.
+ * Defaults to EMBC_ARGCHK_FAIL_RETURN_CODE_DEFAULT.
  */
-#ifndef ARGCHK_FAIL_RETURN_CODE
-#define ARGCHK_FAIL_RETURN_CODE ARGCHK_FAIL_RETURN_CODE_DEFAULT
+#ifndef EMBC_ARGCHK_FAIL_RETURN_CODE
+#define EMBC_ARGCHK_FAIL_RETURN_CODE EMBC_ARGCHK_FAIL_RETURN_CODE_DEFAULT
 #endif
 
 
@@ -68,10 +68,10 @@ EMBC_CPP_GUARD_START
  *      an error.
  * @param message The message to display when condition is false.
  */
-#define ARGCHK_ASSERT(condition, message) do { \
+#define EMBC_ARGCHK_ASSERT(condition, message) do { \
     if (!(condition)) { \
         EMBC_LOGI("chk_assert: %s", (message)); \
-        return ARGCHK_FAIL_RETURN_CODE; \
+        return EMBC_ARGCHK_FAIL_RETURN_CODE; \
     } \
 } while (0)
 
@@ -80,56 +80,56 @@ EMBC_CPP_GUARD_START
  *
  * @param x The expression which should not be null.
  */
-#define ARGCHK_TRUE(x) ARGCHK_ASSERT((x), #x " is false")
+#define EMBC_ARGCHK_TRUE(x) EMBC_ARGCHK_ASSERT((x), #x " is false")
 
 /**
  * @brief Check for a "false" value.
  *
  * @param x The expression which should not be null.
  */
-#define ARGCHK_FALSE(x) ARGCHK_ASSERT(!(x), #x " is true")
+#define EMBC_ARGCHK_FALSE(x) EMBC_ARGCHK_ASSERT(!(x), #x " is true")
     
 /**
  * @brief Check for a non-null value.
  *
  * @param x The expression which should not be null.
  */
-#define ARGCHK_NOT_NULL(x) ARGCHK_ASSERT((x) != 0, #x " is null")
+#define EMBC_ARGCHK_NOT_NULL(x) EMBC_ARGCHK_ASSERT((x) != 0, #x " is null")
 
 /**
  * @brief Assert that a function argument is greater than zero.
  *
  * @param x The function argument to check.
  */
-#define ARGCHK_GT_ZERO(x) ARGCHK_ASSERT((x) > 0, #x " <= 0")
+#define EMBC_ARGCHK_GT_ZERO(x) EMBC_ARGCHK_ASSERT((x) > 0, #x " <= 0")
 
 /**
  * @brief Assert that a function argument is greater than or equal to zero.
  *
  * @param x The function argument to check.
  */
-#define ARGCHK_GTE_ZERO(x) ARGCHK_ASSERT((x) >= 0, #x " < 0")
+#define EMBC_ARGCHK_GTE_ZERO(x) EMBC_ARGCHK_ASSERT((x) >= 0, #x " < 0")
 
 /**
  * @brief Assert that a function argument is not equal to zero.
  *
  * @param x The function argument to check.
  */
-#define ARGCHK_NE_ZERO(x) ARGCHK_ASSERT((x) != 0, #x " != 0")
+#define EMBC_ARGCHK_NE_ZERO(x) EMBC_ARGCHK_ASSERT((x) != 0, #x " != 0")
 
 /**
  * @brief Assert that a function argument is less than zero.
  *
  * @param x The function argument to check.
  */
-#define ARGCHK_LT_ZERO(x) ARGCHK_ASSERT((x) < 0, #x " >= 0")
+#define EMBC_ARGCHK_LT_ZERO(x) EMBC_ARGCHK_ASSERT((x) < 0, #x " >= 0")
 
 /**
  * @brief Assert that a function argument is less than or equal to zero.
  *
  * @param x The function argument to check.
  */
-#define ARGCHK_LTE_ZERO(x) ARGCHK_ASSERT((x) <= 0, #x " > 0")
+#define EMBC_ARGCHK_LTE_ZERO(x) EMBC_ARGCHK_ASSERT((x) <= 0, #x " > 0")
 
 /**
  * @brief Assert that a function argument is less than or equal to zero.
@@ -138,17 +138,17 @@ EMBC_CPP_GUARD_START
  * @param xmin The minimum value, inclusive.
  * @param xmax The maximum value, inclusive.
  */
-#define ARGCHK_RANGE_INT(x, x_min, x_max)  do { \
+#define EMBC_ARGCHK_RANGE_INT(x, x_min, x_max)  do { \
     int x__ = (x); \
     int x_min__ = (x_min); \
     int x_max__ = (x_max); \
     if (x__ < x_min__) { \
         EMBC_LOGI("chk_assert: %s [%d] < %d", #x, x__, x_min__); \
-        return ARGCHK_FAIL_RETURN_CODE; \
+        return EMBC_ARGCHK_FAIL_RETURN_CODE; \
     } \
     if (x__ > x_max__) { \
         EMBC_LOGI("chk_assert: %s [%d] > %d", #x, x__, x_max__); \
-        return ARGCHK_FAIL_RETURN_CODE; \
+        return EMBC_ARGCHK_FAIL_RETURN_CODE; \
     } \
 } while (0)
 
@@ -157,10 +157,10 @@ EMBC_CPP_GUARD_START
  *
  * @param x The function argument or condition to check.
  */
-#define ARGCHK_REQUIRE(x) ARGCHK_ASSERT((x), #x)
+#define EMBC_ARGCHK_REQUIRE(x) EMBC_ARGCHK_ASSERT((x), #x)
 
 /** @} */
 
 EMBC_CPP_GUARD_END
 
-#endif /* ARGCHK_H_ */
+#endif /* EMBC_ARGCHK_H_ */

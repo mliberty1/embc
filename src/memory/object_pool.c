@@ -95,9 +95,9 @@ int32_t embc_object_pool_instance_size(int32_t obj_count, int32_t obj_size) {
 int32_t embc_object_pool_initialize(
         struct embc_object_pool_s * self, int32_t obj_count, int32_t obj_size,
         embc_object_pool_constructor constructor, embc_object_pool_destructor destructor) {
-    ARGCHK_NOT_NULL(self);
-    ARGCHK_GT_ZERO(obj_count);
-    ARGCHK_GT_ZERO(obj_size);
+    EMBC_ARGCHK_NOT_NULL(self);
+    EMBC_ARGCHK_GT_ZERO(obj_count);
+    EMBC_ARGCHK_GT_ZERO(obj_size);
     struct embc_object_pool_size_s sz = embc_object_pool_size(obj_count, obj_size);
     embc_memset(self, 0, sz.sz);
     self->magic = MAGIC;

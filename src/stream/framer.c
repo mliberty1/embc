@@ -213,12 +213,12 @@ void embc_framer_initialize(
         struct embc_framer_s * self,
         struct embc_buffer_allocator_s * buffer_allocator,
         struct embc_framer_hal_callbacks_s * callbacks) {
-    DBC_NOT_NULL(self);
-    DBC_NOT_NULL(buffer_allocator);
-    DBC_NOT_NULL(callbacks);
-    DBC_NOT_NULL(callbacks->tx_fn);
-    DBC_NOT_NULL(callbacks->timer_set_fn);
-    DBC_NOT_NULL(callbacks->timer_cancel_fn);
+    EMBC_DBC_NOT_NULL(self);
+    EMBC_DBC_NOT_NULL(buffer_allocator);
+    EMBC_DBC_NOT_NULL(callbacks);
+    EMBC_DBC_NOT_NULL(callbacks->tx_fn);
+    EMBC_DBC_NOT_NULL(callbacks->timer_set_fn);
+    EMBC_DBC_NOT_NULL(callbacks->timer_cancel_fn);
     EMBC_STRUCT_PTR_INIT(self);
     embc_memset(self, 0, sizeof(*self));
     self->buffer_allocator = buffer_allocator;
@@ -260,9 +260,9 @@ void embc_framer_register_port_callbacks(
         struct embc_framer_s * self,
         uint8_t port,
         struct embc_framer_port_callbacks_s const * callbacks) {
-    DBC_NOT_NULL(self);
-    DBC_RANGE_INT(port, 0, EMBC_FRAMER_PORTS - 1);
-    DBC_NOT_NULL(callbacks);
+    EMBC_DBC_NOT_NULL(self);
+    EMBC_DBC_RANGE_INT(port, 0, EMBC_FRAMER_PORTS - 1);
+    EMBC_DBC_NOT_NULL(callbacks);
     struct embc_framer_port_callbacks_s * c;
 
     if (0 == port) {
@@ -285,7 +285,7 @@ void embc_framer_register_rx_hook(
         struct embc_framer_s * self,
         embc_framer_rx_hook_fn rx_fn,
         void * rx_user_data) {
-    DBC_NOT_NULL(self);
+    EMBC_DBC_NOT_NULL(self);
     if (0 == rx_fn) {
         self->rx_hook_fn = rx_hook_fn;
         self->rx_hook_user_data = self;
@@ -653,9 +653,9 @@ static void handle_ack(struct embc_framer_s *self, struct embc_buffer_s * ack) {
 static void rx_hook_fn(
         void * user_data,
         struct embc_buffer_s * frame) {
-    DBC_NOT_NULL(user_data);
-    DBC_NOT_NULL(frame);
-    DBC_NOT_NULL(frame->data);
+    EMBC_DBC_NOT_NULL(user_data);
+    EMBC_DBC_NOT_NULL(frame);
+    EMBC_DBC_NOT_NULL(frame->data);
     struct embc_framer_s *self = (struct embc_framer_s *) user_data;
     struct embc_framer_header_s hdr = *buffer_hdr(frame);
     if (hdr.port >= EMBC_FRAMER_PORTS) {
@@ -740,7 +740,7 @@ static void rx_hook_fn(
 static int is_header_valid(uint8_t const * buffer) {
     return (
             (buffer[0] == SOF) &&
-            (buffer[HEADER_SIZE - 1] == crc_ccitt_8(0, buffer, HEADER_SIZE - 1))
+            (buffer[HEADER_SIZE - 1] == embc_crc_ccitt_8(0, buffer, HEADER_SIZE - 1))
     );
 }
 
@@ -767,7 +767,7 @@ int32_t embc_framer_validate(uint8_t const * buffer,
     }
     uint8_t const * crc_value = &buffer[sz - FOOTER_SIZE];
     uint32_t crc_rx = EMBC_BBUF_DECODE_U32_LE(crc_value);
-    uint32_t crc_calc = crc32(0, buffer, sz - FOOTER_SIZE);
+    uint32_t crc_calc = embc_crc32(0, buffer, sz - FOOTER_SIZE);
     if (crc_rx != crc_calc) {
         return EMBC_ERROR_MESSAGE_INTEGRITY;
     }
@@ -839,7 +839,7 @@ exit:
 }
 
 void embc_framer_hal_rx_byte(struct embc_framer_s * self, uint8_t byte) {
-    DBC_NOT_NULL(self);
+    EMBC_DBC_NOT_NULL(self);
     embc_buffer_write_u8(self->rx_buffer, byte);
 
     switch (self->rx_state) {
@@ -898,9 +898,9 @@ void embc_framer_hal_rx_byte(struct embc_framer_s * self, uint8_t byte) {
 
 void embc_framer_hal_rx_buffer(struct embc_framer_s * self,
         uint8_t const * buffer, embc_size_t length) {
-    DBC_NOT_NULL(self);
+    EMBC_DBC_NOT_NULL(self);
     if (length > 0) {
-        DBC_NOT_NULL(buffer);
+        EMBC_DBC_NOT_NULL(buffer);
         for (embc_size_t i = 0; i < length; ++i) {
             embc_framer_hal_rx_byte(self, buffer[i]);
         }
@@ -910,8 +910,8 @@ void embc_framer_hal_rx_buffer(struct embc_framer_s * self,
 void embc_framer_hal_tx_done(
         struct embc_framer_s * self,
         struct embc_buffer_s * buffer) {
-    DBC_NOT_NULL(self);
-    DBC_NOT_NULL(buffer);
+    EMBC_DBC_NOT_NULL(self);
+    EMBC_DBC_NOT_NULL(buffer);
     struct embc_list_s * item;
     struct embc_framer_header_s * hdr = buffer_hdr(buffer);
     if (EMBC_FRAMER_TYPE_ACK == (hdr->frame_id & EMBC_FRAMER_TYPE_MASK)) {
@@ -932,8 +932,8 @@ struct embc_buffer_s * embc_framer_construct_frame(
         struct embc_framer_s *self,
         uint8_t frame_id, uint8_t port, uint8_t message_id, uint16_t port_def,
         uint8_t const *payload, uint8_t length) {
-    DBC_NOT_NULL(self);
-    DBC_RANGE_INT(port, 0, (EMBC_FRAMER_PORTS - 1));
+    EMBC_DBC_NOT_NULL(self);
+    EMBC_DBC_RANGE_INT(port, 0, (EMBC_FRAMER_PORTS - 1));
     uint32_t frame_crc = 0;
     EMBC_LOGD3("embc_framer_construct_frame");
     struct embc_buffer_s * b = embc_buffer_alloc(self->buffer_allocator, length + HEADER_SIZE + FOOTER_SIZE);
@@ -945,11 +945,11 @@ struct embc_buffer_s * embc_framer_construct_frame(
     hdr->length = length;
     hdr->port_def0 = (uint8_t) (port_def & 0xff);
     hdr->port_def1 = (uint8_t) ((port_def >> 8) & 0xff);
-    hdr->crc8 = crc_ccitt_8(0, b->data, HEADER_SIZE - 1);
+    hdr->crc8 = embc_crc_ccitt_8(0, b->data, HEADER_SIZE - 1);
     b->cursor = HEADER_SIZE;
     b->length = HEADER_SIZE;
     embc_buffer_write(b, payload, length);
-    frame_crc = crc32(frame_crc, b->data, b->length);
+    frame_crc = embc_crc32(frame_crc, b->data, b->length);
     embc_buffer_write_u32_le(b, frame_crc);
     embc_buffer_write_u8(b, SOF);
     return b;
@@ -959,7 +959,7 @@ struct embc_buffer_s * embc_framer_construct_ack(
         struct embc_framer_s *self,
         uint8_t frame_id, uint8_t port, uint8_t message_id, uint16_t ack_mask,
         uint8_t status) {
-    DBC_NOT_NULL(self);
+    EMBC_DBC_NOT_NULL(self);
     uint32_t frame_crc = 0;
     EMBC_LOGD3("embc_framer_construct_ack");
     struct embc_buffer_s * b = embc_buffer_alloc(self->buffer_allocator, 1 + HEADER_SIZE + FOOTER_SIZE);
@@ -971,11 +971,11 @@ struct embc_buffer_s * embc_framer_construct_ack(
     hdr->length = 1;
     hdr->port_def0 = (uint8_t) (ack_mask & 0xff);
     hdr->port_def1 = (uint8_t) ((ack_mask >> 8) & 0xff);
-    hdr->crc8 = crc_ccitt_8(0, b->data, HEADER_SIZE - 1);
+    hdr->crc8 = embc_crc_ccitt_8(0, b->data, HEADER_SIZE - 1);
     b->cursor = HEADER_SIZE;
     b->length = HEADER_SIZE;
     embc_buffer_write_u8(b, status);
-    frame_crc = crc32(frame_crc, b->data, b->length);
+    frame_crc = embc_crc32(frame_crc, b->data, b->length);
     embc_buffer_write_u32_le(b, frame_crc);
     embc_buffer_write_u8(b, SOF);
     return b;
@@ -985,9 +985,9 @@ void embc_framer_send(
         struct embc_framer_s * self,
         uint8_t port, uint8_t message_id, uint16_t port_def,
         struct embc_buffer_s * buffer) {
-    DBC_NOT_NULL(self);
-    DBC_RANGE_INT(port, 0, EMBC_FRAMER_PORTS - 1);
-    DBC_NOT_NULL(buffer);
+    EMBC_DBC_NOT_NULL(self);
+    EMBC_DBC_RANGE_INT(port, 0, EMBC_FRAMER_PORTS - 1);
+    EMBC_DBC_NOT_NULL(buffer);
     uint32_t frame_crc = 0;
     embc_size_t length = embc_buffer_length(buffer);
 
@@ -1012,8 +1012,8 @@ void embc_framer_send(
     hdr->length = (uint8_t) ((length - HEADER_SIZE) & 0xff);
     hdr->port_def0 = (uint8_t) (port_def & 0xff);
     hdr->port_def1 = (uint8_t) ((port_def >> 8) & 0xff);
-    hdr->crc8 = crc_ccitt_8(0, buffer->data, HEADER_SIZE - 1);
-    frame_crc = crc32(frame_crc, buffer->data, length);
+    hdr->crc8 = embc_crc_ccitt_8(0, buffer->data, HEADER_SIZE - 1);
+    frame_crc = embc_crc32(frame_crc, buffer->data, length);
     embc_buffer_cursor_set(buffer, length);
     embc_buffer_write_u32_le(buffer, frame_crc);
     embc_buffer_write_u8(buffer, SOF);
@@ -1026,7 +1026,7 @@ void embc_framer_send_payload(
         struct embc_framer_s * self,
         uint8_t port, uint8_t message_id, uint16_t port_def,
         uint8_t const * data, uint8_t length) {
-    DBC_RANGE_INT(length, 0, EMBC_FRAMER_PAYLOAD_MAX_SIZE);
+    EMBC_DBC_RANGE_INT(length, 0, EMBC_FRAMER_PAYLOAD_MAX_SIZE);
     EMBC_LOGD3("embc_framer_send_payload");
     struct embc_buffer_s * b = embc_framer_alloc(self);
     embc_buffer_write(b, data, length);
@@ -1034,7 +1034,7 @@ void embc_framer_send_payload(
 }
 
 void embc_framer_resync(struct embc_framer_s * self) {
-    DBC_NOT_NULL(self);
+    EMBC_DBC_NOT_NULL(self);
     rx_purge_queued(self);
     tx_purge_queued(self);
     embc_framer_send_payload(self, 0, 0, EMBC_FRAMER_PORT0_RESYNC, 0, 0);
@@ -1042,7 +1042,7 @@ void embc_framer_resync(struct embc_framer_s * self) {
 
 struct embc_buffer_s * embc_framer_alloc(
         struct embc_framer_s * self) {
-    DBC_NOT_NULL(self);
+    EMBC_DBC_NOT_NULL(self);
     struct embc_buffer_s * b = embc_buffer_alloc(self->buffer_allocator, EMBC_FRAMER_FRAME_MAX_SIZE);
     b->cursor = EMBC_FRAMER_HEADER_SIZE;
     b->length = EMBC_FRAMER_HEADER_SIZE;
@@ -1052,6 +1052,6 @@ struct embc_buffer_s * embc_framer_alloc(
 
 struct embc_framer_status_s embc_framer_status_get(
         struct embc_framer_s * self) {
-    DBC_NOT_NULL(self);
+    EMBC_DBC_NOT_NULL(self);
     return self->status;
 }

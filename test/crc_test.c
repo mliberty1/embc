@@ -39,77 +39,77 @@ uint8_t const MSG4[] = {'1', '2','3', '4', '5', '6', '7', '8', '9'};
 
 static void crc_ccitt_8_well_known(void **state) {
     (void) state;
-    assert_int_equal(0x74, crc_ccitt_8(0, MSG0, sizeof(MSG0)));
-    assert_int_equal(0x30, crc_ccitt_8(0, MSG_00, sizeof(MSG_00)));
-    assert_int_equal(0xa1, crc_ccitt_8(0, MSG_01, sizeof(MSG_01)));
-    assert_int_equal(0xff, crc_ccitt_8(0, MSG_FF, sizeof(MSG_FF)));
-    assert_int_equal(0xdb, crc_ccitt_8(0, MSG2, sizeof(MSG2)));
-    assert_int_equal(0xe4, crc_ccitt_8(0, MSG3, sizeof(MSG3)));
-    assert_int_equal(0x2f, crc_ccitt_8(0, MSG4, sizeof(MSG4)));
+    assert_int_equal(0x74, embc_crc_ccitt_8(0, MSG0, sizeof(MSG0)));
+    assert_int_equal(0x30, embc_crc_ccitt_8(0, MSG_00, sizeof(MSG_00)));
+    assert_int_equal(0xa1, embc_crc_ccitt_8(0, MSG_01, sizeof(MSG_01)));
+    assert_int_equal(0xff, embc_crc_ccitt_8(0, MSG_FF, sizeof(MSG_FF)));
+    assert_int_equal(0xdb, embc_crc_ccitt_8(0, MSG2, sizeof(MSG2)));
+    assert_int_equal(0xe4, embc_crc_ccitt_8(0, MSG3, sizeof(MSG3)));
+    assert_int_equal(0x2f, embc_crc_ccitt_8(0, MSG4, sizeof(MSG4)));
 }
 
 static void crc_ccitt_8_incremental(void **state) {
     (void) state;
     uint16_t crc = 0;
-    crc = crc_ccitt_8(crc, MSG4, 5);
-    crc = crc_ccitt_8(crc, MSG4 + 5, sizeof(MSG4) - 5);
+    crc = embc_crc_ccitt_8(crc, MSG4, 5);
+    crc = embc_crc_ccitt_8(crc, MSG4 + 5, sizeof(MSG4) - 5);
     assert_int_equal(0x2f, crc);
 }
 
 static void crc_ccitt_8_invalid_args(void **state) {
     (void) state;
-    assert_int_equal(0x00000000, crc_ccitt_8(0, 0, 4));
-    assert_int_equal(0x00000000, crc_ccitt_8(0, MSG_00, 0));
+    assert_int_equal(0x00000000, embc_crc_ccitt_8(0, 0, 4));
+    assert_int_equal(0x00000000, embc_crc_ccitt_8(0, MSG_00, 0));
 }
 
 static void crc_ccitt_16_well_known(void **state) {
     (void) state;
-    assert_int_equal(0x7b3f, crc_ccitt_16(0, MSG0, sizeof(MSG0)));
-    assert_int_equal(0x1e0f, crc_ccitt_16(0, MSG_00, sizeof(MSG_00)));
-    assert_int_equal(0x0e2e, crc_ccitt_16(0, MSG_01, sizeof(MSG_01)));
-    assert_int_equal(0x00ff, crc_ccitt_16(0, MSG_FF, sizeof(MSG_FF)));
-    assert_int_equal(0xaeb5, crc_ccitt_16(0, MSG2, sizeof(MSG2)));
-    assert_int_equal(0x39f9, crc_ccitt_16(0, MSG3, sizeof(MSG3)));
-    assert_int_equal((uint16_t) ~0x29B1, crc_ccitt_16(0, MSG4, sizeof(MSG4)));
+    assert_int_equal(0x7b3f, embc_crc_ccitt_16(0, MSG0, sizeof(MSG0)));
+    assert_int_equal(0x1e0f, embc_crc_ccitt_16(0, MSG_00, sizeof(MSG_00)));
+    assert_int_equal(0x0e2e, embc_crc_ccitt_16(0, MSG_01, sizeof(MSG_01)));
+    assert_int_equal(0x00ff, embc_crc_ccitt_16(0, MSG_FF, sizeof(MSG_FF)));
+    assert_int_equal(0xaeb5, embc_crc_ccitt_16(0, MSG2, sizeof(MSG2)));
+    assert_int_equal(0x39f9, embc_crc_ccitt_16(0, MSG3, sizeof(MSG3)));
+    assert_int_equal((uint16_t) ~0x29B1, embc_crc_ccitt_16(0, MSG4, sizeof(MSG4)));
 }
 
 static void crc_ccitt_16_incremental(void **state) {
     (void) state;
     uint16_t crc = 0;
-    crc = crc_ccitt_16(crc, MSG4, 5);
-    crc = crc_ccitt_16(crc, MSG4 + 5, sizeof(MSG4) - 5);
+    crc = embc_crc_ccitt_16(crc, MSG4, 5);
+    crc = embc_crc_ccitt_16(crc, MSG4 + 5, sizeof(MSG4) - 5);
     assert_int_equal((uint16_t) ~0x29B1, crc);
 }
 
 static void crc_ccitt_16_invalid_args(void **state) {
     (void) state;
-    assert_int_equal(0x00000000, crc_ccitt_16(0, 0, 4));
-    assert_int_equal(0x00000000, crc_ccitt_16(0, MSG_00, 0));
+    assert_int_equal(0x00000000, embc_crc_ccitt_16(0, 0, 4));
+    assert_int_equal(0x00000000, embc_crc_ccitt_16(0, MSG_00, 0));
 }
 
 static void crc32_well_known(void **state) {
     (void) state;
-    assert_int_equal(0x2144df1c, crc32(0, MSG0, sizeof(MSG0)));
-    assert_int_equal(0xd202ef8d, crc32(0, MSG_00, sizeof(MSG_00)));
-    assert_int_equal(0xa505df1b, crc32(0, MSG_01, sizeof(MSG_01)));
-    assert_int_equal(0xff000000, crc32(0, MSG_FF, sizeof(MSG_FF)));
-    assert_int_equal(0x352441c2, crc32(0, MSG2, sizeof(MSG2)));
-    assert_int_equal(0x08053b40, crc32(0, MSG3, sizeof(MSG3)));
-    assert_int_equal(0xCBF43926, crc32(0, MSG4, sizeof(MSG4)));
+    assert_int_equal(0x2144df1c, embc_crc32(0, MSG0, sizeof(MSG0)));
+    assert_int_equal(0xd202ef8d, embc_crc32(0, MSG_00, sizeof(MSG_00)));
+    assert_int_equal(0xa505df1b, embc_crc32(0, MSG_01, sizeof(MSG_01)));
+    assert_int_equal(0xff000000, embc_crc32(0, MSG_FF, sizeof(MSG_FF)));
+    assert_int_equal(0x352441c2, embc_crc32(0, MSG2, sizeof(MSG2)));
+    assert_int_equal(0x08053b40, embc_crc32(0, MSG3, sizeof(MSG3)));
+    assert_int_equal(0xCBF43926, embc_crc32(0, MSG4, sizeof(MSG4)));
 }
 
 static void crc32_incremental(void **state) {
     (void) state;
     uint32_t crc = 0;
-    crc = crc32(crc, MSG4, 5);
-    crc = crc32(crc, MSG4 + 5, sizeof(MSG4) - 5);
+    crc = embc_crc32(crc, MSG4, 5);
+    crc = embc_crc32(crc, MSG4 + 5, sizeof(MSG4) - 5);
     assert_int_equal(0xCBF43926, crc);
 }
 
 static void crc32_invalid_args(void **state) {
     (void) state;
-    assert_int_equal(0x00000000, crc32(0, 0, 4));
-    assert_int_equal(0x00000000, crc32(0, MSG_00, 0));
+    assert_int_equal(0x00000000, embc_crc32(0, 0, 4));
+    assert_int_equal(0x00000000, embc_crc32(0, MSG_00, 0));
 }
 
 int main(void) {

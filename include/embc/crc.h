@@ -49,7 +49,7 @@ EMBC_CPP_GUARD_START
  *
  * This function uses the 0x83 polynomial
  */
-uint8_t crc_ccitt_8(uint8_t crc, uint8_t const * data, uint32_t length);
+EMBC_API uint8_t embc_crc_ccitt_8(uint8_t crc, uint8_t const *data, uint32_t length);
 
 /**
  * @brief Compute the CRC-CCITT-16 in one's compliment form.
@@ -67,7 +67,7 @@ uint8_t crc_ccitt_8(uint8_t crc, uint8_t const * data, uint32_t length);
  * @see http://srecord.sourceforge.net/crc16-ccitt.html
  * @see https://www.lammertbies.nl/comm/info/crc-calculation.html
  */
-uint16_t crc_ccitt_16(uint16_t crc, uint8_t const * data, uint32_t length);
+EMBC_API uint16_t embc_crc_ccitt_16(uint16_t crc, uint8_t const *data, uint32_t length);
 
 /**
  * @brief Compute the CRC-32
@@ -80,7 +80,7 @@ uint16_t crc_ccitt_16(uint16_t crc, uint8_t const * data, uint32_t length);
  *
  * @see http://create.stephan-brumme.com/crc32/
  */
-uint32_t crc32(uint32_t crc, uint8_t const * data, uint32_t length);
+EMBC_API uint32_t embc_crc32(uint32_t crc, uint8_t const *data, uint32_t length);
 
 EMBC_CPP_GUARD_END
 

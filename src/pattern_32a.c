@@ -25,7 +25,7 @@
 
 
 void embc_pattern_32a_tx_initialize(struct embc_pattern_32a_tx_s * self) {
-    DBC_NOT_NULL(self);
+    EMBC_DBC_NOT_NULL(self);
     self->shift32 = 0;
     self->counter = 0;
     self->toggle = TOGGLE_SHIFT;
@@ -114,7 +114,7 @@ enum rx_state_e {
 
 void embc_pattern_32a_rx_initialize(
         struct embc_pattern_32a_rx_s * self) {
-    DBC_NOT_NULL(self);
+    EMBC_DBC_NOT_NULL(self);
     embc_pattern_32a_tx_initialize(&self->tx);
     self->receive_count = 0;
     self->missing_count = 0;
@@ -247,8 +247,8 @@ void embc_pattern_32a_rx_buffer(
         struct embc_pattern_32a_rx_s * self,
         uint32_t const * buffer,
         uint32_t size) {
-    DBC_NOT_NULL(self);
-    DBC_NOT_NULL(buffer);
+    EMBC_DBC_NOT_NULL(self);
+    EMBC_DBC_NOT_NULL(buffer);
     uint32_t sz = size / 4;
     for (uint32_t i = 0; i < sz; ++i) {
         embc_pattern_32a_rx_next(self, buffer[i]);

@@ -62,7 +62,7 @@ static inline void buffer_init(struct embc_buffer_s * b) {
 
 embc_size_t embc_buffer_allocator_instance_size(
         embc_size_t const * sizes, embc_size_t length) {
-    DBC_NOT_NULL(sizes);
+    EMBC_DBC_NOT_NULL(sizes);
     embc_size_t total_size = 0;
     total_size = MGR_SZ + POOL_SZ * length;
     for (embc_size_t i = 0; i < length; ++i) {
@@ -75,7 +75,7 @@ embc_size_t embc_buffer_allocator_instance_size(
 void embc_buffer_allocator_initialize(
         struct embc_buffer_allocator_s * self,
         embc_size_t const * sizes, embc_size_t length) {
-    DBC_NOT_NULL(sizes);
+    EMBC_DBC_NOT_NULL(sizes);
     embc_size_t total_size = 0;
     total_size = MGR_SZ + POOL_SZ * length;
     embc_size_t header_size = total_size;
@@ -176,8 +176,8 @@ struct embc_buffer_s * embc_buffer_alloc_unsafe(
 }
 
 static void embc_buffer_free_(struct embc_buffer_manager_s const * self, struct embc_buffer_s * buffer) {
-    DBC_NOT_NULL(self);
-    DBC_NOT_NULL(buffer);
+    EMBC_DBC_NOT_NULL(self);
+    EMBC_DBC_NOT_NULL(buffer);
     EMBC_LOGD3("embc_buffer_free_(%p, %p)", (void *) self, (void *) buffer);
     struct pool_s * p = EMBC_CONTAINER_OF(self, struct pool_s, manager);
     EMBC_ASSERT(p->magic == EMBC_BUFFER_MAGIC);
@@ -196,9 +196,9 @@ static inline void write_update_length(struct embc_buffer_s * buffer) {
 void embc_buffer_write(struct embc_buffer_s * buffer,
                        void const * data,
                        embc_size_t size) {
-    DBC_NOT_NULL(buffer);
+    EMBC_DBC_NOT_NULL(buffer);
     if (size > 0) {
-        DBC_NOT_NULL(data);
+        EMBC_DBC_NOT_NULL(data);
         EMBC_ASSERT(size <= embc_buffer_write_remaining(buffer));
         uint8_t * ptr = buffer->data + buffer->cursor;
         embc_memcpy(ptr, data, size);
@@ -210,8 +210,8 @@ void embc_buffer_write(struct embc_buffer_s * buffer,
 void embc_buffer_copy(struct embc_buffer_s * destination,
                       struct embc_buffer_s * source,
                       embc_size_t size) {
-    DBC_NOT_NULL(destination);
-    DBC_NOT_NULL(source);
+    EMBC_DBC_NOT_NULL(destination);
+    EMBC_DBC_NOT_NULL(source);
     EMBC_ASSERT(size <= embc_buffer_read_remaining(source));
     EMBC_ASSERT(size <= embc_buffer_write_remaining(destination));
     if (size > 0) {
@@ -225,8 +225,8 @@ void embc_buffer_copy(struct embc_buffer_s * destination,
 
 static inline bool write_str_(struct embc_buffer_s * buffer,
                               char const * str) {
-    DBC_NOT_NULL(buffer);
-    DBC_NOT_NULL(str);
+    EMBC_DBC_NOT_NULL(buffer);
+    EMBC_DBC_NOT_NULL(str);
     uint16_t capacity = buffer->capacity - buffer->reserve;
     while (buffer->cursor < capacity) {
         if (*str == 0) {
@@ -253,7 +253,7 @@ bool embc_buffer_write_str_truncate(struct embc_buffer_s * buffer,
 
 
 #define WRITE(buffer, value, buftype) \
-    DBC_NOT_NULL(buffer); \
+    EMBC_DBC_NOT_NULL(buffer); \
     EMBC_ASSERT((embc_size_t) sizeof(value) <= embc_buffer_write_remaining(buffer)); \
     uint8_t * ptr = buffer->data + buffer->cursor; \
     EMBC_BBUF_ENCODE_##buftype (ptr, value); \
@@ -291,8 +291,8 @@ void embc_buffer_write_u64_be(struct embc_buffer_s * buffer, uint64_t value) {
 void embc_buffer_read(struct embc_buffer_s * buffer,
                       void * data,
                       embc_size_t size) {
-    DBC_NOT_NULL(buffer);
-    DBC_NOT_NULL(data);
+    EMBC_DBC_NOT_NULL(buffer);
+    EMBC_DBC_NOT_NULL(data);
     if (size > 0) {
         EMBC_ASSERT(size <= embc_buffer_read_remaining(buffer));
         uint8_t * ptr = buffer->data + buffer->cursor;
@@ -302,7 +302,7 @@ void embc_buffer_read(struct embc_buffer_s * buffer,
 }
 
 #define READ(buffer, ctype, buftype) \
-    DBC_NOT_NULL(buffer); \
+    EMBC_DBC_NOT_NULL(buffer); \
     EMBC_ASSERT((embc_size_t) sizeof(ctype) <= embc_buffer_read_remaining(buffer)); \
     uint8_t * ptr = buffer->data + buffer->cursor; \
     ctype value = EMBC_BBUF_DECODE_##buftype (ptr); \
@@ -340,9 +340,9 @@ uint64_t embc_buffer_read_u64_be(struct embc_buffer_s * buffer) {
 void embc_buffer_erase(struct embc_buffer_s * buffer,
                        embc_size_t start,
                        embc_size_t end) {
-    DBC_NOT_NULL(buffer);
-    DBC_RANGE_INT(start, 0, buffer->length - 1);
-    DBC_RANGE_INT(end, 0, buffer->length);
+    EMBC_DBC_NOT_NULL(buffer);
+    EMBC_DBC_RANGE_INT(start, 0, buffer->length - 1);
+    EMBC_DBC_RANGE_INT(end, 0, buffer->length);
     embc_size_t length = end - start;
     if (length > 0) {
         for (embc_size_t k = start; k < (buffer->length - length); ++k) {

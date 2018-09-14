@@ -20,7 +20,7 @@
 #define CRC16_POLYNOMIAL ((uint16_t) 0x8408)
 #define CRC32_POLYNOMIAL ((uint32_t) 0xEDB88320)
 
-uint8_t crc_ccitt_8(uint8_t crc, uint8_t const * data, uint32_t length) {
+uint8_t embc_crc_ccitt_8(uint8_t crc, uint8_t const *data, uint32_t length) {
     uint8_t byte;
     uint8_t mask;
     uint8_t const * data_end;
@@ -44,7 +44,7 @@ uint8_t crc_ccitt_8(uint8_t crc, uint8_t const * data, uint32_t length) {
     return crc;
 }
 
-uint16_t crc_ccitt_16(uint16_t crc, uint8_t const * data, uint32_t length) {
+uint16_t embc_crc_ccitt_16(uint16_t crc, uint8_t const *data, uint32_t length) {
     uint8_t const * data_end = data + length;
 
     if ((0 == length) || (0 == data)) {
@@ -64,7 +64,7 @@ uint16_t crc_ccitt_16(uint16_t crc, uint8_t const * data, uint32_t length) {
 }
 
 
-uint32_t crc32(uint32_t crc, uint8_t const * data, uint32_t length) {
+uint32_t embc_crc32(uint32_t crc, uint8_t const *data, uint32_t length) {
    uint32_t byte;
    uint32_t mask;
    uint8_t const * data_end;

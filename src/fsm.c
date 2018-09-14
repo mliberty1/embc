@@ -76,7 +76,7 @@ static embc_fsm_event_t events_pop(struct embc_fsm_s * self) {
 }
 
 void embc_fsm_initialize(struct embc_fsm_s * self) {
-    DBC_NOT_NULL(self);
+    EMBC_DBC_NOT_NULL(self);
     for (int32_t idx = 0; idx < (int32_t) self->states_count; ++idx) {
         int32_t state = (int32_t) self->states[idx].state;
         if (idx != state) {
@@ -129,7 +129,7 @@ static void transition(struct embc_fsm_s * self, embc_fsm_state_t next, embc_fsm
 
 static void handle_event(struct embc_fsm_s * self,
                          embc_fsm_event_t event) {
-    DBC_NOT_NULL(self);
+    EMBC_DBC_NOT_NULL(self);
     for (int32_t idx = 0; idx < (int32_t) self->transitions_count; ++idx) {
         struct embc_fsm_transition_s const *t = self->transitions + idx;
         if ((t->current == self->state) || (t->current == EMBC_STATE_ANY)) {
@@ -168,7 +168,7 @@ static void handle_event(struct embc_fsm_s * self,
 
 void embc_fsm_event(struct embc_fsm_s * self,
                   embc_fsm_event_t event) {
-    DBC_NOT_NULL(self);
+    EMBC_DBC_NOT_NULL(self);
     events_push(self, event);
     if (self->reentrant) {
         return;
@@ -182,6 +182,6 @@ void embc_fsm_event(struct embc_fsm_s * self,
 }
 
 void embc_fsm_reset(struct embc_fsm_s * self) {
-    DBC_NOT_NULL(self);
+    EMBC_DBC_NOT_NULL(self);
     embc_fsm_event(self, EMBC_EVENT_RESET);
 }

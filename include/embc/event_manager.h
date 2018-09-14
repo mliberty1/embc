@@ -25,7 +25,9 @@
 
 #include <stdint.h>
 #include <stddef.h>
+#include "embc/cmacro_inc.h"
 
+EMBC_CPP_GUARD_START
 
 /**
  * @ingroup embc
@@ -60,14 +62,14 @@ typedef void (*embc_evm_callback)(void * user_data, int32_t event_id);
  *
  * Use embc_evm_free() to free the instance when done.
  */
-struct embc_evm_s * embc_evm_allocate();
+EMBC_API struct embc_evm_s * embc_evm_allocate();
 
 /**
  * @brief Free an instance previously allocated by embc_evm_allocate.
  *
  * @param self The event manager instance previous returned by embc_evm_allocate().
  */
-void embc_evm_free(struct embc_evm_s * self);
+EMBC_API void embc_evm_free(struct embc_evm_s * self);
 
 /**
  * @brief Schedule a new event.
@@ -81,8 +83,8 @@ void embc_evm_free(struct embc_evm_s * self);
  *      can also be used to cancel the event with event_cancel.
  *      On error, return 0.
  */
-int32_t embc_evm_schedule(struct embc_evm_s * self, int64_t timestamp,
-                          embc_evm_callback cbk_fn, void * cbk_user_data);
+EMBC_API int32_t embc_evm_schedule(struct embc_evm_s * self, int64_t timestamp,
+                                   embc_evm_callback cbk_fn, void * cbk_user_data);
 
 /**
  * @brief Cancel a pending event.
@@ -91,7 +93,7 @@ int32_t embc_evm_schedule(struct embc_evm_s * self, int64_t timestamp,
  * @param event_id The event_id returned by event_schedule().  If 0, ignore.
  * @return 0 or error code.
  */
-int32_t embc_evm_cancel(struct embc_evm_s * self, int32_t event_id);
+EMBC_API int32_t embc_evm_cancel(struct embc_evm_s * self, int32_t event_id);
 
 /**
  * @brief The time for the next scheduled event.
@@ -100,7 +102,7 @@ int32_t embc_evm_cancel(struct embc_evm_s * self, int32_t event_id);
  * @return The time for the next scheduled event.  If no events are
  *      currently pending, returns EMBC_TIME_MIN.
  */
-int64_t embc_evm_time_next(struct embc_evm_s * self);
+EMBC_API int64_t embc_evm_time_next(struct embc_evm_s * self);
 
 /**
  * @brief The time remaining until the next scheduled event.
@@ -110,7 +112,7 @@ int64_t embc_evm_time_next(struct embc_evm_s * self);
  * @return The interval until the next scheduled event.  If no events are
  *      currently pending, returns -1.
  */
-int64_t embc_evm_interval_next(struct embc_evm_s * self, int64_t time_current);
+EMBC_API int64_t embc_evm_interval_next(struct embc_evm_s * self, int64_t time_current);
 
 /**
  * @brief Process all pending events.
@@ -120,8 +122,10 @@ int64_t embc_evm_interval_next(struct embc_evm_s * self, int64_t time_current);
  *      time will be processed.
  * @return The total number of events processed.
  */
-int32_t embc_evm_process(struct embc_evm_s * self, int64_t time_current);
+EMBC_API int32_t embc_evm_process(struct embc_evm_s * self, int64_t time_current);
 
 /** @} */
+
+EMBC_CPP_GUARD_END
 
 #endif  /* EMBC_EVENT_MANAGER_H_ */

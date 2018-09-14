@@ -66,9 +66,9 @@ int32_t embc_pool_initialize(
         struct embc_pool_s * self,
         int32_t block_count,
         int32_t block_size) {
-    DBC_NOT_NULL(self);
-    DBC_GT_ZERO(block_count);
-    DBC_GT_ZERO(block_size);
+    EMBC_DBC_NOT_NULL(self);
+    EMBC_DBC_GT_ZERO(block_count);
+    EMBC_DBC_GT_ZERO(block_size);
     struct embc_pool_size_s sz = embc_pool_size(block_count, block_size);
     embc_memset(self, 0, sz.sz);
     self->magic = MAGIC;
@@ -84,26 +84,26 @@ int32_t embc_pool_initialize(
 }
 
 void embc_pool_finalize(struct embc_pool_s * self) {
-    DBC_NOT_NULL(self);
-    DBC_EQUAL(self->magic, MAGIC);
+    EMBC_DBC_NOT_NULL(self);
+    EMBC_DBC_EQUAL(self->magic, MAGIC);
     self->magic = 0;
 }
 
 int embc_pool_is_empty(struct embc_pool_s * self) {
-    DBC_NOT_NULL(self);
+    EMBC_DBC_NOT_NULL(self);
     return (self->free_head ? 0 : 1);
 }
 
 void * embc_pool_alloc(struct embc_pool_s * self) {
-    DBC_NOT_NULL(self);
-    DBC_NOT_NULL(self->free_head);
+    EMBC_DBC_NOT_NULL(self);
+    EMBC_DBC_NOT_NULL(self->free_head);
     struct embc_pool_element_s * hdr = self->free_head;
     LL_DELETE(self->free_head, hdr);
     return ((void *) (hdr + 1));
 }
 
 void * embc_pool_alloc_unsafe(struct embc_pool_s * self) {
-    DBC_NOT_NULL(self);
+    EMBC_DBC_NOT_NULL(self);
     if (!self->free_head) {
         return 0;
     }
@@ -113,8 +113,8 @@ void * embc_pool_alloc_unsafe(struct embc_pool_s * self) {
 }
 
 void embc_pool_free(struct embc_pool_s * self, void * block) {
-    DBC_NOT_NULL(self);
-    DBC_NOT_NULL(block);
+    EMBC_DBC_NOT_NULL(self);
+    EMBC_DBC_NOT_NULL(block);
     struct embc_pool_element_s * hdr = block;
     --hdr;
     LL_PREPEND(self->free_head, hdr);

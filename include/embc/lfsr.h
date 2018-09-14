@@ -52,7 +52,7 @@ EMBC_CPP_GUARD_START
 /**
  * @brief The LFSR state.
  */
-struct lfsr_s {
+struct embc_lfsr_s {
     /**
      * @brief The current state value.
      */
@@ -77,7 +77,7 @@ struct lfsr_s {
  *
  * The 16-bit polynomial is x16 + x14 + x13 + x11 + 1.
  */
-EMBC_API void lfsr_initialize(struct lfsr_s * self);
+EMBC_API void embc_lfsr_initialize(struct embc_lfsr_s * self);
 
 /**
  * @brief Seed the LFSR.
@@ -86,7 +86,7 @@ EMBC_API void lfsr_initialize(struct lfsr_s * self);
  * @param seed [in] The new value seed for the LFSR.
  * @return 0 on success or error code.
  */
-EMBC_API void lfsr_seed_u16(struct lfsr_s * self, uint16_t seed);
+EMBC_API void embc_lfsr_seed_u16(struct embc_lfsr_s * self, uint16_t seed);
 
 /**
  * @brief Get the next bit in an LFSR pattern.
@@ -95,7 +95,7 @@ EMBC_API void lfsr_seed_u16(struct lfsr_s * self, uint16_t seed);
  * @return The next bit (0 or 1) in the LFSR sequence.
  *
  */
-EMBC_API int lfsr_next_u1(struct lfsr_s * self);
+EMBC_API int embc_lfsr_next_u1(struct embc_lfsr_s * self);
 
 /**
  * @brief Get the next 8-bit value in an LFSR pattern.
@@ -104,7 +104,7 @@ EMBC_API int lfsr_next_u1(struct lfsr_s * self);
  * @return The next 8-bit value in the LFSR sequence.
  *
  */
-EMBC_API uint8_t lfsr_next_u8(struct lfsr_s * self);
+EMBC_API uint8_t embc_lfsr_next_u8(struct embc_lfsr_s * self);
 
 /**
  * @brief Get the next 16-bit value in an LFSR pattern.
@@ -113,7 +113,7 @@ EMBC_API uint8_t lfsr_next_u8(struct lfsr_s * self);
  * @return The next 16-bit value in the LFSR sequence.
  *
  */
-EMBC_API uint16_t lfsr_next_u16(struct lfsr_s * self);
+EMBC_API uint16_t embc_lfsr_next_u16(struct embc_lfsr_s * self);
 
 /**
  * @brief Get the next 32-bit value in an LFSR pattern.
@@ -122,7 +122,7 @@ EMBC_API uint16_t lfsr_next_u16(struct lfsr_s * self);
  * @return The next 32-bit value in the LFSR sequence.
  *
  */
-EMBC_API uint32_t lfsr_next_u32(struct lfsr_s * self);
+EMBC_API uint32_t embc_lfsr_next_u32(struct embc_lfsr_s * self);
 
 /**
  * @brief Follow the next 8-bit value in an LFSR pattern.
@@ -131,7 +131,7 @@ EMBC_API uint32_t lfsr_next_u32(struct lfsr_s * self);
  * @param data [in] The next 8-bit data value for the stream.
  * @return 0 on success, -1 on unexpected data value, 1 on error.
  */
-EMBC_API int lfsr_follow_u8(struct lfsr_s * self, uint8_t data);
+EMBC_API int embc_lfsr_follow_u8(struct embc_lfsr_s * self, uint8_t data);
 
 /** @} */
 
