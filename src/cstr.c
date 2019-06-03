@@ -2,7 +2,22 @@
 
 #include "embc/cstr.h"
 #include "embc/config.h"
-#include <ctype.h>
+
+
+static char _toupper(char c) {
+    if ((c >= 'a') && c <= 'z') {
+        c = c - 'a' + 'A';
+    }
+    return c;
+}
+
+static int _isspace(char c) {
+    if ((c == ' ') || ((c >= 9) && (c <= 13))) {
+        return 1;
+    }
+    return 0;
+}
+
 
 int embc_cstr_copy(char * tgt, char const * src, embc_size_t tgt_size) {
     if ((NULL == tgt) || (tgt_size <= 0)) {
@@ -45,8 +60,8 @@ int embc_cstr_casecmp(const char * s1, const char * s2) {
         } else if (*s2 == 0) {
             return 1;
         }
-        c1 = toupper(*s1);
-        c2 = toupper(*s2);
+        c1 = _toupper(*s1);
+        c2 = _toupper(*s2);
         if (c1 < c2) {
             return -1;
         } else if (c1 > c2) {
@@ -80,7 +95,7 @@ int embc_cstr_to_u32(const char * src, uint32_t * value) {
         return 1;
     }
 
-    while (*src && isspace((uint8_t) *src)) {
+    while (*src && _isspace((uint8_t) *src)) {
         ++src;
     }
     if (!*src) { // empty string.
@@ -111,7 +126,7 @@ int embc_cstr_to_u32(const char * src, uint32_t * value) {
         }
     }
     while (*src) {
-        if (!isspace((uint8_t) *src++)) { // did not parse full string
+        if (!_isspace((uint8_t) *src++)) { // did not parse full string
             return 1;
         }
     }
@@ -127,7 +142,7 @@ int embc_cstr_to_i32(const char * src, int32_t * value) {
         return 1;
     }
 
-    while (*src && isspace((uint8_t) *src)) {
+    while (*src && _isspace((uint8_t) *src)) {
         ++src;
     }
 
@@ -161,7 +176,7 @@ int embc_cstr_to_i32s(const char * src, int32_t exponent, int32_t * value) {
         return -1;
     }
 
-    while (*src && isspace((uint8_t) *src)) {
+    while (*src && _isspace((uint8_t) *src)) {
         ++src;
     }
 
@@ -202,7 +217,7 @@ int embc_cstr_to_i32s(const char * src, int32_t exponent, int32_t * value) {
     while (*src) {
         if ((*src >= '0') && (*src <= '9')) {
             // discard extra digits
-        } else if (!isspace((uint8_t) *src)) { // did not parse full string
+        } else if (!_isspace((uint8_t) *src)) { // did not parse full string
             return 1;
         }
         ++src;
@@ -233,7 +248,7 @@ int embc_cstr_to_f32(const char * src, float * value) {
         return 1;
     }
 
-    while (*src && isspace((uint8_t) *src)) {
+    while (*src && _isspace((uint8_t) *src)) {
         ++src;
     }
     if (!*src) { // empty string.
@@ -245,7 +260,7 @@ int embc_cstr_to_f32(const char * src, float * value) {
         return 1;
     }
     while (*p) {
-        if (!isspace((uint8_t) *p++)) { // did not parse full string
+        if (!_isspace((uint8_t) *p++)) { // did not parse full string
             return 1;
         }
     }
@@ -260,7 +275,7 @@ int embc_cstr_toupper(char * s) {
         return 1;
     }
     while (*s) {
-        *s = toupper((uint8_t) *s);
+        *s = _toupper((uint8_t) *s);
         ++s;
     }
     return 0;
