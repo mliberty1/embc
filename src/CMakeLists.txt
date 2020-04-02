@@ -12,10 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-if (EMBC_TOPLEVEL AND CMAKE_HOST_UNIX)
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -D__FILENAME__=\"\\\"$(basename $(subst  ${CMAKE_CURRENT_SOURCE_DIR}/,embc/,$(abspath $<)))\\\"\"")
-endif()
-
 if ((${CMAKE_SYSTEM_PROCESSOR} MATCHES "arm") AND ${CMAKE_CROSSCOMPILING})
     SET(EMBC_PLATFORM "ARM")
 else()
