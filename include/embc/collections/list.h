@@ -378,7 +378,7 @@ EMBC_API struct embc_list_s * embc_list_index(struct embc_list_s * list,
  * This operation is O(n).
  */
 EMBC_API embc_size_t embc_list_index_of(struct embc_list_s * list,
-                                             struct embc_list_s * item);
+                                        struct embc_list_s * item);
 
 /**
  * @brief Check if a list contains an item.
@@ -395,6 +395,21 @@ static inline bool embc_list_contains(struct embc_list_s * list,
     return (embc_list_index_of(list, item) < 0);
 }
 
+/**
+ * @brief Append all items in list to list_tgt.
+ *
+ * @param list_tgt The target list that will be modified to have append
+ *      all items in list.
+ * @param list The source list which will be empty after this operation.
+ */
+static inline void embc_list_append(struct embc_list_s * list_tgt,
+                                    struct embc_list_s * list) {
+    list->prev->next = list_tgt;
+    list->next->prev = list_tgt->prev;
+    list_tgt->prev->next = list->next;
+    list_tgt->prev = list->prev;
+    embc_list_initialize(list);
+}
 
 /** @} */
 

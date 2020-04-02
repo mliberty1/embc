@@ -24,6 +24,7 @@
 #define EMBC_CDEF_H_
 
 #include "platform.h"
+#include <stddef.h>  // offsetof
 
 /**
  * @ingroup embc

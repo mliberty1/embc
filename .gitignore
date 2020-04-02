@@ -1,6 +1,6 @@
 Debug
 Release
-cmake-build-debug
+cmake-build-debug*
 build
 __pycache__
 *.pyo

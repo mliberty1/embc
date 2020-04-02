@@ -229,6 +229,25 @@ static void list_autoremove(void **state) {
     assert_int_equal(4, embc_list_length(&b));
 }
 
+static void list_append(void **state) {
+    struct state_s *s = (struct state_s *) *state;
+    struct embc_list_s a;
+    struct embc_list_s b;
+    embc_list_initialize(&a);
+    embc_list_initialize(&b);
+    embc_list_add_tail(&a, &s->elements[0].item);
+    embc_list_add_tail(&a, &s->elements[1].item);
+    embc_list_add_tail(&b, &s->elements[2].item);
+    embc_list_add_tail(&b, &s->elements[3].item);
+    embc_list_append(&a, &b);
+    assert_int_equal(4, embc_list_length(&a));
+    assert_int_equal(0, embc_list_length(&b));
+    assert_int_equal(0, embc_list_index_of(&a, &s->elements[0].item));
+    assert_int_equal(1, embc_list_index_of(&a, &s->elements[1].item));
+    assert_int_equal(2, embc_list_index_of(&a, &s->elements[2].item));
+    assert_int_equal(3, embc_list_index_of(&a, &s->elements[3].item));
+}
+
 int main(void) {
     const struct CMUnitTest tests[] = {
             cmocka_unit_test_setup(list_empty, setup),
@@ -244,6 +263,7 @@ int main(void) {
             cmocka_unit_test_setup(list_remove_when_not_in_list, setup),
             cmocka_unit_test_setup(list_index, setup),
             cmocka_unit_test_setup(list_autoremove, setup),
+            cmocka_unit_test_setup(list_append, setup),
     };
 
     return cmocka_run_group_tests(tests, NULL, NULL);
