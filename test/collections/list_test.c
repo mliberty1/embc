@@ -120,6 +120,7 @@ static void list_foreach(void **state) {
         assert_ptr_equal(item, &s->elements[i].item);
         ++i;
     }
+    assert_int_equal(10, i);
 }
 
 static void list_foreach_reverse(void **state) {
@@ -184,6 +185,38 @@ static void list_remove_when_not_in_list(void **state) {
     embc_list_add_tail(&s->list, &s->elements[0].item);
     assert_int_equal(1, embc_list_length(&s->list));
     assert_ptr_equal(embc_list_index(&s->list, 0), &s->elements[0].item);
+}
+
+static void list_replace_empty(void **state) {
+    (void) state;
+    struct embc_list_s item1;
+    embc_list_initialize(&item1);
+    struct embc_list_s item2;
+    embc_list_initialize(&item2);
+    embc_list_replace(&item1, &item2);
+    assert_int_equal(0, embc_list_length(&item1));
+    assert_int_equal(0, embc_list_length(&item2));
+}
+
+static void list_replace(void **state) {
+    struct state_s * s = (struct state_s *) *state;
+    embc_list_add_tail(&s->list, &s->elements[0].item);
+    embc_list_add_tail(&s->list, &s->elements[1].item);
+    assert_int_equal(2, embc_list_length(&s->list));
+    embc_list_replace(&s->elements[0].item, &s->elements[2].item);
+    assert_int_equal(2, embc_list_length(&s->list));
+    assert_ptr_equal(&s->elements[2].item, s->list.next);
+}
+
+static void list_replace_top(void **state) {
+    struct state_s * s = (struct state_s *) *state;
+    struct embc_list_s item;
+    embc_list_initialize(&item);
+    embc_list_add_tail(&s->list, &s->elements[0].item);
+    embc_list_add_tail(&s->list, &s->elements[1].item);
+    embc_list_replace(&s->list, &item);
+    assert_int_equal(0, embc_list_length(&s->list));
+    assert_int_equal(2, embc_list_length(&item));
 }
 
 static void list_index(void **state) {
@@ -261,6 +294,9 @@ int main(void) {
             cmocka_unit_test_setup(list_remove, setup),
             cmocka_unit_test_setup(list_remove_and_insert_while_iterating, setup),
             cmocka_unit_test_setup(list_remove_when_not_in_list, setup),
+            cmocka_unit_test_setup(list_replace_empty, setup),
+            cmocka_unit_test_setup(list_replace, setup),
+            cmocka_unit_test_setup(list_replace_top, setup),
             cmocka_unit_test_setup(list_index, setup),
             cmocka_unit_test_setup(list_autoremove, setup),
             cmocka_unit_test_setup(list_append, setup),
