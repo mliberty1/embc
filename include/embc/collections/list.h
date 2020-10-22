@@ -248,6 +248,33 @@ static inline void embc_list_remove(struct embc_list_s * item) {
 }
 
 /**
+ * @brief Replace an item in a list.
+ *
+ * @param remove The pointer to the item to replace from any list it may be in.
+ *      The item's prev and next pointers are also reset.  This can be a
+ *      top-level list item.
+ * @param add pointer to the item to replace from any list it may be in.
+ *      The item's prev and next pointers are also reset.
+ * @return The pointer to the added item or 0 on error
+ *
+ * Warning: calling this function on an uninitialized item will cause
+ * invalid memory accesses.  Either call embc_list_initialize() when the
+ * item is initialized or ensure that the item is already in a list.
+ */
+static inline struct embc_list_s * embc_list_replace(struct embc_list_s * remove, struct embc_list_s * add) {
+    if (remove->next == remove) {
+        return 0; // empty item, replace not possible
+    }
+    embc_list_remove(add);
+    add->next = remove->next;
+    add->prev = remove->prev;
+    add->prev->next = add;
+    add->next->prev = add;
+    embc_list_initialize(remove);
+    return add;
+}
+
+/**
  * @brief Insert an new item before another item.
  *
  * @param position_item The existing item pointer.
