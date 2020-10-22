@@ -113,7 +113,7 @@ static void test_global_levels(void **state) {
     EMBC_LOG_DEBUG("hello");
     EMBC_LOG_DEBUG2("hello");
 #undef EMBC_LOG_GLOBAL_LEVEL
-#define EMBC_LOG_GLOBAL_LEVEL LOG_LEVEL_ALL
+#define EMBC_LOG_GLOBAL_LEVEL EMBC_LOG_LEVEL_ALL
 }
 
 int main(void) {
