@@ -1,5 +1,5 @@
 <!--
-# Copyright 2014-2017 Jetperch LLC
+# Copyright 2014-2020 Jetperch LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -23,7 +23,7 @@ firmware for embedded devices based upon microcontrollers.  The library can
 also be used on microprocessors as a lightweight supporting library.  
 The EMBC library is available under the permissive Apache 2.0 license.
 
-As of Feb 2017, the EMBC library API is not yet stable and subject to change
+As of Oct 2020, the EMBC library API is not yet stable and subject to change
 without notice.
 
 
