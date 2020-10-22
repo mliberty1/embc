@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2017 Jetperch LLC
+ * Copyright 2014-2020 Jetperch LLC
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -160,9 +160,9 @@ EMBC_CPP_GUARD_START
  *
  * @param x The 64-bit signed fixed point time.
  * @return The time as a float p in seconds.  Note that IEEE 747 singles only
- *      have 32 bits of precision, so the result will likely be truncated.
+ *      have 23 bits of precision, so the result will likely be truncated.
  */
-#define EMBC_TIME_TO_F32(x) (((double) (x)) / ((double) EMBC_TIME_SECOND))
+#define EMBC_TIME_TO_F32(x) (((float) (x)) / ((float) EMBC_TIME_SECOND))
 
 /**
  * @brief Convert the single precision float time to 64-bit fixed point time.
