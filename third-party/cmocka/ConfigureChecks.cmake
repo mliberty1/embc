@@ -7,10 +7,10 @@ include(CheckCXXSourceCompiles)
 include(CheckStructHasMember)
 include(TestBigEndian)
 
-set(PACKAGE ${APPLICATION_NAME})
-set(VERSION ${APPLICATION_VERSION})
+set(PACKAGE ${PROJECT_NAME})
+set(VERSION ${PROJECT_VERSION})
 set(DATADIR ${DATA_INSTALL_DIR})
-set(LIBDIR ${LIB_INSTALL_DIR})
+set(LIBDIR ${CMAKE_INSTALL_LIBDIR})
 set(PLUGINDIR "${PLUGIN_INSTALL_DIR}-${LIBRARY_SOVERSION}")
 set(SYSCONFDIR ${SYSCONF_INSTALL_DIR})
 
@@ -100,7 +100,7 @@ else (WIN32)
 endif (WIN32)
 
 find_library(RT_LIBRARY rt)
-if (RT_LIBRARY AND NOT LINUX)
+if (RT_LIBRARY AND NOT LINUX AND NOT ANDROID)
     set(CMOCKA_REQUIRED_LIBRARIES ${RT_LIBRARY} CACHE INTERNAL "cmocka required system libraries")
 endif ()
 
@@ -135,7 +135,7 @@ int main(void) {
     clock_gettime(CLOCK_REALTIME, &ts);
 
     return 0;
-}" HAVE_CLOCK_GETTIME_REALTIME)
+}" HAVE_CLOCK_REALTIME)
 
     # reset cmake requirements
     set(CMAKE_REQUIRED_INCLUDES)

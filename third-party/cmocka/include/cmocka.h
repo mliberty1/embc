@@ -1,5 +1,6 @@
 /*
  * Copyright 2008 Google Inc.
+ * Copyright 2014-2018 Andreas Schneider <asn@cryptomilk.org>
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -40,12 +41,13 @@ int __stdcall IsDebuggerPresent();
 /**
  * @defgroup cmocka The CMocka API
  *
- * These headers or their equivalents should be included prior to including
+ * These headers or their equivalents MUST be included prior to including
  * this header file.
  * @code
  * #include <stdarg.h>
  * #include <stddef.h>
  * #include <setjmp.h>
+ * #include <stdint.h>
  * @endcode
  *
  * This allows test applications to use custom definitions of C standard
@@ -56,7 +58,7 @@ int __stdcall IsDebuggerPresent();
 
 /* If __WORDSIZE is not set, try to figure it out and default to 32 bit. */
 #ifndef __WORDSIZE
-# if defined(__x86_64__) && !defined(__ILP32__)
+# if (defined(__x86_64__) && !defined(__ILP32__)) || defined(__sparc_v9__) || defined(__sparcv9)
 #  define __WORDSIZE 64
 # else
 #  define __WORDSIZE 32
@@ -105,6 +107,10 @@ typedef uintmax_t LargestIntegralType;
 # endif /* _WIN32 */
 #endif /* LargestIntegralTypePrintfFormat */
 
+#ifndef FloatPrintfFormat
+# define FloatPrintfFormat "%f"
+#endif /* FloatPrintfFormat */
+
 /* Perform an unsigned cast to LargestIntegralType. */
 #define cast_to_largest_integral_type(value) \
     ((LargestIntegralType)(value))
@@ -115,7 +121,7 @@ typedef uintmax_t LargestIntegralType;
     /* WIN32 is an ILP32 platform */
     typedef unsigned int uintptr_t;
 # elif defined(_WIN64)
-    typedef unsigned long int uintptr_t
+    typedef unsigned long int uintptr_t;
 # else /* _WIN32 */
 
 /* ILP32 and LP64 platforms */
@@ -207,8 +213,8 @@ cast_to_largest_integral_type(cast_to_pointer_integral_type(value))
  * }
  * @endcode
  *
- * For a complete example please at a look
- * <a href="http://git.cryptomilk.org/projects/cmocka.git/tree/example/chef_wrap/waiter_test_wrap.c">here</a>.
+ * For a complete example please take a look
+ * <a href="https://git.cryptomilk.org/projects/cmocka.git/tree/example/mock">here</a>.
  *
  * @{
  */
@@ -424,8 +430,8 @@ void will_return_maybe(#function, LargestIntegralType value);
  * }
  * @endcode
  *
- * For a complete example please at a look at
- * <a href="http://git.cryptomilk.org/projects/cmocka.git/tree/example/chef_wrap/waiter_test_wrap.c">here</a>
+ * For a complete example please take a look
+ * <a href="https://git.cryptomilk.org/projects/cmocka.git/tree/example/mock">here</a>
  *
  * @{
  */
@@ -965,6 +971,24 @@ void expect_any(#function, #parameter);
 
 #ifdef DOXYGEN
 /**
+ * @brief Add an event to always check if a parameter (of any value) has been passed.
+ *
+ * The event is triggered by calling check_expected() in the mocked function.
+ *
+ * @param[in]  #function  The function to add the check for.
+ *
+ * @param[in]  #parameter The name of the parameter passed to the function.
+ *
+ * @see check_expected().
+ */
+void expect_any_always(#function, #parameter);
+#else
+#define expect_any_always(function, parameter) \
+        expect_any_count(function, parameter, WILL_RETURN_ALWAYS)
+#endif
+
+#ifdef DOXYGEN
+/**
  * @brief Add an event to repeatedly check if a parameter (of any value) has
  *        been passed.
  *
@@ -1107,7 +1131,7 @@ void assert_return_code(int rc, int error);
  * @brief Assert that the given pointer is non-NULL.
  *
  * The function prints an error message to standard error and terminates the
- * test by calling fail() if the pointer is non-NULL.
+ * test by calling fail() if the pointer is NULL.
  *
  * @param[in]  pointer  The pointer to evaluate.
  *
@@ -1213,6 +1237,51 @@ void assert_int_not_equal(int a, int b);
                           cast_to_largest_integral_type(b), \
                           __FILE__, __LINE__)
 #endif
+
+#ifdef DOXYGEN
+/**
+ * @brief Assert that the two given float are equal given an epsilon.
+ *
+ * The function prints an error message to standard error and terminates the
+ * test by calling fail() if the float are not equal (given an epsilon).
+ *
+ * @param[in]  a        The first float to compare.
+ *
+ * @param[in]  b        The float to compare against the first one.
+ *
+ * @param[in]  epsilon  The epsilon used as margin for float comparison.
+ */
+void assert_float_equal(float a, float b, float epsilon);
+#else
+#define assert_float_equal(a, b, epsilon) \
+	_assert_float_equal((float)a, \
+			(float)b, \
+			(float)epsilon, \
+			__FILE__, __LINE__)
+#endif
+
+#ifdef DOXYGEN
+/**
+ * @brief Assert that the two given float are not equal given an epsilon.
+ *
+ * The function prints an error message to standard error and terminates the
+ * test by calling fail() if the float are not equal (given an epsilon).
+ *
+ * @param[in]  a        The first float to compare.
+ *
+ * @param[in]  b        The float to compare against the first one.
+ *
+ * @param[in]  epsilon  The epsilon used as margin for float comparison.
+ */
+void assert_float_not_equal(float a, float b, float epsilon);
+#else
+#define assert_float_not_equal(a, b, epsilon) \
+	_assert_float_not_equal((float)a, \
+			(float)b, \
+			(float)epsilon, \
+			__FILE__, __LINE__)
+#endif
+
 
 #ifdef DOXYGEN
 /**
@@ -1698,8 +1767,8 @@ static inline void _unit_test_dummy(void **state) {
  */
 #define cmocka_unit_test_prestate_setup_teardown(f, setup, teardown, state) { #f, f, setup, teardown, state }
 
-#define run_tests(tests) _run_tests(tests, sizeof(tests) / sizeof(tests)[0])
-#define run_group_tests(tests) _run_group_tests(tests, sizeof(tests) / sizeof(tests)[0])
+#define run_tests(tests) _run_tests(tests, sizeof(tests) / sizeof((tests)[0]))
+#define run_group_tests(tests) _run_group_tests(tests, sizeof(tests) / sizeof((tests)[0]))
 
 #ifdef DOXYGEN
 /**
@@ -1763,7 +1832,7 @@ int cmocka_run_group_tests(const struct CMUnitTest group_tests[],
                            CMFixtureFunction group_teardown);
 #else
 # define cmocka_run_group_tests(group_tests, group_setup, group_teardown) \
-        _cmocka_run_group_tests(#group_tests, group_tests, sizeof(group_tests) / sizeof(group_tests)[0], group_setup, group_teardown)
+        _cmocka_run_group_tests(#group_tests, group_tests, sizeof(group_tests) / sizeof((group_tests)[0]), group_setup, group_teardown)
 #endif
 
 #ifdef DOXYGEN
@@ -1832,7 +1901,7 @@ int cmocka_run_group_tests_name(const char *group_name,
                                 CMFixtureFunction group_teardown);
 #else
 # define cmocka_run_group_tests_name(group_name, group_tests, group_setup, group_teardown) \
-        _cmocka_run_group_tests(group_name, group_tests, sizeof(group_tests) / sizeof(group_tests)[0], group_setup, group_teardown)
+        _cmocka_run_group_tests(group_name, group_tests, sizeof(group_tests) / sizeof((group_tests)[0]), group_setup, group_teardown)
 #endif
 
 /** @} */
@@ -2198,6 +2267,12 @@ void _assert_return_code(const LargestIntegralType result,
                          const char * const expression,
                          const char * const file,
                          const int line);
+void _assert_float_equal(const float a, const float n,
+		const float epsilon, const char* const file,
+		const int line);
+void _assert_float_not_equal(const float a, const float n,
+		const float epsilon, const char* const file,
+		const int line);
 void _assert_int_equal(
     const LargestIntegralType a, const LargestIntegralType b,
     const char * const file, const int line);
@@ -2278,6 +2353,31 @@ enum cm_message_output {
  *
  */
 void cmocka_set_message_output(enum cm_message_output output);
+
+
+/**
+ * @brief Set a pattern to only run the test matching the pattern.
+ *
+ * This allows to filter tests and only run the ones matching the pattern. The
+ * pattern can include two wildards. The first is '*', a wildcard that matches
+ * zero or more characters, or ‘?’, a wildcard that matches exactly one
+ * character.
+ *
+ * @param[in]  pattern    The pattern to match, e.g. "test_wurst*"
+ */
+void cmocka_set_test_filter(const char *pattern);
+
+/**
+ * @brief Set a pattern to skip tests matching the pattern.
+ *
+ * This allows to filter tests and skip the ones matching the pattern. The
+ * pattern can include two wildards. The first is '*', a wildcard that matches
+ * zero or more characters, or ‘?’, a wildcard that matches exactly one
+ * character.
+ *
+ * @param[in]  pattern    The pattern to match, e.g. "test_wurst*"
+ */
+void cmocka_set_skip_filter(const char *pattern);
 
 /** @} */
 

@@ -1,3 +1,33 @@
+Thu Mar 28 2019 Andreas Schneider <asn@cryptomilk.org>
+    * cmocka version 1.1.5
+    * Added cmocka_set_skip_filter()
+
+Thu Mar 28 2019 Andreas Schneider <asn@cryptomilk.org>
+    * cmocka version 1.1.4
+    * Added assert_float(_not)_equal()
+    * Added expect_any_always()
+    * Small bug fixes
+
+Wed Sep 26 2018 Andreas Schneider <asn@cryptomilk.org>
+    * cmocka version 1.1.3
+    * Fixed subunit output on failures
+    * Do not abort if a test is skipped
+    * Switched to Modern CMake
+
+Wed Aug 29 2018 Andreas Schneider <asn@cryptomilk.org>
+    * cmocka version 1.1.2
+    * Added function to filter tests (cmocka_set_test_filter)
+    * Added new mocking example (uptime)
+    * Fixed fixture error reporting
+    * Fixed compiler flags detection
+    * Some improvement for API documentation
+
+Fri Apr 07 2016 Andreas Schneider <asn@cryptomilk.org>
+    * cmocka: version 1.1.1
+    * Fixed TAP output
+    * Fixed cmocka on Windows x64
+    * Fixed xUnit output durations
+
 Wed Sep 21 2016 Andreas Schneider <asn@cryptomilk.org>
     * cmocka: version 1.1.0
     * Added support to catch multiple exceptions

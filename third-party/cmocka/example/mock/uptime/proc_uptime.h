@@ -1,5 +1,5 @@
 /*
- * Copyright 2008 Google Inc.
+ * Copyright 2018 Andreas Scheider <asn@cryptomilk.org>
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,14 +14,9 @@
  * limitations under the License.
  */
 
-typedef struct KeyValue {
-    unsigned int key;
-    const char* value;
-} KeyValue;
+#ifndef _PROC_UPTIME_H
+#define _PROC_UPTIME_H
 
-void set_key_values(KeyValue * const new_key_values,
-                    const unsigned int new_number_of_key_values);
+int uptime(const char *uptime_path, double *uptime_secs, double *idle_secs);
 
-KeyValue* find_item_by_value(const char * const value);
-
-void sort_items_by_key(void);
+#endif /* _PROC_UPTIME_H */

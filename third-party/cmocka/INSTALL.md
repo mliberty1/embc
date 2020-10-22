@@ -26,7 +26,8 @@ On Windows you should choose a makefile gernerator with -G, for example:
    cmake -G "Visual Studio 12 2013" -DCMAKE_BUILD_TYPE=Debug /path/to/source
 
 You can also use the CMake GUI which is shipped with CMake. It will list all
-available generators for MSVC on Windows.
+available generators for MSVC on Windows. We only support Visual Studio 2013
+or newer which supports C99.
 
 ### CMake standard options
 Here is a list of the most interesting options provided out of the box by
@@ -69,7 +70,7 @@ If you want to install cmocka after compilation run:
 
 The cmocka library can be found in the `build/src` directory.
 You can run the binaries in `build/examples/*` which is a
-are exsample tests.
+are example tests.
 
 ## Testing
 
