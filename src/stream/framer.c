@@ -35,8 +35,7 @@
  *   fills or the received timeout expires.
  */
 
-
-//#define LOG_LEVEL LOG_LEVEL_ALL
+// #define EMBC_LOG_LEVEL EMBC_LOG_LEVEL_ALL
 #include "embc/stream/framer.h"
 #include "embc/stream/framer_util.h"
 #include "embc/collections/list.h"
