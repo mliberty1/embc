@@ -7,6 +7,12 @@ __pycache__
 *.pyc
 *.atsuo
 
+py/build/**
+py/dist/**
+py/embc.egg-info/**
+py/embc/libembc.dll
+
+
 # Compiled Object files
 *.slo
 *.lo
