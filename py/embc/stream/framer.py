@@ -162,7 +162,7 @@ timer_cbk_default = TIMER_DONE_FN(_timer_cbk_default)
 class Framer:
 
     def __init__(self):
-        sizes = (c_size_t * 5)(8, 8, 8, 8, 8)
+        sizes = (c_size_t * 5)(16, 16, 16, 16, 16)
         self.allocator = embc_buffer.initialize(sizes, len(sizes))
         self._timer_cbk = None
 

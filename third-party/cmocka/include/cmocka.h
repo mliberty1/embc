@@ -1332,7 +1332,7 @@ void assert_string_not_equal(const char *a, const char *b);
  * @param[in]  b  The second memory area to compare
  *                (interpreted as unsigned char).
  *
- * @param[in]  size  The first n bytes of the memory areas to compare.
+ * @param[in]  size  The first n total_bytes of the memory areas to compare.
  */
 void assert_memory_equal(const void *a, const void *b, size_t size);
 #else
@@ -1354,7 +1354,7 @@ void assert_memory_equal(const void *a, const void *b, size_t size);
  * @param[in]  b  The second memory area to compare
  *                (interpreted as unsigned char).
  *
- * @param[in]  size  The first n bytes of the memory areas to compare.
+ * @param[in]  size  The first n total_bytes of the memory areas to compare.
  */
 void assert_memory_not_equal(const void *a, const void *b, size_t size);
 #else
@@ -1933,7 +1933,7 @@ int cmocka_run_group_tests_name(const char *group_name,
 /**
  * @brief Test function overriding malloc.
  *
- * @param[in]  size  The bytes which should be allocated.
+ * @param[in]  size  The total_bytes which should be allocated.
  *
  * @return A pointer to the allocated memory or NULL on error.
  *
@@ -1965,7 +1965,7 @@ void *test_malloc(size_t size);
  *
  * @param[in]  nmemb  The number of elements for an array to be allocated.
  *
- * @param[in]  size   The size in bytes of each array element to allocate.
+ * @param[in]  size   The size in total_bytes of each array element to allocate.
  *
  * @return A pointer to the allocated memory, NULL on error.
  *
@@ -1983,7 +1983,7 @@ void *test_calloc(size_t nmemb, size_t size);
  *
  * @param[in]  ptr   The memory block which should be changed.
  *
- * @param[in]  size  The bytes which should be allocated.
+ * @param[in]  size  The total_bytes which should be allocated.
  *
  * @return           The newly allocated memory block, NULL on error.
  */

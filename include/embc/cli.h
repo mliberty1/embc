@@ -136,7 +136,7 @@ typedef struct embc_cli_s {
     char cmdline[EMBC_CLI_LINE_LENGTH + 2];
 
     /**
-     * @brief The current size of cmdline in bytes.
+     * @brief The current size of cmdline in total_bytes.
      */
     embc_size_t cmdlen;
 

@@ -44,6 +44,7 @@ set(SOURCES
         stream/async_sink.c
         stream/async_source.c
         stream/framer.c
+        stream/framer_rx.c
         ${PLATFORM_SRC}
 )
 

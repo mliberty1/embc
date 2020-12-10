@@ -118,7 +118,7 @@ enum embc_stream_transaction_type_e {
      * @brief Transmit data from the producer to the consumer.
      *
      * The associated data.ioctl_write.ptr points to the buffer to write, and
-     * the length contains the number of bytes to write.  The buffer must
+     * the length contains the number of total_bytes to write.  The buffer must
      * remain valid until the corresponding response.
      *
      * The stream protocol places no constraints or guarantees on the
@@ -180,7 +180,7 @@ enum embc_stream_transaction_type_e {
      * consumer must add a header before sending the buffer down a chain of
      * streams.  In this mode, data.event_write_request_consumer_buffer.ptr
      * contains the buffer to fill and length contains the desired number of
-     * bytes.  The producer is obligated to provide length bytes except for
+     * total_bytes.  The producer is obligated to provide length total_bytes except for
      * the last WRITE transaction in a file.
      */
     EMBC_STREAM_EVENT_WRITE_REQUEST = 129,
@@ -295,7 +295,7 @@ struct embc_stream_transaction_s {
     uint8_t reserved;
 
     /**
-     * @brief The length of data.ptr in bytes.
+     * @brief The length of data.ptr in total_bytes.
      *
      * This field is only set when the type requires data.ptr.  The length
      * should be 0 when data is unused or for any immediate data type.

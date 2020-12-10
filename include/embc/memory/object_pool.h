@@ -75,8 +75,8 @@ struct embc_object_pool_s;
  * @brief Get the pool instance size.
  *
  * @param obj_count The number of objects in the pool.
- * @param obj_size The size of each object in bytes.
- * @return The required size for embc_object_pool_s in bytes.
+ * @param obj_size The size of each object in total_bytes.
+ * @return The required size for embc_object_pool_s in total_bytes.
  */
 EMBC_API int32_t embc_object_pool_instance_size(int32_t obj_count,
                                                 int32_t obj_size);
@@ -85,9 +85,9 @@ EMBC_API int32_t embc_object_pool_instance_size(int32_t obj_count,
  * @brief Initialize a new memory pool.
  *
  * @param[out] self The memory pool to initialize which must be at least
- *      embc_object_pool_instance_size(obj_count, obj_size) bytes.
+ *      embc_object_pool_instance_size(obj_count, obj_size) total_bytes.
  * @param obj_count The number of objects in the pool.
- * @param obj_size The size of each object in bytes.
+ * @param obj_size The size of each object in total_bytes.
  * @param constructor The function called for each new object allocated.
  *      If not provided, the object memory will be set to zero.
  * @param destructor The function called when an object is freed.

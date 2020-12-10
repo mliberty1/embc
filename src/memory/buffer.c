@@ -134,7 +134,7 @@ static embc_size_t size_to_index_(struct embc_buffer_allocator_s * self, embc_si
     EMBC_ASSERT((size > 0) && (size <= self->size_max));
     embc_size_t index = 32 - embc_clz((uint32_t) (size - 1));
     if (index < 5) {
-        index = 0; // 32 bytes is smallest
+        index = 0; // 32 total_bytes is smallest
     } else {
         index = index - 5;
     }

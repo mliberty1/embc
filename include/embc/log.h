@@ -227,6 +227,31 @@ extern char const embc_log_level_char[EMBC_LOG_LEVEL_ALL + 1];
     } while (0)
 
 
+#ifdef _MSC_VER
+/* Microsoft Visual Studio compiler support */
+/** Log a emergency using printf-style arguments. */
+#define EMBC_LOG_EMERGENCY(format, ...)  EMBC_LOG(EMBC_LOG_LEVEL_EMERGENCY, format, __VA_ARGS__)
+/** Log a alert using printf-style arguments. */
+#define EMBC_LOG_ALERT(format, ...)  EMBC_LOG(EMBC_LOG_LEVEL_ALERT, format, __VA_ARGS__)
+/** Log a critical failure using printf-style arguments. */
+#define EMBC_LOG_CRITICAL(format, ...)  EMBC_LOG(EMBC_LOG_LEVEL_CRITICAL, format, __VA_ARGS__)
+/** Log an error using printf-style arguments. */
+#define EMBC_LOG_ERROR(format, ...)     EMBC_LOG(EMBC_LOG_LEVEL_ERROR, format, __VA_ARGS__)
+/** Log a warning using printf-style arguments. */
+#define EMBC_LOG_WARNING(format, ...)      EMBC_LOG(EMBC_LOG_LEVEL_WARNING, format, __VA_ARGS__)
+/** Log a notice using printf-style arguments. */
+#define EMBC_LOG_NOTICE(format, ...)    EMBC_LOG(EMBC_LOG_LEVEL_NOTICE,   format, __VA_ARGS__)
+/** Log an informative message using printf-style arguments. */
+#define EMBC_LOG_INFO(format, ...)      EMBC_LOG(EMBC_LOG_LEVEL_INFO,     format, __VA_ARGS__)
+/** Log a detailed debug message using printf-style arguments. */
+#define EMBC_LOG_DEBUG1(format, ...)    EMBC_LOG(EMBC_LOG_LEVEL_DEBUG1,    format, __VA_ARGS__)
+/** Log a very detailed debug message using printf-style arguments. */
+#define EMBC_LOG_DEBUG2(format, ...)    EMBC_LOG(EMBC_LOG_LEVEL_DEBUG2,  format, __VA_ARGS__)
+/** Log an insanely detailed debug message using printf-style arguments. */
+#define EMBC_LOG_DEBUG3(format, ...)    EMBC_LOG(EMBC_LOG_LEVEL_DEBUG3,  format, __VA_ARGS__)
+
+#else
+/* GCC compiler support */
 // zero length variadic arguments are not allowed for macros
 // this hack ensures that LOG(message) and LOG(format, args...) are both supported.
 // https://stackoverflow.com/questions/5588855/standard-alternative-to-gccs-va-args-trick
@@ -235,35 +260,40 @@ extern char const embc_log_level_char[EMBC_LOG_LEVEL_ALL + 1];
 #define _EMBC_LOG_N(level, format, ...) EMBC_LOG(level, format, __VA_ARGS__)
 #define _EMBC_LOG_DISPATCH(level, ...)  _EMBC_LOG_SELECT(_EMBC_LOG, __VA_ARGS__, N, N, N, N, N, N, N, N, N, N, 1, 0)(level, __VA_ARGS__)
 
-
 /** Log a emergency using printf-style arguments. */
 #define EMBC_LOG_EMERGENCY(...)  _EMBC_LOG_DISPATCH(EMBC_LOG_LEVEL_EMERGENCY, __VA_ARGS__)
 /** Log a alert using printf-style arguments. */
-#define EMBC_LOG_ALERT(...)  _EMBC_LOG_DISPATCH(EMBC_LOG_LEVEL_ALERT, format, __VA_ARGS__)
+#define EMBC_LOG_ALERT(...)  _EMBC_LOG_DISPATCH(EMBC_LOG_LEVEL_ALERT, __VA_ARGS__)
 /** Log a critical failure using printf-style arguments. */
 #define EMBC_LOG_CRITICAL(...)  _EMBC_LOG_DISPATCH(EMBC_LOG_LEVEL_CRITICAL, __VA_ARGS__)
 /** Log an error using printf-style arguments. */
 #define EMBC_LOG_ERROR(...)     _EMBC_LOG_DISPATCH(EMBC_LOG_LEVEL_ERROR, __VA_ARGS__)
-/** Log an error using printf-style arguments.  Alias for EMBC_LOG_ERROR. */
-#define EMBC_LOG_ERR EMBC_LOG_ERROR
 /** Log a warning using printf-style arguments. */
 #define EMBC_LOG_WARNING(...)      _EMBC_LOG_DISPATCH(EMBC_LOG_LEVEL_WARNING, __VA_ARGS__)
-/** Log a warning using printf-style arguments.  Alias for EMBC_LOG_WARNING. */
-#define EMBC_LOG_WARN EMBC_LOG_WARNING
 /** Log a notice using printf-style arguments. */
 #define EMBC_LOG_NOTICE(...)    _EMBC_LOG_DISPATCH(EMBC_LOG_LEVEL_NOTICE,   __VA_ARGS__)
 /** Log an informative message using printf-style arguments. */
 #define EMBC_LOG_INFO(...)      _EMBC_LOG_DISPATCH(EMBC_LOG_LEVEL_INFO,     __VA_ARGS__)
 /** Log a detailed debug message using printf-style arguments. */
 #define EMBC_LOG_DEBUG1(...)    _EMBC_LOG_DISPATCH(EMBC_LOG_LEVEL_DEBUG1,    __VA_ARGS__)
-/** Log a detailed debug message using printf-style arguments.  Alias for EMBC_LOG_DEBUG1. */
-#define EMBC_LOG_DEBUG EMBC_LOG_DEBUG1
-/** Log a detailed debug message using printf-style arguments.  Alias for EMBC_LOG_DEBUG1. */
-#define EMBC_LOG_DBG EMBC_LOG_DEBUG1
 /** Log a very detailed debug message using printf-style arguments. */
 #define EMBC_LOG_DEBUG2(...)    _EMBC_LOG_DISPATCH(EMBC_LOG_LEVEL_DEBUG2,  __VA_ARGS__)
 /** Log an insanely detailed debug message using printf-style arguments. */
 #define EMBC_LOG_DEBUG3(...)    _EMBC_LOG_DISPATCH(EMBC_LOG_LEVEL_DEBUG3,  __VA_ARGS__)
+
+#endif
+
+
+/** Log an error using printf-style arguments.  Alias for EMBC_LOG_ERROR. */
+#define EMBC_LOG_ERR EMBC_LOG_ERROR
+/** Log a warning using printf-style arguments.  Alias for EMBC_LOG_WARNING. */
+#define EMBC_LOG_WARN EMBC_LOG_WARNING
+/** Log a detailed debug message using printf-style arguments.  Alias for EMBC_LOG_DEBUG1. */
+#define EMBC_LOG_DEBUG EMBC_LOG_DEBUG1
+/** Log a detailed debug message using printf-style arguments.  Alias for EMBC_LOG_DEBUG1. */
+#define EMBC_LOG_DBG EMBC_LOG_DEBUG1
+
+
 
 
 #define EMBC_LOGE EMBC_LOG_ERROR

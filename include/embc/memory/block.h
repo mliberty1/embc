@@ -62,8 +62,8 @@ struct embc_mblock_s;
  * @brief Get the block instance size.
  *
  * @param mem_size The total size of the memory to manage.
- * @param block_size The size of each block in bytes.
- * @return The required size for embc_mblock_s in bytes.
+ * @param block_size The size of each block in total_bytes.
+ * @return The required size for embc_mblock_s in total_bytes.
  */
 EMBC_API int32_t embc_mblock_instance_size(int32_t mem_size,
                                            int32_t block_size);
@@ -72,10 +72,10 @@ EMBC_API int32_t embc_mblock_instance_size(int32_t mem_size,
  * @brief Initialize a new block allocator.
  *
  * @param[out] self The memory block allocator to initialize which must be at
- *      least embc_mblock_instance_size(mem_size, block_size) bytes.
+ *      least embc_mblock_instance_size(mem_size, block_size) total_bytes.
  * @param mem The memory region to manage.
  * @param mem_size The total size of the memory to manage.
- * @param block_size The size of each block in bytes.
+ * @param block_size The size of each block in total_bytes.
  * @return 0 or error code.
  */
 EMBC_API int32_t embc_mblock_initialize(

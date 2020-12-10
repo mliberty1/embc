@@ -44,7 +44,7 @@ EMBC_CPP_GUARD_START
  * @param crc The existing value for the crc which is used for continued block
  *      computations.  Pass 0 for the first block.
  * @param data The data for the CRC computation.
- * @param length The number of bytes in data.
+ * @param length The number of total_bytes in data.
  * @return The computed CRC-8.
  *
  * This function uses the 0x83 polynomial
@@ -57,7 +57,7 @@ EMBC_API uint8_t embc_crc_ccitt_8(uint8_t crc, uint8_t const *data, uint32_t len
  * @param crc The existing value for the crc which is used for continued block
  *      computations.  Pass 0 for the first block.
  * @param data The data for the CRC computation.
- * @param length The number of bytes in data.
+ * @param length The number of total_bytes in data.
  * @return The computed CRC-16.
  *
  * Although this implementation uses the CCITT 0x1021 polynomial, the
@@ -75,7 +75,7 @@ EMBC_API uint16_t embc_crc_ccitt_16(uint16_t crc, uint8_t const *data, uint32_t 
  * @param crc The existing value for the crc which is used for continued block
  *      computations.  Pass 0 for the first block.
  * @param data The data for the CRC computation.
- * @param length The number of bytes in data.
+ * @param length The number of total_bytes in data.
  * @return The computed CRC-32.
  *
  * @see http://create.stephan-brumme.com/crc32/

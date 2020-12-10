@@ -76,7 +76,7 @@ struct embc_buffer_manager_s {
  *
  * These buffers are normally used to hold dynamic data that needs to
  * passed through the system.  Buffers can easily be sent between tasks
- * or through networking stacks.  Each buffer adds 32 bytes of overhead
+ * or through networking stacks.  Each buffer adds 32 total_bytes of overhead
  * on most 32-bit architectures.  The buffer includes a linked list item
  * so that it can easily participate in queues and scatter/gather lists.
  * For single words of data, standard RTOS message queues are usually more
@@ -116,7 +116,7 @@ struct embc_buffer_s {
     uint8_t * const data;
 
     /**
-     * @brief The total storage capacity of the buffer in bytes.
+     * @brief The total storage capacity of the buffer in total_bytes.
      *
      * The last byte in the buffer is data[capacity - 1].
      * Applications should **never** modify this capacity!
@@ -136,7 +136,7 @@ struct embc_buffer_s {
     uint16_t cursor;
 
     /**
-     * @brief The length of the current buffer contents in bytes.
+     * @brief The length of the current buffer contents in total_bytes.
      *
      * This field allows memory safe reading from the buffer.
      *
@@ -145,7 +145,7 @@ struct embc_buffer_s {
     uint16_t length;
 
     /**
-     * @brief The length to reserve at the end of the buffer in bytes.
+     * @brief The length to reserve at the end of the buffer in total_bytes.
      *
      * This field allows safe reservation of space at the end of the buffer.
      * A common use is for networking stacks.  The stack can allocate the
@@ -207,7 +207,7 @@ struct embc_buffer_s {
  *      how many 32 byte buffers to allocate.  See the table below
  *      for details on sizes and the overhead for each size.
  * @param length The number of entries in sizes.
- * @return The size of the buffer allocator instance in bytes.
+ * @return The size of the buffer allocator instance in total_bytes.
  * @see embc_buffer_allocator_new()
  * @see embc_buffer_allocator_initialize()
  */
@@ -218,7 +218,7 @@ EMBC_API embc_size_t embc_buffer_allocator_instance_size(
  * @brief Initialize the buffer allocator.
  *
  * @param self The instance to initialize which must be at least
- *      embc_buffer_allocator_instance_size(sizes, length) bytes.
+ *      embc_buffer_allocator_instance_size(sizes, length) total_bytes.
  * @param sizes The length 8 array of sizes to allocate to each
  *      buffer size.  sizes[0] (minimum size) determines
  *      how many 32 byte buffers to allocate.  See the table below
@@ -231,7 +231,7 @@ EMBC_API embc_size_t embc_buffer_allocator_instance_size(
  * This module also includes a fast buffer manager (memory manager)
  * that performs constant-time allocation and deallocation.  The memory
  * manager is similar to a memory pool.  However, this memory manager
- * supports multiple buffer payload sizes in powers of 2 started with 32 bytes.
+ * supports multiple buffer payload sizes in powers of 2 started with 32 total_bytes.
  * This approach shares many features with slab allocators.  The number
  * of blocks of each size are specified at initialization, and the system
  * memory manager only allocates once.
@@ -324,20 +324,20 @@ static inline void embc_buffer_free(struct embc_buffer_s * buffer) {
 }
 
 /**
- * @brief Get the total number of bytes that can be stored in the buffer.
+ * @brief Get the total number of total_bytes that can be stored in the buffer.
  *
  * @param buffer The buffer instance.
- * @return To total size of buffer in bytes.
+ * @return To total size of buffer in total_bytes.
  */
 static inline embc_size_t embc_buffer_capacity(struct embc_buffer_s * buffer) {
     return (embc_size_t) (buffer->capacity);
 }
 
 /**
- * @brief Get the number of bytes currently in the buffer.
+ * @brief Get the number of total_bytes currently in the buffer.
  *
  * @param buffer The buffer instance.
- * @return To size of data currently in buffer in bytes.
+ * @return To size of data currently in buffer in total_bytes.
  */
 static inline embc_size_t embc_buffer_length(struct embc_buffer_s * buffer) {
     return (embc_size_t) (buffer->length);
@@ -347,7 +347,7 @@ static inline embc_size_t embc_buffer_length(struct embc_buffer_s * buffer) {
  * @brief Get the remaining buffer size available for write from the cursor.
  *
  * @param buffer The buffer instance.
- * @return The amount of additional data that buffer can hold in bytes.
+ * @return The amount of additional data that buffer can hold in total_bytes.
  */
 static inline embc_size_t embc_buffer_write_remaining(struct embc_buffer_s * buffer) {
     return (embc_size_t) (buffer->capacity - buffer->cursor - buffer->reserve);
@@ -357,7 +357,7 @@ static inline embc_size_t embc_buffer_write_remaining(struct embc_buffer_s * buf
  * @brief Get the remaining buffer size available for reads from the cursor.
  *
  * @param buffer The buffer instance.
- * @return The amount of additional data that can be read from the buffer in bytes.
+ * @return The amount of additional data that can be read from the buffer in total_bytes.
  */
 static inline embc_size_t embc_buffer_read_remaining(struct embc_buffer_s * buffer) {
     return (embc_size_t) (buffer->length - buffer->cursor);
@@ -417,7 +417,7 @@ static inline void embc_buffer_clear(struct embc_buffer_s * buffer) {
  *
  * @param[inout] buffer The buffer instance.
  * @param[in] data The pointer to the data to write.
- * @param[in] size The size of data in bytes.
+ * @param[in] size The size of data in total_bytes.
  * @warning This function asserts if buffer capacity is exceeded.
  */
 EMBC_API void embc_buffer_write(struct embc_buffer_s * buffer,
@@ -430,7 +430,7 @@ EMBC_API void embc_buffer_write(struct embc_buffer_s * buffer,
  * @param[inout] destination The destination buffer instance.
  * @param[in] source The source buffer instance.  Data will be copied starting
  *      from the cursor.
- * @param[in] size The number of bytes to copy.
+ * @param[in] size The number of total_bytes to copy.
  * @warning This function asserts if buffer capacity is exceeded.
  */
 EMBC_API void embc_buffer_copy(struct embc_buffer_s * destination,
@@ -538,7 +538,7 @@ EMBC_API void embc_buffer_write_u64_be(struct embc_buffer_s * buffer, uint64_t v
  *
  * @param[inout] buffer The buffer instance.
  * @param[inout] data The pointer to the data to write.
- * @param[in] size The size of data to read in bytes.
+ * @param[in] size The size of data to read in total_bytes.
  * @warning This function asserts if buffer capacity is exceeded.
  */
 EMBC_API void embc_buffer_read(struct embc_buffer_s * buffer,
@@ -658,7 +658,7 @@ extern const struct embc_buffer_manager_s embc_buffer_manager_static;
  * @brief Declare a new static buffer instance.
  *
  * @param name The name for the buffer.
- * @param size The size of the buffer in bytes.
+ * @param size The size of the buffer in total_bytes.
  *
  * The allocation is static.  If this macro is placed in the outer scope of
  * a .c file, the buffer will be placed into BSS memory.  If this macro is
@@ -696,7 +696,7 @@ extern const struct embc_buffer_manager_s embc_buffer_manager_static;
  * @brief Define a new static buffer instance.
  *
  * @param name The name for the buffer.
- * @param size The size of the buffer in bytes.
+ * @param size The size of the buffer in total_bytes.
  *
  * The allocation is static.  If this macro is placed in the outer scope of
  * a .c file, the buffer will be placed into BSS memory.  If this macro is

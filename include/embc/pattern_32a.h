@@ -109,7 +109,7 @@ EMBC_API uint32_t embc_pattern_32a_tx_next(
  *
  * @param self The instance to initialize.
  * @param buffer The buffer to fill.  Must be 32-bit word aligned.
- * @param size The size of buffer in bytes.  Must be a multiple of 4.
+ * @param size The size of buffer in total_bytes.  Must be a multiple of 4.
  */
 
 EMBC_API void embc_pattern_32a_tx_buffer(
@@ -140,7 +140,7 @@ EMBC_API void embc_pattern_32a_rx_next(
  *
  * @param The receiver instance.
  * @param buffer The buffer to process.  Must be 32-bit word aligned.
- * @param size The size of buffer in bytes.  Must be a multiple of 4.
+ * @param size The size of buffer in total_bytes.  Must be a multiple of 4.
  */
 EMBC_API void embc_pattern_32a_rx_buffer(
         struct embc_pattern_32a_rx_s * self,

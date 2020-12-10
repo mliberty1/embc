@@ -1,4 +1,5 @@
-# Copyright 2014-2017 Jetperch LLC
+#!/usr/bin/env python3
+# Copyright 2018-2020 Jetperch LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,8 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-ADD_CMOCKA_TEST(async_test)
-ADD_CMOCKA_TEST(async_sink_test)
-ADD_CMOCKA_TEST(async_source_test)
-ADD_CMOCKA_TEST(framer_test)
-ADD_CMOCKA_TEST(framer_rx_test)
+from . import crc, framer_tester
+
+__all__ = [crc, framer_tester]
+"""This list of available command modules.  Each module must contain a 
+parser_config(subparser) function.  The function must return the callable(args)
+that will be executed for the command."""

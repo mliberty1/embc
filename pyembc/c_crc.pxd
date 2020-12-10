@@ -1,4 +1,4 @@
-# Copyright 2014-2017 Jetperch LLC
+# Copyright 2020 Jetperch LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,8 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-ADD_CMOCKA_TEST(async_test)
-ADD_CMOCKA_TEST(async_sink_test)
-ADD_CMOCKA_TEST(async_source_test)
-ADD_CMOCKA_TEST(framer_test)
-ADD_CMOCKA_TEST(framer_rx_test)
+from libc.stdint cimport uint8_t, uint16_t, uint32_t
+
+cdef extern from "embc/crc.h":
+
+    uint8_t embc_crc_ccitt_8(uint8_t crc, const uint8_t  *data, uint32_t length)
+    uint16_t embc_crc_ccitt_16(uint16_t crc, const uint8_t *data, uint32_t length)
+    uint32_t embc_crc32(uint32_t crc, const uint8_t *data, uint32_t length)

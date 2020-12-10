@@ -62,7 +62,7 @@ struct embc_stream_source_s {
  * @param self The instance to initialize.
  * @param transaction_buffer The producer buffer to use when transmitting
  *      data.  This only allows a single transaction outstanding at a time.
- * @param transaction_length The length of transaction_buffer in bytes.
+ * @param transaction_length The length of transaction_buffer in total_bytes.
  */
 EMBC_API void embc_stream_source_initialize(
         struct embc_stream_source_s * self,

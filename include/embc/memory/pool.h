@@ -60,8 +60,8 @@ struct embc_pool_s;
  * @brief Get the pool instance size.
  *
  * @param block_count The number of blocks in the pool.
- * @param block_size The size of each block in bytes.
- * @return The required size for embc_pool_s in bytes.
+ * @param block_size The size of each block in total_bytes.
+ * @return The required size for embc_pool_s in total_bytes.
  */
 EMBC_API int32_t embc_pool_instance_size(int32_t block_count,
                                          int32_t block_size);
@@ -70,9 +70,9 @@ EMBC_API int32_t embc_pool_instance_size(int32_t block_count,
  * @brief Initialize a new memory pool.
  *
  * @param[out] self The memory pool to initialize which must be at least
- *      embc_pool_instance_size(block_count, block_size) bytes.
+ *      embc_pool_instance_size(block_count, block_size) total_bytes.
  * @param block_count The number of blocks in the pool.
- * @param block_size The size of each block in bytes.
+ * @param block_size The size of each block in total_bytes.
  * @return 0 or error code.
  */
 EMBC_API int32_t embc_pool_initialize(

@@ -43,7 +43,7 @@ EMBC_CPP_GUARD_START
  *
  * @param user_data The arbitrary user data.
  * @param buffer The completed buffer.
- * @param length The length of buffer in bytes.
+ * @param length The length of buffer in total_bytes.
  */
 typedef void (*embc_stream_sink_data_fn)(
         void * user_data,
@@ -74,7 +74,7 @@ struct embc_stream_sink_s {
  * @param self The instance to initialize.
  * @param transaction_buffer The producer buffer to use when transmitting
  *      data.  This only allows a single transaction outstanding at a time.
- * @param transaction_length The length of transaction_buffer in bytes.
+ * @param transaction_length The length of transaction_buffer in total_bytes.
  */
 EMBC_API void embc_stream_sink_initialize(
         struct embc_stream_sink_s * self,

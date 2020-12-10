@@ -43,7 +43,7 @@ manually create the embc/config.h file.
 
 First install the build tools for your system.
 
-    sudo apt-get install build-essential cmake
+    sudo apt-get install build-essential cmake doxygen graphviz
 
 Then compile the EMBC library:
 

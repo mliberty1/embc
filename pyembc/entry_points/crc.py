@@ -1,4 +1,4 @@
-# Copyright 2014-2017 Jetperch LLC
+# Copyright 2020 Jetperch LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,8 +12,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-ADD_CMOCKA_TEST(async_test)
-ADD_CMOCKA_TEST(async_sink_test)
-ADD_CMOCKA_TEST(async_source_test)
-ADD_CMOCKA_TEST(framer_test)
-ADD_CMOCKA_TEST(framer_rx_test)
+import numpy as np
+from pyembc import crc
+
+
+def parser_config(p):
+    """compute CRC."""
+    p.add_argument('--data',
+                   help='The CRC data.')
+    return on_cmd
+
+
+def on_cmd(args):
+    if args.data is not None:
+        x = np.array([int(x, 0) for x in args.data.split(',')], dtype=np.uint8)
+        y = crc.crc32(0, x)
+        print(f'0x{y:08x}')
+        return 0
+    return 1
+

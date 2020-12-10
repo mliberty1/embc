@@ -48,7 +48,7 @@ EMBC_CPP_GUARD_START
  * @param tgt The null-terminated destination string.
  * @param src The null-terminated source string.  If NULL, then tgt
  *      will be populated with an empty string.
- * @param tgt_size The total number of bytes available in tgt.
+ * @param tgt_size The total number of total_bytes available in tgt.
  * @return 0 on success, 1 if truncated, -1 on tgt NULL or tgt_size <= 0.
  */
 EMBC_API int embc_cstr_copy(char * tgt, char const * src, embc_size_t tgt_size);

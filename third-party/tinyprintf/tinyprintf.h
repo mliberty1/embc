@@ -45,9 +45,9 @@ specifier.
 
 The memory footprint of course depends on the target CPU, compiler and
 compiler options, but a rough guesstimate (based on a H8S target) is about
-1.4 kB for code and some twenty 'int's and 'char's, say 60 bytes of stack space.
+1.4 kB for code and some twenty 'int's and 'char's, say 60 total_bytes of stack space.
 Not too bad. Your mileage may vary. By hacking the source code you can
-get rid of some hundred bytes, I'm sure, but personally I feel the balance of
+get rid of some hundred total_bytes, I'm sure, but personally I feel the balance of
 functionality and flexibility versus  code size is close to optimal for
 many embedded systems.
 

@@ -60,7 +60,7 @@ void embc_fatal(char const * file, int line, char const * msg) {
     if (fatal_fn_) {
         fatal_fn_(fatal_user_data_, file, line, msg);
     } else {
-        embc_lib_printf_("FATAL: %s : %d : %s", file, line, msg);
+        embc_lib_printf_("FATAL: %s : %d : %s\n", file, line, msg);
     }
 }
 

@@ -62,7 +62,7 @@
 #include <cmocka.h>
 #include <cmocka_private.h>
 
-/* Size of guard bytes around dynamically allocated blocks. */
+/* Size of guard total_bytes around dynamically allocated blocks. */
 #define MALLOC_GUARD_SIZE 16
 /* Pattern used to initialize guard blocks. */
 #define MALLOC_GUARD_PATTERN 0xEF
@@ -1339,7 +1339,7 @@ static int memory_equal_display_error(const char* const a, const char* const b,
         if (differences >= 16) {
             cm_print_error("...\n");
         }
-        cm_print_error("%"PRIdS " bytes of %p and %p differ\n",
+        cm_print_error("%"PRIdS " total_bytes of %p and %p differ\n",
                        differences, (void *)a, (void *)b);
         return 0;
     }
@@ -1364,7 +1364,7 @@ static int memory_not_equal_display_error(
         }
     }
     if (same == size) {
-        cm_print_error("%"PRIdS "bytes of %p and %p the same\n",
+        cm_print_error("%"PRIdS "total_bytes of %p and %p the same\n",
                        same, (void *)a, (void *)b);
         return 0;
     }

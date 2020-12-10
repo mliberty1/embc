@@ -83,7 +83,7 @@ EMBC_API void embc_lib_print_set(embc_lib_print_fn fn, void * user_data);
 /**
  * @brief Dynamically allocate a block of memory.
  *
- * @param sz The size in bytes.
+ * @param sz The size in total_bytes.
  * @return The pointer to the allocated memory or 0.
  */
 EMBC_API void * embc_lib_alloc(embc_size_t sz);

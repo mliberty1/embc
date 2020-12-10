@@ -91,11 +91,11 @@ static inline uint32_t embc_clz(uint32_t x);
 static inline uint32_t embc_upper_power_of_two(uint32_t x);
 
 /**
- * @brief Fill the first num bytes of the memory buffer to value.
+ * @brief Fill the first num total_bytes of the memory buffer to value.
  *
  * @param ptr The memory buffer to fill.
  * @param value The new value for each byte.
- * @param num The number of bytes to fill.
+ * @param num The number of total_bytes to fill.
  */
 static inline void embc_memset(void * ptr, int value, embc_size_t num);
 
@@ -104,7 +104,7 @@ static inline void embc_memset(void * ptr, int value, embc_size_t num);
  *
  * @param destination The destination buffer.
  * @param source The source buffer.
- * @param num The number of bytes to copy.
+ * @param num The number of total_bytes to copy.
  *
  * The buffers destination and source must not overlap or the buffers may
  * be corrupted by this function!
@@ -115,7 +115,7 @@ static inline void embc_memcpy(void * destination, void const * source, embc_siz
 /**
  * @brief The function type used by EMBC to allocate memory.
  *
- * @param size_bytes The number of bytes to allocate.
+ * @param size_bytes The number of total_bytes to allocate.
  * @return The pointer to the allocated memory.
  */
 typedef void * (*embc_alloc_fn)(embc_size_t size_bytes);
@@ -140,7 +140,7 @@ EMBC_API void embc_allocator_set(embc_alloc_fn alloc, embc_free_fn free);
 /**
  * @brief Allocate memory from the heap.
  *
- * @param size_bytes The number of bytes to allocate.
+ * @param size_bytes The number of total_bytes to allocate.
  * @return The pointer to the allocated memory.
  *
  * This function will assert on out of memory conditions.
@@ -154,7 +154,7 @@ EMBC_API void * embc_alloc(embc_size_t size_bytes);
 /**
  * @brief Allocate memory from the heap and clear to 0.
  *
- * @param size_bytes The number of bytes to allocate.
+ * @param size_bytes The number of total_bytes to allocate.
  * @return The pointer to the allocated memory.
  *
  * This function will assert on out of memory conditions.

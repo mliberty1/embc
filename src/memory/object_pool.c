@@ -23,7 +23,7 @@
 #include "utlist.h"
 
 
-#define EMBC_POOL_ALIGNMENT 8  /* in bytes */
+#define EMBC_POOL_ALIGNMENT 8  /* in total_bytes */
 #define MAGIC 0x9548CE11
 #define STATUS_ALLOC 0xbfbf  /* bit[0] must be set! */
 

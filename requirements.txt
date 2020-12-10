@@ -1,0 +1,14 @@
+check-manifest>=0.37
+coverage>=4.5.2
+Cython>=0.29.3
+m2r
+# https://developercommunity.visualstudio.com/content/problem/1207405/fmod-after-an-update-to-windows-2004-is-causing-a.html
+numpy==1.19.3; sys_platform == 'win32'
+numpy>=1.15.2; sys_platform != 'win32'
+psutil
+pypiwin32>=223; sys_platform == 'win32'
+# python {path_to_python}\scripts\pywin32_postinstall.py -install
+python-dateutil>=2.7.3
+recommonmark
+sphinx>=3.1.0
+wheel

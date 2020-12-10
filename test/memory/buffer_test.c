@@ -221,7 +221,7 @@ static void buffer_reserve(void **state) {
     (void) state;
     struct embc_buffer_allocator_s * a = embc_buffer_allocator_new(SIZES1, EMBC_ARRAY_SIZE(SIZES1));
     struct embc_buffer_s * b = embc_buffer_alloc(a, 30);
-    b->reserve = 27; // leaves 5 bytes
+    b->reserve = 27; // leaves 5 total_bytes
     embc_buffer_write_str_truncate(b, "hello world!");
     assert_int_equal(5, embc_buffer_length(b));
     expect_assert_failure(embc_buffer_write_u8(b, 1));
