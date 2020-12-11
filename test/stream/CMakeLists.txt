@@ -15,5 +15,5 @@
 ADD_CMOCKA_TEST(async_test)
 ADD_CMOCKA_TEST(async_sink_test)
 ADD_CMOCKA_TEST(async_source_test)
+ADD_CMOCKA_TEST(data_link_test)
 ADD_CMOCKA_TEST(framer_test)
-ADD_CMOCKA_TEST(framer_rx_test)

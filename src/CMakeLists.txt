@@ -43,8 +43,8 @@ set(SOURCES
         stream/async.c
         stream/async_sink.c
         stream/async_source.c
+        stream/data_link.c
         stream/framer.c
-        stream/framer_rx.c
         ${PLATFORM_SRC}
 )
 
