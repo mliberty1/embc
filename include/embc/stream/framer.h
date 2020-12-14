@@ -51,7 +51,7 @@ extern "C" {
 #define EMBC_FRAMER_MIN_SIZE (EMBC_FRAMER_HEADER_SIZE + EMBC_FRAMER_FOOTER_SIZE + 1)
 #define EMBC_FRAMER_OVERHEAD_SIZE (EMBC_FRAMER_HEADER_SIZE + EMBC_FRAMER_FOOTER_SIZE)
 #define EMBC_FRAMER_FRAME_ID_MAX ((1 << 11) - 1)
-#define EMBC_FRAMER_PORTS_MAX ((1 << 5) - 1)
+#define EMBC_FRAMER_MESSAGE_ID_MAX ((1 << 24) - 1)
 
 
 enum embc_framer_type_e {
@@ -61,7 +61,7 @@ enum embc_framer_type_e {
     EMBC_FRAMER_FT_ACK_ONE = 0x3,
     EMBC_FRAMER_FT_NACK_FRAME_ID = 0x4,
     EMBC_FRAMER_FT_INVALID2 = 0x5,
-    EMBC_FRAMER_FT_NACK_FRAMING_ERROR = 0x6,
+    EMBC_FRAMER_FT_NACK_FRAMING_ERROR = 0x6,  // next expect frame_id
     EMBC_FRAMER_FT_RESET = 0x7,
 };
 
@@ -83,14 +83,12 @@ struct embc_framer_api_s {
      *
      * @param user_data The arbitrary user data.
      * @param frame_id The frame id.
-     * @param port_id The port id.
-     * @param message_id The message id.
-     * @param msg_buffer The payload buffer.
+     * @param metadata The metadata.
+     * @param msg The message buffer.
      * @param msg_size The size of msg_buffer in bytes.
      */
-    void (*data_fn)(void * user_data, uint16_t frame_id,
-                    uint8_t port_id, uint16_t message_id,
-                    uint8_t const *msg_buffer, uint32_t msg_size);
+    void (*data_fn)(void * user_data, uint16_t frame_id, uint32_t metadata,
+                    uint8_t *msg, uint32_t msg_size);
 
     /**
      * @brief The function to call on link frames.
@@ -144,15 +142,13 @@ void embc_framer_reset(struct embc_framer_s * self);
  *
  * @param b The output buffer, which must be at least msg_size + EMBC_FRAMER_OVERHEAD_SIZE bytes.
  * @param frame_id The frame id for the frame.
- * @param port_id The port id for the frame.
- * @param message_id The message id
- * @param msg_buffer The payload buffer.
+ * @param metadata The message metdata
+ * @param msg The payload buffer.
  * @param msg_size The size of msg_buffer in bytes.
  * @return 0 or error code.
  */
-int32_t embc_framer_construct_data(uint8_t * b, uint16_t frame_id,
-                                   uint8_t port_id, uint16_t message_id,
-                                   uint8_t const *msg_buffer, uint32_t msg_size);
+int32_t embc_framer_construct_data(uint8_t * b, uint16_t frame_id, uint32_t metadata,
+                                   uint8_t const *msg, uint32_t msg_size);
 
 /**
  * @brief Construct a link frame.
@@ -163,5 +159,15 @@ int32_t embc_framer_construct_data(uint8_t * b, uint16_t frame_id,
  * @return 0 or error code.
  */
 int32_t embc_framer_construct_link(uint8_t * b, enum embc_framer_type_e frame_type, uint16_t frame_id);
+
+/**
+ * @brief Compute the difference between frame ids.
+ *
+ * @param a The first frame id.
+ * @param b The second frame_id.
+ * @return The frame id difference of a - b.
+ */
+int32_t embc_framer_frame_id_subtract(uint16_t a, uint16_t b);
+
 
 #endif  /* EMBC_STREAM_FRAMER_H__ */

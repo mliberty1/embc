@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2017 Jetperch LLC
+ * Copyright 2014-2020 Jetperch LLC
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,77 +21,103 @@
 #include <cmocka.h>
 #include <string.h>
 #include "embc/stream/data_link.h"
-#include "embc/memory/buffer.h"
-#include "embc/collections/list.h"
-#include "embc/crc.h"
-#include "embc/time.h"
-#include "embc.h"
+#include <stdio.h>
 
 #define SEND_BUFFER_SIZE (1 << 13)
 static uint8_t PAYLOAD1[] = {1, 2, 3, 4, 5, 6, 7, 8};
+// print(', '.join(['0x%02x' % x for x in range(256)]))
+static uint8_t PAYLOAD_MAX[] = {
+        0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f,
+        0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f,
+        0x20, 0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x28, 0x29, 0x2a, 0x2b, 0x2c, 0x2d, 0x2e, 0x2f,
+        0x30, 0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38, 0x39, 0x3a, 0x3b, 0x3c, 0x3d, 0x3e, 0x3f,
+        0x40, 0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47, 0x48, 0x49, 0x4a, 0x4b, 0x4c, 0x4d, 0x4e, 0x4f,
+        0x50, 0x51, 0x52, 0x53, 0x54, 0x55, 0x56, 0x57, 0x58, 0x59, 0x5a, 0x5b, 0x5c, 0x5d, 0x5e, 0x5f,
+        0x60, 0x61, 0x62, 0x63, 0x64, 0x65, 0x66, 0x67, 0x68, 0x69, 0x6a, 0x6b, 0x6c, 0x6d, 0x6e, 0x6f,
+        0x70, 0x71, 0x72, 0x73, 0x74, 0x75, 0x76, 0x77, 0x78, 0x79, 0x7a, 0x7b, 0x7c, 0x7d, 0x7e, 0x7f,
+        0x80, 0x81, 0x82, 0x83, 0x84, 0x85, 0x86, 0x87, 0x88, 0x89, 0x8a, 0x8b, 0x8c, 0x8d, 0x8e, 0x8f,
+        0x90, 0x91, 0x92, 0x93, 0x94, 0x95, 0x96, 0x97, 0x98, 0x99, 0x9a, 0x9b, 0x9c, 0x9d, 0x9e, 0x9f,
+        0xa0, 0xa1, 0xa2, 0xa3, 0xa4, 0xa5, 0xa6, 0xa7, 0xa8, 0xa9, 0xaa, 0xab, 0xac, 0xad, 0xae, 0xaf,
+        0xb0, 0xb1, 0xb2, 0xb3, 0xb4, 0xb5, 0xb6, 0xb7, 0xb8, 0xb9, 0xba, 0xbb, 0xbc, 0xbd, 0xbe, 0xbf,
+        0xc0, 0xc1, 0xc2, 0xc3, 0xc4, 0xc5, 0xc6, 0xc7, 0xc8, 0xc9, 0xca, 0xcb, 0xcc, 0xcd, 0xce, 0xcf,
+        0xd0, 0xd1, 0xd2, 0xd3, 0xd4, 0xd5, 0xd6, 0xd7, 0xd8, 0xd9, 0xda, 0xdb, 0xdc, 0xdd, 0xde, 0xdf,
+        0xe0, 0xe1, 0xe2, 0xe3, 0xe4, 0xe5, 0xe6, 0xe7, 0xe8, 0xe9, 0xea, 0xeb, 0xec, 0xed, 0xee, 0xef,
+        0xf0, 0xf1, 0xf2, 0xf3, 0xf4, 0xf5, 0xf6, 0xf7, 0xf8, 0xf9, 0xfa, 0xfb, 0xfc, 0xfd, 0xfe, 0xff};
 
 struct test_s {
-    struct embc_framer_s * f;
+    struct embc_dl_s * dl;
     uint8_t send_buffer[SEND_BUFFER_SIZE];
     uint8_t send_buffer_size;
+    uint32_t send_available;
     uint32_t time_ms;
 };
 
-static uint32_t ll_time_get_ms(void * ll_user_data) {
-    struct test_s * self = (struct test_s *) ll_user_data;
+static uint32_t ll_time_get_ms(void * user_data) {
+    struct test_s * self = (struct test_s *) user_data;
     return self->time_ms;
 }
 
-static void ll_send(void * ll_user_data, uint8_t const * buffer, uint32_t buffer_size) {
-    struct test_s * self = (struct test_s *) ll_user_data;
+static void ll_send(void * user_data, uint8_t const * buffer, uint32_t buffer_size) {
+    struct test_s * self = (struct test_s *) user_data;
     check_expected(buffer_size);
     check_expected_ptr(buffer);
     memcpy(self->send_buffer + self->send_buffer_size, buffer, buffer_size);
     self->send_buffer_size += buffer_size;
 }
 
-static uint32_t ll_send_available(void * ll_user_data) {
-    struct test_s * self = (struct test_s *) ll_user_data;
-    (void) self;
-    return EMBC_FRAMER_MAX_SIZE; // todo
+static uint32_t ll_send_available(void * user_data) {
+    struct test_s * self = (struct test_s *) user_data;
+    return self->send_available; // todo
 }
 
-void recv_01(void *user_data, uint8_t port_id,
-             uint16_t message_id, uint8_t *msg_buffer, uint32_t msg_size) {
-    (void) user_data;
-    check_expected(port_id);
-    check_expected(message_id);
+static void on_reset(void *user_data) {
+    struct test_s * self = (struct test_s *) user_data;
+    check_expected_ptr(self);
+}
+
+static void on_recv(void *user_data, uint32_t metadata, uint8_t *msg_buffer, uint32_t msg_size) {
+    struct test_s * self = (struct test_s *) user_data;
+    (void) self;
+    check_expected(metadata);
     check_expected(msg_size);
     check_expected_ptr(msg_buffer);
 }
 
-void event_cbk_01(void * user_data,
-               struct embc_framer_s * instance,
-               enum embc_framer_event_s event) {
-    struct test_s * self = (struct test_s *) user_data;
-    assert_ptr_equal(self->f, instance);
-    check_expected(event);
+static void expect_recv(uint32_t metadata, uint8_t *msg_buffer, uint32_t msg_size) {
+    expect_value(on_recv, metadata, metadata);
+    expect_value(on_recv, msg_size, msg_size);
+    expect_memory(on_recv, msg_buffer, msg_buffer, msg_size);
 }
 
 static int setup(void ** state) {
     struct test_s *self = NULL;
     self = (struct test_s *) test_calloc(1, sizeof(struct test_s));
 
-    struct embc_framer_config_s config = {
-        .event_cbk = event_cbk_01,
-        .event_user_data = self
+    struct embc_dl_config_s config = {
+        .tx_window_size = 64,
+        .tx_buffer_size = (1 << 13),
+        .rx_window_size = 64,
+        .rx_buffer_size = (1 << 13),
+        .tx_timeout_ms = 10,
     };
 
-    struct embc_framer_ll_s ll = {
-            .ll_user_data = self,
-            .time_get_ms = ll_time_get_ms,
-            .send = ll_send,
-            .send_available = ll_send_available,
+    struct embc_dl_ll_s ll = {
+        .user_data = self,
+        .time_get_ms = ll_time_get_ms,
+        .send = ll_send,
+        .send_available = ll_send_available,
     };
 
-    self->f = embc_framer_initialize(&config, &ll);
-    assert_non_null(self->f);
-    embc_framer_port_register(self->f, 2, recv_01, state);
+    struct embc_dl_api_s ul = {
+            .user_data = self,
+            .reset_fn = on_reset,
+            .recv_fn = on_recv,
+    };
+
+    self->send_available = EMBC_FRAMER_MAX_SIZE;
+    self->dl = embc_dl_initialize(&config, &ll);
+    assert_non_null(self->dl);
+    embc_dl_register_upper_layer(self->dl, &ul);
 
     *state = self;
     return 0;
@@ -99,77 +125,174 @@ static int setup(void ** state) {
 
 static int teardown(void ** state) {
     struct test_s *self = (struct test_s *) *state;
-    embc_framer_finalize(self->f);
+    embc_dl_finalize(self->dl);
     test_free(self);
     return 0;
 }
 
 static void test_initial_state(void ** state) {
     struct test_s *self = (struct test_s *) *state;
-    struct embc_framer_status_s status;
+    struct embc_dl_status_s status;
 
-    assert_non_null(self->f);
-    assert_int_equal(0, embc_framer_status_get(self->f, &status));
+    assert_non_null(self->dl);
+    assert_int_equal(0, embc_dl_status_get(self->dl, &status));
     assert_int_equal(1, status.version);
-    assert_int_equal(0, status.rx.total_bytes);
-    assert_int_equal(0, status.rx.invalid_bytes);
+    assert_int_equal(0, status.rx.msg_bytes);
     assert_int_equal(0, status.rx.data_frames);
-    assert_int_equal(0, status.rx.crc_errors);
-    assert_int_equal(0, status.rx.ack);
-    assert_int_equal(0, status.rx.nack_frame_id);
-    assert_int_equal(0, status.rx.nack_frame_error);
-    assert_int_equal(0, status.rx.resync);
-    assert_int_equal(0, status.rx.frame_too_big);
+    assert_int_equal(0, status.rx_framer.total_bytes);
+    assert_int_equal(0, status.rx_framer.ignored_bytes);
+    assert_int_equal(0, status.rx_framer.resync);
     assert_int_equal(0, status.tx.bytes);
     assert_int_equal(0, status.tx.data_frames);
 }
 
-static void send(struct test_s *self,
-                 uint16_t frame_id, uint8_t port_id, uint16_t message_id,
-                 uint8_t *msg_buffer, uint32_t msg_size) {
+static void expect_send_data(struct test_s *self,
+                             uint16_t frame_id, uint16_t metadata,
+                             uint8_t *msg_buffer, uint32_t msg_size) {
+    (void) self;
     uint8_t b[EMBC_FRAMER_MAX_SIZE];
-    embc_framer_construct_data(b, frame_id, port_id, message_id, msg_buffer, msg_size);
+    assert_int_equal(0, embc_framer_construct_data(b, frame_id, metadata, msg_buffer, msg_size));
     uint16_t frame_sz = msg_size + EMBC_FRAMER_OVERHEAD_SIZE;
     expect_value(ll_send, buffer_size, frame_sz);
     expect_memory(ll_send, buffer, b, frame_sz);
-    assert_int_equal(0, embc_framer_send(self->f, port_id, message_id, msg_buffer, msg_size));
 }
 
-#if 0  // todo
-static void ll_recv(struct test_s *self,
-                    uint16_t frame_id, uint8_t port_id, uint16_t message_id,
-                    uint8_t *msg_buffer, uint32_t msg_size) {
-    uint8_t b[EMBC_FRAMER_FRAME_MAX_SIZE];
-    embc_framer_construct_data(b, frame_id, port_id, message_id, msg_buffer, msg_size);
-    uint16_t frame_sz = msg_size + EMBC_FRAMER_OVERHEAD_SIZE;
-    embc_framer_ll_recv(self->f, b, frame_sz);
+static void send_and_expect(struct test_s *self,
+                 uint16_t frame_id, uint16_t metadata,
+                 uint8_t *msg_buffer, uint32_t msg_size) {
+    expect_send_data(self, frame_id, metadata, msg_buffer, msg_size);
+    assert_int_equal(0, embc_dl_send(self->dl, metadata, msg_buffer, msg_size));
 }
-#endif
 
-static void ll_recv_link(struct test_s *self, enum embc_framer_frame_type_e frame_type, uint16_t frame_id) {
+static void expect_send_link(enum embc_framer_type_e frame_type, uint16_t frame_id) {
     uint8_t b[EMBC_FRAMER_LINK_SIZE];
-    embc_framer_construct_link(b, frame_type, frame_id);
-    embc_framer_ll_recv(self->f, b, EMBC_FRAMER_LINK_SIZE);
+    assert_int_equal(0, embc_framer_construct_link(b, frame_type, frame_id));
+    expect_value(ll_send, buffer_size, EMBC_FRAMER_LINK_SIZE);
+    expect_memory(ll_send, buffer, b, EMBC_FRAMER_LINK_SIZE);
 }
 
-static void test_send_one_with_ack(void ** state) {
+static void recv_link(struct test_s *self, enum embc_framer_type_e frame_type, uint16_t frame_id) {
+    uint8_t b[EMBC_FRAMER_LINK_SIZE];
+    assert_int_equal(0, embc_framer_construct_link(b, frame_type, frame_id));
+    embc_dl_ll_recv(self->dl, b, sizeof(b));
+}
+
+static void recv_data(struct test_s *self, uint16_t frame_id, uint16_t metadata,
+                      uint8_t *msg_buffer, uint32_t msg_size) {
+    uint8_t b[EMBC_FRAMER_MAX_SIZE];
+    assert_int_equal(0, embc_framer_construct_data(b, frame_id, metadata, msg_buffer, msg_size));
+    uint16_t frame_sz = msg_size + EMBC_FRAMER_OVERHEAD_SIZE;
+    embc_dl_ll_recv(self->dl, b, frame_sz);
+}
+
+static void test_send_data_with_ack(void ** state) {
     struct test_s *self = (struct test_s *) *state;
-    struct embc_framer_status_s status;
+    struct embc_dl_status_s status;
 
-    send(self, 0, 1, 2, PAYLOAD1, sizeof(PAYLOAD1));
+    send_and_expect(self, 0, 1, PAYLOAD1, sizeof(PAYLOAD1));
+    embc_dl_process(self->dl);
 
-    assert_int_equal(0, embc_framer_status_get(self->f, &status));
+    assert_int_equal(0, embc_dl_status_get(self->dl, &status));
     assert_int_equal(sizeof(PAYLOAD1) + EMBC_FRAMER_OVERHEAD_SIZE, status.tx.bytes);
     assert_int_equal(0, status.tx.data_frames);
 
-    ll_recv_link(self, EMBC_FRAMER_FT_ACK_ALL, 0);
-    assert_int_equal(0, embc_framer_status_get(self->f, &status));
+    recv_link(self, EMBC_FRAMER_FT_ACK_ALL, 0);
+    assert_int_equal(0, embc_dl_status_get(self->dl, &status));
     assert_int_equal(sizeof(PAYLOAD1) + EMBC_FRAMER_OVERHEAD_SIZE, status.tx.bytes);
     assert_int_equal(1, status.tx.data_frames);
 }
 
-#if 0
+static void test_send_nack_resend_ack(void ** state) {
+    struct test_s *self = (struct test_s *) *state;
+    struct embc_dl_status_s status;
 
+    send_and_expect(self, 0, 1, PAYLOAD1, sizeof(PAYLOAD1));
+    embc_dl_process(self->dl);
+
+    recv_link(self, EMBC_FRAMER_FT_NACK_FRAMING_ERROR, 0);
+    assert_int_equal(0, embc_dl_status_get(self->dl, &status));
+    assert_int_equal(0, status.tx.data_frames);
+
+    expect_send_data(self, 0, 1, PAYLOAD1, sizeof(PAYLOAD1));  // due to nack
+    embc_dl_process(self->dl);
+
+    recv_link(self, EMBC_FRAMER_FT_ACK_ALL, 0);
+    assert_int_equal(0, embc_dl_status_get(self->dl, &status));
+    assert_int_equal(1, status.tx.data_frames);
+}
+
+static void test_send_data_timeout_then_ack(void ** state) {
+    struct test_s *self = (struct test_s *) *state;
+    struct embc_dl_status_s status;
+
+    self->time_ms = 5;
+    send_and_expect(self, 0, 1, PAYLOAD1, sizeof(PAYLOAD1));
+    embc_dl_process(self->dl);
+    self->time_ms += 10;
+    embc_dl_process(self->dl);
+    self->time_ms += 1;
+    expect_send_data(self, 0, 1, PAYLOAD1, sizeof(PAYLOAD1));
+    embc_dl_process(self->dl);
+
+    recv_link(self, EMBC_FRAMER_FT_ACK_ALL, 0);
+    assert_int_equal(0, embc_dl_status_get(self->dl, &status));
+    assert_int_equal(sizeof(PAYLOAD1) + EMBC_FRAMER_OVERHEAD_SIZE, status.tx.bytes);
+    assert_int_equal(1, status.tx.data_frames);
+}
+
+static void test_send_multiple_with_buffer_wrap(void ** state) {
+    struct test_s *self = (struct test_s *) *state;
+    struct embc_dl_status_s status;
+    uint32_t count = (1 << 16) / sizeof(PAYLOAD_MAX);
+
+    for (uint32_t i = 0; i < count; ++i) {
+        send_and_expect(self, i, i + 1, PAYLOAD_MAX, sizeof(PAYLOAD_MAX));
+        embc_dl_process(self->dl);
+        recv_link(self, EMBC_FRAMER_FT_ACK_ALL, i);
+    }
+
+    assert_int_equal(0, embc_dl_status_get(self->dl, &status));
+    assert_int_equal(count * sizeof(PAYLOAD_MAX), status.tx.msg_bytes);
+    assert_int_equal(count * (sizeof(PAYLOAD_MAX) + EMBC_FRAMER_OVERHEAD_SIZE), status.tx.bytes);
+    assert_int_equal(count, status.tx.data_frames);
+}
+
+static void test_recv_and_ack(void ** state) {
+    struct test_s *self = (struct test_s *) *state;
+    struct embc_dl_status_s status;
+
+    expect_recv(1, PAYLOAD1, sizeof(PAYLOAD1));
+    recv_data(self, 0, 1, PAYLOAD1, sizeof(PAYLOAD1));
+
+    expect_send_link(EMBC_FRAMER_FT_ACK_ALL, 0);
+    embc_dl_process(self->dl);
+
+    assert_int_equal(0, embc_dl_status_get(self->dl, &status));
+    assert_int_equal(sizeof(PAYLOAD1), status.rx.msg_bytes);
+    assert_int_equal(EMBC_FRAMER_LINK_SIZE, status.tx.bytes);
+    assert_int_equal(1, status.rx.data_frames);
+}
+
+static void test_recv_multiple_all_acks(void ** state) {
+    struct test_s *self = (struct test_s *) *state;
+    struct embc_dl_status_s status;
+    uint32_t count = (1 << 16) / sizeof(PAYLOAD_MAX);
+
+    for (uint32_t i = 0; i < count; ++i) {
+        printf("iteration %d\n", i);
+        expect_recv(1, PAYLOAD_MAX, sizeof(PAYLOAD_MAX));
+        recv_data(self, i, 1, PAYLOAD_MAX, sizeof(PAYLOAD_MAX));
+        expect_send_link(EMBC_FRAMER_FT_ACK_ALL, i);
+        embc_dl_process(self->dl);
+    }
+
+    assert_int_equal(0, embc_dl_status_get(self->dl, &status));
+    assert_int_equal(count * sizeof(PAYLOAD_MAX), status.rx.msg_bytes);
+    assert_int_equal(count * EMBC_FRAMER_LINK_SIZE, status.tx.bytes);
+    assert_int_equal(count, status.rx.data_frames);
+}
+
+#if 0
 static void test_send_one_with_nack(void ** state) {
     struct test_s *self = (struct test_s *) *state;
     struct embc_framer_status_s status;
@@ -195,7 +318,6 @@ static void test_send_one_with_nack(void ** state) {
     assert_int_equal(2 * (sizeof(PAYLOAD1) + EMBC_FRAMER_OVERHEAD_SIZE), status.tx.bytes);
     assert_int_equal(1, status.tx.data_frames);
 }
-
 
 static void test_receive_one(void ** state) {
     struct embc_framer_status_s status;
@@ -316,7 +438,12 @@ int main(void) {
     hal_test_initialize();
     const struct CMUnitTest tests[] = {
             cmocka_unit_test_setup_teardown(test_initial_state, setup, teardown),
-            cmocka_unit_test_setup_teardown(test_send_one_with_ack, setup, teardown),
+            cmocka_unit_test_setup_teardown(test_send_data_with_ack, setup, teardown),
+            cmocka_unit_test_setup_teardown(test_send_nack_resend_ack, setup, teardown),
+            cmocka_unit_test_setup_teardown(test_send_data_timeout_then_ack, setup, teardown),
+            cmocka_unit_test_setup_teardown(test_send_multiple_with_buffer_wrap, setup, teardown),
+            cmocka_unit_test_setup_teardown(test_recv_and_ack, setup, teardown),
+            cmocka_unit_test_setup_teardown(test_recv_multiple_all_acks, setup, teardown),
             //cmocka_unit_test_setup_teardown(test_send_one_with_timeout, setup, teardown),
             //cmocka_unit_test_setup_teardown(test_send_one_with_nack, setup, teardown),
             //cmocka_unit_test_setup_teardown(test_receive_one, setup, teardown),

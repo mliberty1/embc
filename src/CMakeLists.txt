@@ -45,6 +45,7 @@ set(SOURCES
         stream/async_source.c
         stream/data_link.c
         stream/framer.c
+        stream/ring_buffer_u8.c
         ${PLATFORM_SRC}
 )
 

@@ -15,13 +15,6 @@
  */
 
 /*
-TODO:
- - port 0 implementation
- - enqueue send messages & defer send_done until actually done
- - add send priority support
- */
-
-/*
  * Known issues:
  *
  * - 1: Susceptible to corrupted length:
@@ -36,25 +29,16 @@ TODO:
 
 #define EMBC_LOG_LEVEL EMBC_LOG_LEVEL_ALL
 #include "embc/stream/data_link.h"
-#include "embc/collections/list.h"
+#include "embc/stream/ring_buffer_u8.h"
+#include "embc/cdef.h"
 #include "embc/ec.h"
-#include "embc/bbuf.h"
-#include "embc/crc.h"
 #include "embc/log.h"
 #include "embc/platform.h"
-
-#define FRAME_ID_MASK (EMBC_FRAMER_COUNT - 1)  // for incrementing
-
-// The following must all be powers of 2
-#define EMBC_FRAMER_TX_RING_BUFFER_SIZE (1 << 13)
-#define EMBC_FRAMER_RX_RING_BUFFER_SIZE (1 << 13)
-#define EMBC_FRAMER_LINK_BUFFER_SIZE (1 << 8)
-#define EMBC_FRAMER_TX_WINDOW_SIZE (1 << 6)
-#define EMBC_FRAMER_RX_WINDOW_SIZE (1 << 6)
 
 
 enum tx_frame_state_e {
     TX_FRAME_ST_IDLE,
+    TX_FRAME_ST_SEND,
     TX_FRAME_ST_SENT,
     TX_FRAME_ST_ACK,
 };
@@ -66,145 +50,280 @@ enum rx_frame_state_e {
 };
 
 struct tx_frame_s {
-    uint32_t last_send_time;
-    uint16_t tx_buf_offset;
+    uint8_t * buf;
+    uint32_t last_send_time_ms;
     uint8_t state;
     uint8_t send_count;
 };
 
 struct rx_frame_s {
-    uint16_t tx_buf_offset;
+    uint8_t * buf;
     uint8_t state;
+    uint8_t reserved;
 };
 
 struct embc_dl_s {
-    struct embc_dl_config_s config;
     struct embc_dl_ll_s ll_instance;
+    struct embc_dl_api_s ul_instance;
 
-    uint16_t tx_frame_id; // the last frame that has not yet be ACKed
+    uint16_t tx_frame_last_id; // the last frame that has not yet be ACKed
+    uint16_t tx_frame_next_id; // the next frame id for sending.
     uint16_t rx_frame_id; // the next frame that has not yet been received
 
-    uint8_t tx_buf[EMBC_FRAMER_TX_RING_BUFFER_SIZE];
-    uint16_t tx_buf_head;
-    uint16_t tx_buf_tail;
+    struct embc_rb8_s tx_buf;
+    struct embc_rb8_s rx_buf;
+    struct embc_rb8_s tx_link_buf;
 
-    uint8_t rx_buf[EMBC_FRAMER_RX_RING_BUFFER_SIZE];
-    uint16_t rx_buf_head;
-    uint16_t rx_buf_tail;
-
-    uint8_t link_buf[EMBC_FRAMER_LINK_BUFFER_SIZE];
-    uint16_t link_buf_head;
-    uint16_t link_buf_tail;
-
-    struct tx_frame_s tx_frames[EMBC_FRAMER_TX_WINDOW_SIZE];
-    struct rx_frame_s rx_frames[EMBC_FRAMER_RX_WINDOW_SIZE];
+    struct tx_frame_s * tx_frames;
+    uint16_t tx_frame_count;
+    uint32_t tx_timeout_ms;
+    struct rx_frame_s * rx_frames;
+    uint16_t rx_frame_count;
 
     struct embc_framer_s rx_framer;
-    struct embc_dl_status_s status;
+    struct embc_dl_rx_status_s rx_status;
+    struct embc_dl_tx_status_s tx_status;
 };
 
-
 int32_t embc_dl_send(struct embc_dl_s * self,
-                     uint8_t port_id, uint16_t message_id,
-                     uint8_t const *msg_buffer, uint32_t msg_size) {
-    uint8_t b[EMBC_FRAMER_MAX_SIZE];
-    uint16_t frame_id = self->tx_frame_id;
-    int32_t rv = embc_framer_construct_data(b, frame_id, port_id, message_id, msg_buffer, msg_size);
+                     uint32_t metadata,
+                     uint8_t const *msg, uint32_t msg_size) {
+    // todo consider mutex?
+    uint16_t idx = self->tx_frame_next_id & (self->tx_frame_count - 1);
+    struct tx_frame_s * f = &self->tx_frames[idx];
+
+    if (f->state != TX_FRAME_ST_IDLE) {
+        return EMBC_ERROR_NOT_ENOUGH_MEMORY;
+    }
+    uint16_t frame_sz = msg_size + EMBC_FRAMER_OVERHEAD_SIZE;
+    uint8_t * b = embc_rb8_insert(&self->tx_buf, frame_sz);
+    if (!b) {
+        return EMBC_ERROR_NOT_ENOUGH_MEMORY;
+    }
+
+    uint16_t frame_id = self->tx_frame_next_id;
+    int32_t rv = embc_framer_construct_data(b, frame_id, metadata, msg, msg_size);
     if (rv) {
         EMBC_LOGW("embc_framer_send construct failed");
+        embc_rb8_pop(&self->tx_buf, frame_sz);
         return rv;
     }
 
-    uint16_t frame_sz = msg_size + EMBC_FRAMER_OVERHEAD_SIZE;
-    self->status.tx.bytes += frame_sz;
-    self->ll_instance.send(self->ll_instance.user_data, b, frame_sz);
+    // queue transmit frame for send_data()
+    f->last_send_time_ms = self->ll_instance.time_get_ms(self->ll_instance.user_data);
+    f->send_count = 1;
+    f->buf = b;
+    f->state = TX_FRAME_ST_SEND;
+    self->tx_status.msg_bytes += msg_size;
+    self->tx_status.bytes += frame_sz;
+    self->tx_frame_next_id = (self->tx_frame_next_id + 1) & EMBC_FRAMER_FRAME_ID_MAX;
 
+    // frame queued for send_data()
+    // todo notify process?
     return 0;
 }
 
+static uint16_t tx_buf_frame_sz(struct tx_frame_s * f) {
+    return ((uint16_t) f->buf[3]) + 1 + EMBC_FRAMER_OVERHEAD_SIZE;
+}
+
+static void send_data(struct embc_dl_s * self, uint16_t frame_id) {
+    uint16_t idx = frame_id & (self->tx_frame_count - 1);
+    struct tx_frame_s * f = &self->tx_frames[idx];
+    if (TX_FRAME_ST_IDLE == f->state) {
+        EMBC_LOGW("send_data when idle");
+        return;
+    } else if (TX_FRAME_ST_ACK == f->state) {
+        EMBC_LOGW("send_data when already ack");  // but do it anyway
+    }
+
+    uint16_t frame_sz = tx_buf_frame_sz(f);
+
+    uint32_t send_sz = self->ll_instance.send_available(self->ll_instance.user_data);
+    if (send_sz < frame_sz) {
+        // todo - support partial send, modify process, too
+        return;
+    }
+
+    f->state = TX_FRAME_ST_SENT;
+    if (f->send_count) {
+        ++self->tx_status.retransmissions;
+    }
+    f->send_count += 1;
+    f->last_send_time_ms = self->ll_instance.time_get_ms(self->ll_instance.user_data);
+    self->ll_instance.send(self->ll_instance.user_data, f->buf, frame_sz);
+}
+
+static void send_link_pending(struct embc_dl_s * self) {
+    uint32_t pending_sz = embc_rb8_size(&self->tx_link_buf);
+    uint32_t send_sz = self->ll_instance.send_available(self->ll_instance.user_data);
+    if (pending_sz <= send_sz) {
+        send_sz = pending_sz;
+    } else {
+        // round to link frame multiple
+        send_sz = (send_sz / EMBC_FRAMER_LINK_SIZE) * EMBC_FRAMER_LINK_SIZE; // round down
+    }
+    if (!send_sz) {
+        return;
+    }
+
+    self->tx_status.bytes += send_sz;
+    if ((self->tx_link_buf.tail + send_sz) > self->tx_link_buf.buf_size) {
+        // wrap around, send in two parts
+        uint32_t sz = self->tx_link_buf.buf_size - self->tx_link_buf.tail;
+        self->ll_instance.send(self->ll_instance.user_data,
+                               self->tx_link_buf.buf + self->tx_link_buf.tail,
+                               sz);
+        embc_rb8_pop(&self->tx_link_buf, sz);
+        send_sz -= sz;
+        self->ll_instance.send(self->ll_instance.user_data,
+                               self->tx_link_buf.buf,
+                               send_sz);
+        embc_rb8_pop(&self->tx_link_buf, send_sz);
+    } else {
+        self->ll_instance.send(self->ll_instance.user_data,
+                               self->tx_link_buf.buf + self->tx_link_buf.tail,
+                               send_sz);
+        embc_rb8_pop(&self->tx_link_buf, send_sz);
+    }
+}
+
 static void send_link(struct embc_dl_s * self, enum embc_framer_type_e frame_type, uint16_t frame_id) {
-    uint32_t sz = (self->link_buf_tail - self->link_buf_head) & (EMBC_FRAMER_LINK_BUFFER_SIZE - 1);
-    uint32_t send_sz;
-    if (sz < EMBC_FRAMER_LINK_SIZE) {
+    uint8_t * b = embc_rb8_insert(&self->tx_link_buf, EMBC_FRAMER_LINK_SIZE);
+    if (!b) {
         EMBC_LOG_WARN("link buffer full");
         return;
     }
-    uint8_t * b = self->link_buf + self->link_buf_head;
     int rv = embc_framer_construct_link(b, frame_type, frame_id);
     if (rv) {
         EMBC_LOGW("send_link construct failed");
+        embc_rb8_pop(&self->tx_link_buf, EMBC_FRAMER_LINK_SIZE);
         return;
     }
-    self->link_buf_head = (self->link_buf_head + 1) & (EMBC_FRAMER_LINK_BUFFER_SIZE - 1);
+    // queued for send_link_pending
+}
 
-    sz = (self->link_buf_tail - self->link_buf_head) & (EMBC_FRAMER_LINK_BUFFER_SIZE - 1);
-    send_sz = self->ll_instance.send_available(self->ll_instance.user_data);
-    if (sz > send_sz) {
-        sz = (send_sz / EMBC_FRAMER_LINK_SIZE) * EMBC_FRAMER_LINK_SIZE;
-    }
-    if (sz < EMBC_FRAMER_LINK_SIZE) {
+static void on_recv_data(void * user_data, uint16_t frame_id, uint32_t metadata,
+                         uint8_t *msg, uint32_t msg_size) {
+    struct embc_dl_s * self = (struct embc_dl_s *) user_data;
+
+    if (self->rx_frame_id == frame_id) {
+        // next expected frame, error free operation case
+        send_link(self, EMBC_FRAMER_FT_ACK_ALL, frame_id);
+        self->rx_frame_id = (self->rx_frame_id + 1) & EMBC_FRAMER_FRAME_ID_MAX;
+        ++self->rx_status.data_frames;
+        self->rx_status.msg_bytes += msg_size;
+        if (self->ul_instance.recv_fn) {
+            self->ul_instance.recv_fn(self->ul_instance.user_data, metadata, msg, msg_size);
+        }
         return;
-    }
-    self->status.tx.bytes += sz;
-    if ((self->link_buf_tail + sz) > EMBC_FRAMER_LINK_BUFFER_SIZE) {
-        // wrap around, send in two parts
-        send_sz = EMBC_FRAMER_LINK_BUFFER_SIZE - self->link_buf_tail;
-        self->ll_instance.send(self->ll_instance.user_data,
-                               self->link_buf + self->link_buf_tail,
-                               send_sz);
-        self->link_buf_tail = 0;
-        sz -= send_sz;
-        self->ll_instance.send(self->ll_instance.user_data,
-                               self->link_buf + self->link_buf_tail,
-                               sz);
-        self->link_buf_tail += sz;
+    } else if (frame_id < self->rx_frame_id) {
+        // we already have this frame
+        send_link(self, EMBC_FRAMER_FT_ACK_ALL, frame_id);
+    } else if (frame_id >= (self->rx_frame_id + self->rx_frame_count)) {
+        // todo handle wrap
+        // too far in the future, nack
+        send_link(self, EMBC_FRAMER_FT_NACK_FRAME_ID, frame_id);
     } else {
-        self->ll_instance.send(self->ll_instance.user_data,
-                               self->link_buf + self->link_buf_tail,
-                               sz);
+        // store to our buffer
+        send_link(self, EMBC_FRAMER_FT_ACK_ONE, frame_id);
+        // todo
     }
 }
 
+static bool is_in_tx_window(struct embc_dl_s * self, uint16_t frame_id) {
+    int32_t frame_delta = embc_framer_frame_id_subtract(frame_id, self->tx_frame_last_id);
+    if (frame_delta < 0) {
+        return false;  // frame_id is from the past, ignore
+    } else if (frame_delta > self->tx_frame_count) {
+        EMBC_LOGE("ack_all too far into the future: %d", (int) frame_delta);
+        return false;
+    }
+    uint16_t frame_id_end = (self->tx_frame_next_id - 1) & EMBC_FRAMER_FRAME_ID_MAX;
+    frame_delta = embc_framer_frame_id_subtract(frame_id, frame_id_end);
+    if (frame_delta > 0) {
+        EMBC_LOGE("ack_all out of window range: %d", (int) frame_delta);
+        return false;
+    }
+    return true;
+}
 
+static struct tx_frame_s * tx_frame_get(struct embc_dl_s * self, uint16_t frame_id) {
+    if (is_in_tx_window(self, frame_id)) {
+        uint16_t idx = frame_id & (self->tx_frame_count - 1);
+        struct tx_frame_s * f = &self->tx_frames[idx];
+        return f;
+    } else {
+        return 0;
+    }
+}
 
-void embc_dl_data_cbk(void * user_data, uint16_t frame_id,
-                      uint8_t port_id, uint16_t message_id,
-                      uint8_t const *msg_buffer, uint32_t msg_size) {
-    struct embc_dl_s * self = (struct embc_dl_s *) user_data;
-    ++self->status.rx.data_frames;
-    // todo
-    (void) frame_id;
-    (void) port_id;
-    (void) message_id;
-    (void) msg_buffer;
-    (void) msg_size;
+static bool retire_tx_frame(struct embc_dl_s * self) {
+    struct tx_frame_s * f = tx_frame_get(self, self->tx_frame_last_id);
+    if (f && (f->state != TX_FRAME_ST_IDLE)) {
+        self->tx_frame_last_id = (self->tx_frame_last_id + 1) & EMBC_FRAMER_FRAME_ID_MAX;
+        ++self->tx_status.data_frames;
+        f->state = TX_FRAME_ST_IDLE;
+        if (f->buf != embc_rb8_tail(&self->tx_buf)) {
+            EMBC_LOGE("tx buffer lost sync");
+            // todo
+        } else {
+            uint16_t frame_sz = tx_buf_frame_sz(f);
+            embc_rb8_pop(&self->tx_buf, frame_sz);
+        }
+        return true;
+    }
+    return false;
+}
 
-    (void) send_link;
-
+static void retire_tx_frames(struct embc_dl_s * self) {
+    while (self->tx_frame_last_id != self->tx_frame_next_id) {
+        if (!retire_tx_frame(self)) {
+            break;
+        }
+    }
 }
 
 static void handle_ack_all(struct embc_dl_s * self, uint16_t frame_id) {
-    (void) frame_id;
-    ++self->status.tx.data_frames;
-    // todo
+    int32_t frame_delta = embc_framer_frame_id_subtract(frame_id, self->tx_frame_last_id);
+    if (frame_delta < 0) {
+        return;  // frame_id is from the past, ignore
+    } else if (frame_delta > self->tx_frame_count) {
+        EMBC_LOGE("ack_all too far into the future: %d", (int) frame_delta);
+        return;
+    }
+    uint16_t frame_id_end = (self->tx_frame_next_id - 1) & EMBC_FRAMER_FRAME_ID_MAX;
+    frame_delta = embc_framer_frame_id_subtract(frame_id, frame_id_end);
+    if (frame_delta > 0) {
+        EMBC_LOGE("ack_all out of window range: %d", (int) frame_delta);
+        frame_id = frame_id_end; // only process what we have
+    }
+
+    while (embc_framer_frame_id_subtract(frame_id, self->tx_frame_last_id) >= 0) {
+        retire_tx_frame(self);
+    }
 }
 
 static void handle_ack_one(struct embc_dl_s * self, uint16_t frame_id) {
-    (void) self;
-    (void) frame_id;
-    // todo
+    struct tx_frame_s * f = tx_frame_get(self, frame_id);
+    if (f && ((f->state == TX_FRAME_ST_SEND) || (f->state == TX_FRAME_ST_SENT))) {
+        f->state = TX_FRAME_ST_ACK;
+    }
+    retire_tx_frames(self);
 }
 
 static void handle_nack_frame_id(struct embc_dl_s * self, uint16_t frame_id) {
-    (void) self;
-    (void) frame_id;
-    // todo
+    struct tx_frame_s * f = tx_frame_get(self, frame_id);
+    if (f && (f->state != TX_FRAME_ST_IDLE)) {
+        f->state = TX_FRAME_ST_SEND;
+    }
 }
 
 static void handle_nack_framing_error(struct embc_dl_s * self, uint16_t frame_id) {
-    (void) self;
-    (void) frame_id;
-    // todo
+    struct tx_frame_s * f = tx_frame_get(self, frame_id);
+    if (f && (f->state != TX_FRAME_ST_IDLE)) {
+        f->state = TX_FRAME_ST_SEND;
+    }
 }
 
 static void handle_reset(struct embc_dl_s * self, uint16_t frame_id) {
@@ -213,7 +332,7 @@ static void handle_reset(struct embc_dl_s * self, uint16_t frame_id) {
     // todo
 }
 
-void embc_dl_link_cbk(void * user_data, enum embc_framer_type_e frame_type, uint16_t frame_id) {
+static void on_recv_link(void * user_data, enum embc_framer_type_e frame_type, uint16_t frame_id) {
     struct embc_dl_s * self = (struct embc_dl_s *) user_data;
     switch (frame_type) {
         case EMBC_FRAMER_FT_ACK_ALL: handle_ack_all(self, frame_id); break;
@@ -225,21 +344,85 @@ void embc_dl_link_cbk(void * user_data, enum embc_framer_type_e frame_type, uint
     }
 }
 
-void embc_dl_framing_error_cbk(void * user_data) {
+static void on_framing_error(void * user_data) {
     struct embc_dl_s * self = (struct embc_dl_s *) user_data;
-    (void) self;
-    // todo
+    send_link(self, EMBC_FRAMER_FT_NACK_FRAMING_ERROR, self->rx_frame_id);
+}
+
+void embc_dl_ll_recv(struct embc_dl_s * self,
+                     uint8_t const * buffer, uint32_t buffer_size) {
+    embc_framer_ll_recv(&self->rx_framer, buffer, buffer_size);
 }
 
 uint32_t embc_dl_service_interval_ms(struct embc_dl_s * self) {
-    (void) self;
-    return 0xffffffffU;
-    // todo
+    uint32_t rv = 0xffffffffU;
+    int32_t frame_count = embc_framer_frame_id_subtract(self->tx_frame_next_id, self->tx_frame_last_id);
+    uint32_t now = self->ll_instance.time_get_ms(self->ll_instance.user_data);
+    for (int32_t offset = 0; offset < frame_count; ++offset) {
+        uint16_t frame_id = (self->tx_frame_last_id + offset) & EMBC_FRAMER_FRAME_ID_MAX;
+        uint16_t idx = (frame_id + offset) & (self->tx_frame_count - 1);
+        struct tx_frame_s * f = &self->tx_frames[idx];
+        if (f->state == TX_FRAME_ST_SENT) {
+            uint32_t delta = now - f->last_send_time_ms;
+            if (delta > self->tx_timeout_ms) {
+                return 0;
+            }
+            delta -= self->tx_timeout_ms;
+            if (delta < rv) {
+                rv = delta;
+            }
+        }
+    }
+    return rv;
+}
+
+static void tx_timeout(struct embc_dl_s * self) {
+    int32_t frame_count = embc_framer_frame_id_subtract(self->tx_frame_next_id, self->tx_frame_last_id);
+    uint32_t now = self->ll_instance.time_get_ms(self->ll_instance.user_data);
+    for (int32_t offset = 0; offset < frame_count; ++offset) {
+        uint16_t frame_id = (self->tx_frame_last_id + offset) & EMBC_FRAMER_FRAME_ID_MAX;
+        uint16_t idx = (frame_id + offset) & (self->tx_frame_count - 1);
+        struct tx_frame_s * f = &self->tx_frames[idx];
+        if (f->state == TX_FRAME_ST_SENT) {
+            uint32_t delta = now - f->last_send_time_ms;
+            if (delta > self->tx_timeout_ms) {
+                f->state = TX_FRAME_ST_SEND;
+            }
+        }
+    }
+}
+
+static void tx_transmit(struct embc_dl_s * self) {
+    for (uint16_t offset = 0; offset < self->tx_frame_count; ++offset) {
+        uint16_t frame_id = (self->tx_frame_last_id + offset) & EMBC_FRAMER_FRAME_ID_MAX;
+        uint16_t idx = (self->tx_frame_last_id + offset) & (self->tx_frame_count - 1);
+        struct tx_frame_s * f = &self->tx_frames[idx];
+        if (f->state == TX_FRAME_ST_SEND) {
+            send_data(self, frame_id);
+            break;
+        }
+    }
 }
 
 void embc_dl_process(struct embc_dl_s * self) {
-    (void) self;
-    // todo
+    send_link_pending(self);
+    tx_timeout(self);
+    tx_transmit(self);
+}
+
+static uint32_t to_power_of_two(uint32_t v) {
+    if (v == 0) {
+        return v;
+    }
+    if (v > (1U << 31)) {
+        // round down, which is ok for us
+        return (1U << 31);
+    }
+    uint32_t k = 1;
+    while (v > k) {
+        k <<= 1;
+    }
+    return k;
 }
 
 struct embc_dl_s * embc_dl_initialize(
@@ -250,21 +433,95 @@ struct embc_dl_s * embc_dl_initialize(
         return 0;
     }
 
-    struct embc_dl_s * self = (struct embc_dl_s *) embc_alloc_clr(sizeof(struct embc_dl_s));
+    uint32_t tx_link_buffer_size = config->tx_link_buffer_size;
+    if (tx_link_buffer_size <= EMBC_FRAMER_LINK_SIZE) {
+        tx_link_buffer_size = EMBC_FRAMER_LINK_SIZE + 1;
+    }
+
+    uint32_t tx_buffer_size = config->tx_buffer_size;
+    if (tx_buffer_size <= EMBC_FRAMER_MAX_SIZE) {
+        // must buffer at least one message
+        tx_buffer_size = EMBC_FRAMER_MAX_SIZE + 1;
+    }
+
+    uint32_t tx_window_size = to_power_of_two(config->tx_window_size);
+    if (tx_window_size < 1) {
+        tx_window_size = 1;
+    }
+    uint32_t rx_window_size = to_power_of_two(config->rx_window_size);
+
+    // Perform single allocation for embc_dl_s and all buffers.
+    size_t sz = sizeof(struct embc_dl_s);
+    sz += sizeof(struct tx_frame_s[2]) / 2 * tx_window_size;
+    sz += sizeof(struct rx_frame_s[2]) / 2 * rx_window_size;
+    sz += tx_link_buffer_size;
+    sz += tx_buffer_size;
+    sz += config->rx_buffer_size;
+
+    struct embc_dl_s * self = (struct embc_dl_s *) embc_alloc_clr(sz);
     if (!self) {
         EMBC_LOGE("alloc failed");
         return 0;
     }
     EMBC_LOGI("initialize");
 
-    self->config = *config;
+    uint8_t * mem = (uint8_t *) self;
+    size_t offset = sizeof(struct embc_dl_s);
+    sz = sizeof(struct tx_frame_s[2]) / 2 * tx_window_size;
+    self->tx_frame_count = tx_window_size;
+    self->tx_frames = (struct tx_frame_s *) (mem + offset);
+    offset += sz;
+
+    sz = sizeof(struct rx_frame_s[2]) / 2 * rx_window_size;
+    self->rx_frame_count = rx_window_size;
+    self->rx_frames = (struct rx_frame_s *) (mem + offset);
+    offset += sz;
+
+    embc_rb8_init(&self->tx_link_buf, (uint8_t *) (mem + offset), tx_link_buffer_size);
+    offset += tx_link_buffer_size;
+
+    embc_rb8_init(&self->tx_buf, (uint8_t *) (mem + offset), tx_buffer_size);
+    offset += tx_buffer_size;
+
+    embc_rb8_init(&self->rx_buf, (uint8_t *) (mem + offset), config->rx_buffer_size);
+    // offset += config->rx_buffer_size;
+
+    self->tx_timeout_ms = config->tx_timeout_ms;
     self->ll_instance = *ll_instance;
-    self->status.version = 1;
-    embc_framer_reset(&self->rx_framer);
+    self->rx_framer.api.user_data = self;
+    self->rx_framer.api.framing_error_fn = on_framing_error;
+    self->rx_framer.api.link_fn = on_recv_link;
+    self->rx_framer.api.data_fn = on_recv_data;
+    embc_dl_reset(self);
     return self;
 }
 
-int32_t embc_framer_finalize(struct embc_framer_s * self) {
+void embc_dl_register_upper_layer(struct embc_dl_s * self, struct embc_dl_api_s const * ul) {
+    self->ul_instance = *ul;
+}
+
+void embc_dl_reset(struct embc_dl_s * self) {
+    self->tx_frame_last_id = 0;
+    self->tx_frame_next_id = 0;
+    self->rx_frame_id = 0;
+    embc_rb8_clear(&self->tx_buf);
+    embc_rb8_clear(&self->rx_buf);
+    embc_rb8_clear(&self->tx_link_buf);
+
+    for (uint16_t f = 0; f < self->tx_frame_count; ++f) {
+        self->tx_frames[f].state = TX_FRAME_ST_IDLE;
+    }
+
+    for (uint16_t f = 0; f < self->rx_frame_count; ++f) {
+        self->rx_frames[f].state = RX_FRAME_ST_IDLE;
+    }
+
+    embc_framer_reset(&self->rx_framer);
+    embc_memset(&self->rx_status, 0, sizeof(self->rx_status));
+    embc_memset(&self->tx_status, 0, sizeof(self->tx_status));
+}
+
+int32_t embc_dl_finalize(struct embc_dl_s * self) {
     EMBC_LOGD("finalize");
     if (self) {
         embc_free(self);
@@ -272,14 +529,15 @@ int32_t embc_framer_finalize(struct embc_framer_s * self) {
     return 0;
 }
 
-int32_t embc_framer_status_get(
-        struct embc_framer_s * self,
-        struct embc_framer_status_s * status) {
-    (void) self;
+int32_t embc_dl_status_get(
+        struct embc_dl_s * self,
+        struct embc_dl_status_s * status) {
     if (!status) {
         return EMBC_ERROR_PARAMETER_INVALID;
     }
-    *status = self->status;
+    status->version = 1;
+    status->rx = self->rx_status;
+    status->rx_framer = self->rx_framer.status;
+    status->tx = self->tx_status;
     return 0;
 }
-

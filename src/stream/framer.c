@@ -18,7 +18,6 @@
 #define EMBC_LOG_LEVEL EMBC_LOG_LEVEL_ALL
 #include "embc/stream/framer.h"
 #include "embc/ec.h"
-#include "embc/bbuf.h"
 #include "embc/crc.h"
 #include "embc/log.h"
 #include "embc/platform.h"
@@ -40,12 +39,6 @@ struct recv_buf_s {
 
 static void recv(struct embc_framer_s * self, struct recv_buf_s * buf);
 
-
-static inline bool is_port_id_valid(struct embc_framer_s * self, uint8_t port_id) {
-    (void) self;
-    return port_id < EMBC_FRAMER_PORTS_MAX;
-}
-
 static inline uint8_t parse_frame_type(uint8_t const * frame) {
     return (frame[2] >> 5) & 0x7;;
 }
@@ -58,16 +51,14 @@ static inline uint16_t parse_link_frame_id(uint8_t const * frame) {
     return (((uint16_t) (frame[2] & 0x7)) << 8) | frame[3];
 }
 
-static inline uint8_t parse_data_port_id(uint8_t const * frame) {
-    return frame[5] & 0x1f;
-}
-
 static inline uint16_t parse_data_payload_length(uint8_t const * frame) {
     return 1 + ((uint16_t) frame[3]);
 }
 
-static inline uint16_t parse_data_message_id(uint8_t const * frame) {
-    return ((uint16_t) frame[6]) | (((uint16_t) frame[7]) << 8);
+static inline uint16_t parse_data_metadata(uint8_t const * frame) {
+    return ((uint32_t) frame[5])
+        | (((uint32_t) frame[6]) << 8)
+        | (((uint32_t) frame[7]) << 16);;
 }
 
 static bool validate_crc(uint8_t const * frame) {
@@ -78,7 +69,10 @@ static bool validate_crc(uint8_t const * frame) {
         frame_sz = EMBC_FRAMER_LINK_SIZE;
     }
     uint8_t const * crc_value = frame + frame_sz - EMBC_FRAMER_FOOTER_SIZE;
-    uint32_t crc_rx = EMBC_BBUF_DECODE_U32_LE(crc_value);
+    uint32_t crc_rx = ((uint32_t) crc_value[0])
+        | (((uint32_t) crc_value[1]) << 8)
+        | (((uint32_t) crc_value[2]) << 16)
+        | (((uint32_t) crc_value[3]) << 24);
     uint32_t crc_calc = embc_crc32(0, frame + 2, frame_sz - EMBC_FRAMER_FOOTER_SIZE - 2);
     return (crc_rx == crc_calc);
 }
@@ -134,8 +128,7 @@ static void handle_frame(struct embc_framer_s * self) {
             if (self->api.data_fn) {
                 self->api.data_fn(self->api.user_data,
                                   parse_data_frame_id(self->buf),
-                                  parse_data_port_id(self->buf),
-                                  parse_data_message_id(self->buf),
+                                  parse_data_metadata(self->buf),
                                   self->buf + EMBC_FRAMER_HEADER_SIZE,
                                   parse_data_payload_length(self->buf));
             }
@@ -257,16 +250,15 @@ void embc_framer_reset(struct embc_framer_s * self) {
     embc_memset(&self->status, 0, sizeof(self->status));
 }
 
-int32_t embc_framer_construct_data(uint8_t * b, uint16_t frame_id,
-                                   uint8_t port_id, uint16_t message_id,
-                                   uint8_t const *msg_buffer, uint32_t msg_size) {
+int32_t embc_framer_construct_data(uint8_t * b, uint16_t frame_id, uint32_t metadata,
+                                   uint8_t const *msg, uint32_t msg_size) {
     if ((msg_size < 1) || (msg_size > 256)) {
         return EMBC_ERROR_PARAMETER_INVALID;
     }
     if (frame_id > EMBC_FRAMER_FRAME_ID_MAX) {
         return EMBC_ERROR_PARAMETER_INVALID;
     }
-    if (port_id > EMBC_FRAMER_PORTS_MAX) {
+    if (metadata > EMBC_FRAMER_MESSAGE_ID_MAX) {
         return EMBC_ERROR_PARAMETER_INVALID;
     }
     b[0] = EMBC_FRAMER_SOF1;
@@ -274,10 +266,10 @@ int32_t embc_framer_construct_data(uint8_t * b, uint16_t frame_id,
     b[2] = (EMBC_FRAMER_FT_DATA << 5) | ((frame_id >> 8) & 0x7);
     b[3] = msg_size - 1;
     b[4] = (uint8_t) (frame_id & 0xff);
-    b[5] = port_id & 0x1f;
-    b[6] = message_id & 0xff;
-    b[7] = (message_id >> 8) & 0xff;
-    memcpy(b + EMBC_FRAMER_HEADER_SIZE, msg_buffer, msg_size);
+    b[5] = metadata & 0xff;
+    b[6] = (metadata >> 8) & 0xff;
+    b[7] = (metadata >> 16) & 0xff;
+    memcpy(b + EMBC_FRAMER_HEADER_SIZE, msg, msg_size);
     uint32_t crc = embc_crc32(0, b + 2, msg_size + EMBC_FRAMER_HEADER_SIZE - 2);
     b[EMBC_FRAMER_HEADER_SIZE + msg_size + 0] = crc & 0xff;
     b[EMBC_FRAMER_HEADER_SIZE + msg_size + 1] = (crc >> 8) & 0xff;
@@ -313,4 +305,13 @@ int32_t embc_framer_construct_link(uint8_t * b, enum embc_framer_type_e frame_ty
     b[6] = (crc >> 16) & 0xff;
     b[7] = (crc >> 24) & 0xff;
     return 0;
+}
+
+int32_t embc_framer_frame_id_subtract(uint16_t a, uint16_t b) {
+    uint16_t c = (a - b) & EMBC_FRAMER_FRAME_ID_MAX;
+    if (c > (EMBC_FRAMER_FRAME_ID_MAX / 2)) {
+        return ((int32_t) c) - (EMBC_FRAMER_FRAME_ID_MAX + 1);
+    } else {
+        return (int32_t) c;
+    }
 }

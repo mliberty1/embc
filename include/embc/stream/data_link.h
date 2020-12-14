@@ -18,7 +18,7 @@
 /**
  * @file
  *
- * @brief Message framer and multiplexer for byte streams.
+ * @brief Reliable data link layer for byte streams.
  */
 
 #ifndef EMBC_STREAM_DATA_LINK_H__
@@ -33,12 +33,12 @@ extern "C" {
 
 /**
  * @ingroup embc
- * @defgroup embc_framer Message framer and multiplexer for byte streams.
+ * @defgroup embc_data_link Reliable data link layer for byte streams.
  *
- * @brief Provide reliable framing and multiplexing over total_bytes
+ * @brief Provide reliable framing and retransmission over byte
  *      streams, such as UART and sockets.
  *
- * This module provides reliable frame transmission over byte streams.
+ * This module provides reliable message transmission over byte streams.
  * Framing multi-byte messages over a byte-oriented interface is a common
  * problem for UART and network communications.  In addition to framing and
  * deframing messages, this module provides reliable delivery through frame
@@ -46,7 +46,7 @@ extern "C" {
  * but larger messages are segmented over multiple frames and then
  * reassembled at the application layer.
  *
- * The features of this framer include:
+ * The features of this data link include:
  *
  * - Robust framing using SOF byte, length, and CRC32.
  * - Fast recovery on errors for minimal RAM usage.
@@ -87,14 +87,9 @@ extern "C" {
  *  </tr>
  *  <tr><td colspan="8">length[7:0]</td></tr>
  *  <tr><td colspan="8">frame_id[7:0]</td></tr>
- *  <tr>
- *      <td colspan="1">rsv=0</td>
- *      <td colspan="1">rsv=0</td>
- *      <td colspan="1">rsv=0</td>
- *      <td colspan="5">port[4:0]</td>
- *  </tr>
- *  <tr><td colspan="8">message_id[7:0]</td></tr>
- *  <tr><td colspan="8">message_id[15:8]</td></tr>
+ *  <tr><td colspan="8">metadata[7:0]</td></tr>
+ *  <tr><td colspan="8">metadata[15:8]</td></tr>
+ *  <tr><td colspan="8">metadata[23:16]</td></tr>
  *  <tr><td colspan="8">... payload ...</td></tr>
  *  <tr><td colspan="8">frame_crc[7:0]</td></tr>
  *  <tr><td colspan="8">frame_crc[15:8]</td></tr>
@@ -120,16 +115,16 @@ extern "C" {
  * - "length" is the payload length (not full frame length) in total_bytes, minus 1.
  *   The maximum payload length is 256 total_bytes.  Since the frame overhead is 9
  *   total_bytes, the actual frame length ranges from 9 to 265 total_bytes.
- * - "port" contains an application-specific payload format identifier.
- *   This field is used to multiplex multiple message types onto a single
- *   byte stream, similar to a TCP port.  Port 0 is reserved for
- *   link management.
- * - "message_id" contains an identifier that is assigned by the application.
- *   Although not required, many applications ensure that message_id values are
- *   unique within each port for all messages currently in flight.  Two bits of
- *   message_id may also be used for segmentation and reassembly using
- *   a start bit and a stop bit.  For example,
- *   10 is start, 01 is end, 00 is middle and 11 is a single frame message.
+ * - "metadata" contains arbitrary 24-bit data that is transmitted along with the
+ *   message payload.  The metadata format is usually assigned by the higher-level
+ *   protocol or application.  The embc/stream/transport.h defines this field
+ *   for the optional transport level.  Common "metadata" uses include:
+ *   - "port" to multiplex multiple message types or endpoints onto
+ *     this single byte stream, similar to a TCP port.
+ *   - "start" and "stop" bits to segment and reassemble messages larger than
+ *     the frame payload size.  For example,
+ *     10 is start, 01 is end, 00 is middle and 11 is a single frame message.
+ *   - "unique_id" that is unique for all messages in flight for a prot.
  * - "payload" contains the arbitrary payload of "length" total_bytes.
  * - "frame_crc" contains the CRC32 computed over the header and payload.
  *   The SOF, frame_crc and EOF total_bytes are excluded from the calculation.
@@ -153,8 +148,8 @@ extern "C" {
  *  <tr><td colspan="8">SOF2[7:0]</td></tr>
  *  <tr>
  *      <td colspan="3">frame_type</td>
- *      <td colspan="1">1</td>
- *      <td colspan="1">1</td>
+ *      <td colspan="1">rsv=0</td>
+ *      <td colspan="1">rsv=0</td>
  *      <td colspan="3">frame_id[10:8]</td>
  *  </tr>
  *  <tr><td colspan="8">frame_id[7:0]</td></tr>
@@ -277,19 +272,23 @@ struct embc_dl_s;
 #define EMBC_DL_INFLIGHT_MAX (EMBC_FRAMER_COUNT / 2 - 1)
 
 struct embc_dl_config_s {
+    uint32_t tx_link_buffer_size;  // in bytes
     uint32_t tx_window_size;  // in frames
     uint32_t tx_buffer_size;  // in bytes
     uint32_t rx_window_size;  // in frames
     uint32_t rx_buffer_size;  // in bytes
+    uint32_t tx_timeout_ms;   // transmit timeout in milliseconds
 };
 
 struct embc_dl_tx_status_s {
     uint64_t bytes;
+    uint64_t msg_bytes;
     uint64_t data_frames;
+    uint64_t retransmissions;
 };
 
 struct embc_dl_rx_status_s {
-    uint64_t bytes;
+    uint64_t msg_bytes;
     uint64_t data_frames;
 };
 
@@ -300,16 +299,9 @@ struct embc_dl_status_s {
     uint32_t version;
     uint32_t reserved;
     struct embc_dl_rx_status_s rx;
+    struct embc_framer_status_s rx_framer;
     struct embc_dl_tx_status_s tx;
     uint64_t send_buffers_free;
-};
-
-/**
- * @brief The framer events.
- */
-enum embc_dl_event_s {
-    EMBC_DL_EV_UNDEFINED,
-    EMBC_DL_EV_RECV_RESET,
 };
 
 /**
@@ -330,42 +322,21 @@ struct embc_dl_api_s {
      * @brief The function called upon message receipt.
      *
      * @param user_data The arbitrary user data.
-     * @param port_id The port id for the message.
-     * @param message_id The message id for the message.
-     * @param msg_buffer The buffer containing the message.
+     * @param metadata The arbitrary 24-bit metadata associated with the message.
+     * @param msg The buffer containing the message.
      *      This buffer is only valid for the duration of the callback.
      * @param msg_size The size of msg_buffer in bytes.
      */
-    void (*recv_fn)(void *user_data,
-                    uint8_t port_id, uint16_t message_id,
-                    uint8_t *msg_buffer, uint32_t msg_size);
+    void (*recv_fn)(void *user_data, uint32_t metadata,
+                    uint8_t *msg, uint32_t msg_size);
 };
-
-#if 0
-/**
- * @brief The commands defined for port 0.
- */
-enum embc_framer_port0_cmd_e {
-    EMBC_FRAMER_PORT0_IGNORE = 0x00,
-    EMBC_FRAMER_PORT0_CONNECT = 0x01,
-    EMBC_FRAMER_PORT0_CONNECT_ACK = 0x81,
-    EMBC_FRAMER_PORT0_PING_REQ = 0x02,
-    EMBC_FRAMER_PORT0_PING_RSP = 0x82,
-    EMBC_FRAMER_PORT0_STATUS_REQ = 0x03,
-    EMBC_FRAMER_PORT0_STATUS = 0x83,
-    EMBC_FRAMER_PORT0_LOOPBACK_REQ = 0x05,
-    EMBC_FRAMER_PORT0_LOOPBACK_RSP = 0x85,
-};
-#endif
 
 /**
  * @brief Send a message.
  *
  * @param self The instance.
- * @param port_id The port identifier for the message.
- * @param message_id The arbitrary message_id, often used to match the
- *      send callback and received response messages.
- * @param msg_buffer The msg_buffer containing the message.  The driver
+ * @param metadata The arbitrary 24-bit metadata associated with the message.
+ * @param msgr The msg_buffer containing the message.  The driver
  *      copies this buffer, so it only needs to be valid for the duration
  *      of the function call.
  * @param msg_size The size of msg_buffer in total_bytes.
@@ -373,46 +344,26 @@ enum embc_framer_port0_cmd_e {
  *
  * The port send_done_cbk callback will be called when the send completes.
  */
-int32_t embc_dl_send(struct embc_dl_s * self,
-                     uint8_t port_id, uint16_t message_id,
-                     uint8_t const *msg_buffer, uint32_t msg_size);
+int32_t embc_dl_send(struct embc_dl_s * self, uint32_t metadata,
+                     uint8_t const *msg, uint32_t msg_size);
 
 /**
- * @brief The function to call on data frames received.
+ * @brief Provide receive data to this data link instance.
  *
- * @param user_data The arbitrary user data which is the embc_dl_s instance.
- * @param frame_id The frame id.
- * @param port_id The port id.
- * @param message_id The message id.
- * @param msg_buffer The payload buffer.
- * @param msg_size The size of msg_buffer in bytes.
+ * @param self The data link instance.
+ * @param buffer The data received, which is only valid for the
+ *      duration of the callback.
+ * @param buffer_size The size of buffer in total_bytes.
  */
-void embc_dl_data_cbk(void * user_data, uint16_t frame_id,
-                      uint8_t port_id, uint16_t message_id,
-                      uint8_t const *msg_buffer, uint32_t msg_size);
+void embc_dl_ll_recv(struct embc_dl_s * self,
+                     uint8_t const * buffer, uint32_t buffer_size);
 
 /**
- * @brief The function to call on link frame received.
- *
- * @param user_data The arbitrary user data which is the embc_dl_s instance.
- * @param frame_type The frame type.
- * @param frame_id The frame id.
- */
-void embc_dl_link_cbk(void * user_data, enum embc_framer_type_e frame_type, uint16_t frame_id);
-
-/**
- * @brief The function to call on any framing errors.
- *
- * @param user_data The arbitrary user data which is the embc_dl_s instance.
- */
-void embc_dl_framing_error_cbk(void * user_data);
-
-/**
- * @brief The maximum time until the next embc_framer_process() call.
+ * @brief The maximum time until the next embc_dl_process() call.
  *
  * @param self The instance.
  * @return The maximum time in milliseconds until the system must call
- *      embc_framer_process().  The system may call process sooner.
+ *      embc_dl_process().  The system may call process sooner.
  */
 uint32_t embc_dl_service_interval_ms(struct embc_dl_s * self);
 
@@ -440,7 +391,7 @@ struct embc_dl_ll_s {
      *
      * @param hal The HAL instance (user_data).
      * @return The current time in milliseconds.
-     *      The framer module only uses relative time.  The HAL
+     *      The data link module only uses relative time.  The HAL
      *      implementation is free to select any definition of 0.
      *      This value wraps every 49 days.
      */
@@ -460,7 +411,6 @@ struct embc_dl_ll_s {
      */
     void (*send)(void * user_data, uint8_t const * buffer, uint32_t buffer_size);
 
-
     /**
      * @brief The number of bytes currently available to send().
      *
@@ -469,7 +419,7 @@ struct embc_dl_ll_s {
      */
     uint32_t (*send_available)(void * user_data);
 
-    // note: recv is performed through the embc_framer_ll_recv with the framer instance.
+    // note: recv is performed through the embc_dl_ll_recv with the dl instance.
 };
 
 /**
@@ -477,11 +427,19 @@ struct embc_dl_ll_s {
  *
  * @param config The data link configuration.
  * @param ll_instance The lower-level driver instance.
- * @return The new framer instance.
+ * @return The new data link instance.
  */
 struct embc_dl_s * embc_dl_initialize(
         struct embc_dl_config_s const * config,
         struct embc_dl_ll_s * ll_instance);
+
+/**
+ * @brief Register callbacks for the upper-layer.
+ *
+ * @param self The data link instance.
+ * @param ul The upper layer
+ */
+void embc_dl_register_upper_layer(struct embc_dl_s * self, struct embc_dl_api_s const * ul);
 
 /**
  * @brief Reset the data link state.
@@ -491,9 +449,9 @@ struct embc_dl_s * embc_dl_initialize(
 void embc_dl_reset(struct embc_dl_s * self);
 
 /**
- * @brief Stop, finalize, and deallocate the framer.
+ * @brief Stop, finalize, and deallocate the data link instance.
  *
- * @param self The framer instance.
+ * @param self The data link instance.
  * @return 0 or error code.
  *
  * While this method is provided for completeness, most embedded systems will
@@ -502,9 +460,9 @@ void embc_dl_reset(struct embc_dl_s * self);
 int32_t embc_dl_finalize(struct embc_dl_s * self);
 
 /**
- * @brief Get the status for the framer.
+ * @brief Get the status for the data link.
  *
- * @param self The framer instance.
+ * @param self The data link instance.
  * @param status The status instance to populate.
  * @return 0 or error code.
  */
