@@ -21,6 +21,7 @@
 #include <cmocka.h>
 #include <string.h>
 #include "embc/stream/data_link.h"
+#include "embc/stream/ring_buffer_u8.h"
 #include <stdio.h>
 
 #define SEND_BUFFER_SIZE (1 << 13)
@@ -46,9 +47,9 @@ static uint8_t PAYLOAD_MAX[] = {
 
 struct test_s {
     struct embc_dl_s * dl;
-    uint8_t send_buffer[SEND_BUFFER_SIZE];
-    uint8_t send_buffer_size;
     uint32_t send_available;
+    struct embc_rb8_s link_buf;
+    uint8_t link_buffer_[512];
     uint32_t time_ms;
 };
 
@@ -59,10 +60,19 @@ static uint32_t ll_time_get_ms(void * user_data) {
 
 static void ll_send(void * user_data, uint8_t const * buffer, uint32_t buffer_size) {
     struct test_s * self = (struct test_s *) user_data;
-    check_expected(buffer_size);
-    check_expected_ptr(buffer);
-    memcpy(self->send_buffer + self->send_buffer_size, buffer, buffer_size);
-    self->send_buffer_size += buffer_size;
+    if (buffer[2] & 0xE0) {
+        while (buffer_size) {
+            assert_true(embc_rb8_size(&self->link_buf) >= EMBC_FRAMER_LINK_SIZE);
+            uint8_t *b = embc_rb8_tail(&self->link_buf);
+            assert_memory_equal(buffer, b, EMBC_FRAMER_LINK_SIZE);
+            embc_rb8_pop(&self->link_buf, EMBC_FRAMER_LINK_SIZE);
+            buffer += EMBC_FRAMER_LINK_SIZE;
+            buffer_size -= EMBC_FRAMER_LINK_SIZE;
+        }
+    } else {
+        check_expected(buffer_size);
+        check_expected_ptr(buffer);
+    }
 }
 
 static uint32_t ll_send_available(void * user_data) {
@@ -99,6 +109,7 @@ static int setup(void ** state) {
         .rx_window_size = 64,
         .rx_buffer_size = (1 << 13),
         .tx_timeout_ms = 10,
+        .tx_link_buffer_size = 128,
     };
 
     struct embc_dl_ll_s ll = {
@@ -118,6 +129,8 @@ static int setup(void ** state) {
     self->dl = embc_dl_initialize(&config, &ll);
     assert_non_null(self->dl);
     embc_dl_register_upper_layer(self->dl, &ul);
+
+    embc_rb8_init(&self->link_buf, self->link_buffer_, sizeof(self->link_buffer_));
 
     *state = self;
     return 0;
@@ -164,11 +177,9 @@ static void send_and_expect(struct test_s *self,
     assert_int_equal(0, embc_dl_send(self->dl, metadata, msg_buffer, msg_size));
 }
 
-static void expect_send_link(enum embc_framer_type_e frame_type, uint16_t frame_id) {
-    uint8_t b[EMBC_FRAMER_LINK_SIZE];
+static void expect_send_link(struct test_s *self, enum embc_framer_type_e frame_type, uint16_t frame_id) {
+    uint8_t * b = embc_rb8_insert(&self->link_buf, EMBC_FRAMER_LINK_SIZE);
     assert_int_equal(0, embc_framer_construct_link(b, frame_type, frame_id));
-    expect_value(ll_send, buffer_size, EMBC_FRAMER_LINK_SIZE);
-    expect_memory(ll_send, buffer, b, EMBC_FRAMER_LINK_SIZE);
 }
 
 static void recv_link(struct test_s *self, enum embc_framer_type_e frame_type, uint16_t frame_id) {
@@ -264,7 +275,7 @@ static void test_recv_and_ack(void ** state) {
     expect_recv(1, PAYLOAD1, sizeof(PAYLOAD1));
     recv_data(self, 0, 1, PAYLOAD1, sizeof(PAYLOAD1));
 
-    expect_send_link(EMBC_FRAMER_FT_ACK_ALL, 0);
+    expect_send_link(self, EMBC_FRAMER_FT_ACK_ALL, 0);
     embc_dl_process(self->dl);
 
     assert_int_equal(0, embc_dl_status_get(self->dl, &status));
@@ -282,7 +293,7 @@ static void test_recv_multiple_all_acks(void ** state) {
         printf("iteration %d\n", i);
         expect_recv(1, PAYLOAD_MAX, sizeof(PAYLOAD_MAX));
         recv_data(self, i, 1, PAYLOAD_MAX, sizeof(PAYLOAD_MAX));
-        expect_send_link(EMBC_FRAMER_FT_ACK_ALL, i);
+        expect_send_link(self, EMBC_FRAMER_FT_ACK_ALL, i);
         embc_dl_process(self->dl);
     }
 
@@ -292,147 +303,26 @@ static void test_recv_multiple_all_acks(void ** state) {
     assert_int_equal(count, status.rx.data_frames);
 }
 
-#if 0
-static void test_send_one_with_nack(void ** state) {
-    struct test_s *self = (struct test_s *) *state;
-    struct embc_framer_status_s status;
-
-    send(self, 0, 1, 2, 3, PAYLOAD1, sizeof(PAYLOAD1));
-    respond_with_send_done(self);
-
-    assert_int_equal(0, embc_framer_status_get(self->f, &status));
-    assert_int_equal(sizeof(PAYLOAD1) + EMBC_FRAMER_OVERHEAD_SIZE, status.tx.bytes);
-    assert_int_equal(0, status.tx.data_frames);
-
-    // NACK causes retransmission
-    expect_any(ll_send, buffer_size);
-    expect_any(ll_send, buffer);
-    respond_with_nack(self, 0, 0, 0);
-    respond_with_send_done(self);
-
-    // ACK causes send_done
-    expect_send_done(2, 3);
-    respond_with_ack(self, 0);
-
-    assert_int_equal(0, embc_framer_status_get(self->f, &status));
-    assert_int_equal(2 * (sizeof(PAYLOAD1) + EMBC_FRAMER_OVERHEAD_SIZE), status.tx.bytes);
-    assert_int_equal(1, status.tx.data_frames);
-}
-
-static void test_receive_one(void ** state) {
-    struct embc_framer_status_s status;
-    struct test_s *self = (struct test_s *) *state;
-    assert_non_null(self->ul.recv);
-
-    expect_value(recv_01, msg_size, sizeof(FRAME1_PAYLOAD));
-    expect_memory(recv_01, msg_buffer, FRAME1_PAYLOAD, sizeof(FRAME1_PAYLOAD));
-    self->ul.recv(self->ul.ul_user_data, FRAME1, sizeof(FRAME1));
-
-    assert_int_equal(0, embc_framer_status_get(self->f, &status));
-    assert_int_equal(sizeof(FRAME1), status.rx.total_bytes);
-    assert_int_equal(1, status.rx.frames);
-    assert_int_equal(0, status.rx.crc_errors);
-    assert_int_equal(0, status.rx.resync);
-    assert_int_equal(0, status.rx.frame_id_errors);
-    assert_int_equal(0, status.rx.frames_missing);
-    assert_int_equal(0, status.rx.frame_too_big);
-}
-
-static void test_receive_one_many_sof(void ** state) {
-    struct test_s *self = (struct test_s *) *state;
-    uint8_t sof[] = {EMBC_FRAMER_SOF1, EMBC_FRAMER_SOF1, EMBC_FRAMER_SOF1, EMBC_FRAMER_SOF1, EMBC_FRAMER_SOF1};
-    self->ul.recv(self->ul.ul_user_data, sof, sizeof(sof));
-    expect_value(recv_01, msg_size, sizeof(FRAME1_PAYLOAD));
-    expect_memory(recv_01, msg_buffer, FRAME1_PAYLOAD, sizeof(FRAME1_PAYLOAD));
-    self->ul.recv(self->ul.ul_user_data, FRAME1, sizeof(FRAME1));
-}
-
-static void test_receive_one_initial_garbage(void ** state) {
-    struct embc_framer_status_s status;
-    struct test_s *self = (struct test_s *) *state;
-    uint8_t sof[1024];
-    for (uint32_t i = 0; i < sizeof(sof); ++i) {
-        sof[i] = EMBC_FRAMER_SOF1;
-    }
-
-    // initial garbage contains SOF with long frame length
-    uint8_t garbage[] = {0x12, 0x13, EMBC_FRAMER_SOF1, 0xff, EMBC_FRAMER_SOF1, 0x00, EMBC_FRAMER_SOF1, EMBC_FRAMER_SOF1};
-    self->ul.recv(self->ul.ul_user_data, garbage, sizeof(garbage));
-
-    expect_value(recv_01, msg_size, sizeof(FRAME1_PAYLOAD));
-    expect_memory(recv_01, msg_buffer, FRAME1_PAYLOAD, sizeof(FRAME1_PAYLOAD));
-    self->ul.recv(self->ul.ul_user_data, FRAME1, sizeof(FRAME1));
-
-    assert_int_equal(0, embc_framer_status_get(self->f, &status));
-    assert_int_equal(sizeof(garbage) + sizeof(FRAME1), status.rx.total_bytes);
-    assert_int_equal(1, status.rx.frames);
-    assert_int_equal(1, status.rx.frame_too_big);
-}
-
-static void test_receive_two(void ** state) {
-    struct embc_framer_status_s status;
+static void test_recv_out_of_order(void ** state) {
     struct test_s *self = (struct test_s *) *state;
 
-    expect_value(recv_01, msg_size, sizeof(FRAME1_PAYLOAD));
-    expect_memory(recv_01, msg_buffer, FRAME1_PAYLOAD, sizeof(FRAME1_PAYLOAD));
-    self->ul.recv(self->ul.ul_user_data, FRAME1, sizeof(FRAME1));
+    expect_recv(0x11, PAYLOAD_MAX, sizeof(PAYLOAD_MAX));
+    recv_data(self, 0, 0x11, PAYLOAD_MAX, sizeof(PAYLOAD_MAX));
+    expect_send_link(self, EMBC_FRAMER_FT_ACK_ALL, 0);
+    embc_dl_process(self->dl);
 
-    expect_value(recv_01, msg_size, sizeof(FRAME2_PAYLOAD));
-    expect_memory(recv_01, msg_buffer, FRAME2_PAYLOAD, sizeof(FRAME2_PAYLOAD));
-    self->ul.recv(self->ul.ul_user_data, FRAME2, sizeof(FRAME2));
+    recv_data(self, 2, 0x33, PAYLOAD_MAX, sizeof(PAYLOAD_MAX));
+    expect_send_link(self, EMBC_FRAMER_FT_NACK_FRAME_ID, 1);
+    expect_send_link(self, EMBC_FRAMER_FT_ACK_ONE, 2);
+    embc_dl_process(self->dl);
 
-    assert_int_equal(0, embc_framer_status_get(self->f, &status));
-    assert_int_equal(sizeof(FRAME1) + sizeof(FRAME2), status.rx.total_bytes);
-    assert_int_equal(2, status.rx.frames);
+    expect_recv(0x22, PAYLOAD1, sizeof(PAYLOAD1));
+    expect_recv(0x33, PAYLOAD_MAX, sizeof(PAYLOAD_MAX));
+    recv_data(self, 1, 0x22, PAYLOAD1, sizeof(PAYLOAD1));
+
+    expect_send_link(self, EMBC_FRAMER_FT_ACK_ALL, 2);
+    embc_dl_process(self->dl);
 }
-
-static void test_receive_valid_invalid_valid(void ** state) {
-    struct embc_framer_status_s status;
-    struct test_s *self = (struct test_s *) *state;
-
-    expect_value(recv_01, msg_size, sizeof(FRAME1_PAYLOAD));
-    expect_memory(recv_01, msg_buffer, FRAME1_PAYLOAD, sizeof(FRAME1_PAYLOAD));
-    self->ul.recv(self->ul.ul_user_data, FRAME1, sizeof(FRAME1));
-
-    self->ul.recv(self->ul.ul_user_data, FRAME1_BAD_CRC, sizeof(FRAME1_BAD_CRC));
-
-    expect_value(recv_01, msg_size, sizeof(FRAME2_PAYLOAD));
-    expect_memory(recv_01, msg_buffer, FRAME2_PAYLOAD, sizeof(FRAME2_PAYLOAD));
-    self->ul.recv(self->ul.ul_user_data, FRAME2, sizeof(FRAME2));
-
-    assert_int_equal(0, embc_framer_status_get(self->f, &status));
-    assert_int_equal(sizeof(FRAME1) + sizeof(FRAME1_BAD_CRC) + sizeof(FRAME2), status.rx.total_bytes);
-    assert_int_equal(2, status.rx.frames);
-    assert_int_equal(1, status.rx.crc_errors);
-    assert_int_equal(1, status.rx.resync);
-}
-
-static void test_receive_valid_invalid_valid_extra_sofs(void ** state) {
-    struct embc_framer_status_s status;
-    struct test_s *self = (struct test_s *) *state;
-    uint8_t sof[] = {EMBC_FRAMER_SOF1, EMBC_FRAMER_SOF1, EMBC_FRAMER_SOF1, EMBC_FRAMER_SOF1, EMBC_FRAMER_SOF1};
-
-    self->ul.recv(self->ul.ul_user_data, sof, sizeof(sof));
-    expect_value(recv_01, msg_size, sizeof(FRAME1_PAYLOAD));
-    expect_memory(recv_01, msg_buffer, FRAME1_PAYLOAD, sizeof(FRAME1_PAYLOAD));
-    self->ul.recv(self->ul.ul_user_data, FRAME1, sizeof(FRAME1));
-
-    self->ul.recv(self->ul.ul_user_data, sof, sizeof(sof));
-    self->ul.recv(self->ul.ul_user_data, FRAME1_BAD_CRC, sizeof(FRAME1_BAD_CRC));
-
-    expect_value(recv_01, msg_size, sizeof(FRAME2_PAYLOAD));
-    expect_memory(recv_01, msg_buffer, FRAME2_PAYLOAD, sizeof(FRAME2_PAYLOAD));
-    self->ul.recv(self->ul.ul_user_data, sof, sizeof(sof));
-    self->ul.recv(self->ul.ul_user_data, FRAME2, sizeof(FRAME2));
-    self->ul.recv(self->ul.ul_user_data, sof, sizeof(sof));
-
-    assert_int_equal(0, embc_framer_status_get(self->f, &status));
-    assert_int_equal(sizeof(FRAME1) + sizeof(FRAME1_BAD_CRC) + sizeof(FRAME2) + sizeof(sof) * 4, status.rx.total_bytes);
-    assert_int_equal(2, status.rx.frames);
-    assert_int_equal(1, status.rx.crc_errors);
-    assert_int_equal(1, status.rx.resync);
-}
-#endif
 
 int main(void) {
     hal_test_initialize();
@@ -444,14 +334,9 @@ int main(void) {
             cmocka_unit_test_setup_teardown(test_send_multiple_with_buffer_wrap, setup, teardown),
             cmocka_unit_test_setup_teardown(test_recv_and_ack, setup, teardown),
             cmocka_unit_test_setup_teardown(test_recv_multiple_all_acks, setup, teardown),
-            //cmocka_unit_test_setup_teardown(test_send_one_with_timeout, setup, teardown),
-            //cmocka_unit_test_setup_teardown(test_send_one_with_nack, setup, teardown),
-            //cmocka_unit_test_setup_teardown(test_receive_one, setup, teardown),
-            //cmocka_unit_test_setup_teardown(test_receive_one_many_sof, setup, teardown),
-            //cmocka_unit_test_setup_teardown(test_receive_one_initial_garbage, setup, teardown),
-            //cmocka_unit_test_setup_teardown(test_receive_two, setup, teardown),
-            //cmocka_unit_test_setup_teardown(test_receive_valid_invalid_valid, setup, teardown),
-            //cmocka_unit_test_setup_teardown(test_receive_valid_invalid_valid_extra_sofs, setup, teardown),
+            cmocka_unit_test_setup_teardown(test_recv_out_of_order, setup, teardown),
+            //cmocka_unit_test_setup_teardown(, setup, teardown),
+            //cmocka_unit_test_setup_teardown(, setup, teardown),
     };
 
     return cmocka_run_group_tests(tests, NULL, NULL);

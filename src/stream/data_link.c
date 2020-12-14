@@ -29,11 +29,36 @@
 
 #define EMBC_LOG_LEVEL EMBC_LOG_LEVEL_ALL
 #include "embc/stream/data_link.h"
+#include "embc/stream/msg_ring_buffer.h"
 #include "embc/stream/ring_buffer_u8.h"
 #include "embc/cdef.h"
 #include "embc/ec.h"
 #include "embc/log.h"
 #include "embc/platform.h"
+
+
+static inline void encode_u16(uint8_t * b, uint16_t value) {
+    b[0] = (value >> 0) & 0xff;
+    b[1] = (value >> 8) & 0xff;
+}
+
+static inline void encode_u32(uint8_t * b, uint32_t value) {
+    b[0] = (value >> 0) & 0xff;
+    b[1] = (value >> 8) & 0xff;
+    b[2] = (value >> 16) & 0xff;
+    b[3] = (value >> 24) & 0xff;
+}
+
+static inline uint16_t decode_u16(uint8_t * b) {
+    return ((uint16_t) b[0]) | (((uint16_t) b[1]) << 8);
+}
+
+static inline uint16_t decode_u32(uint8_t * b) {
+    return ((uint32_t) b[0])
+        | (((uint32_t) b[1]) << 8)
+        | (((uint32_t) b[2]) << 16)
+        | (((uint32_t) b[3]) << 24);
+}
 
 
 enum tx_frame_state_e {
@@ -68,10 +93,11 @@ struct embc_dl_s {
 
     uint16_t tx_frame_last_id; // the last frame that has not yet be ACKed
     uint16_t tx_frame_next_id; // the next frame id for sending.
-    uint16_t rx_frame_id; // the next frame that has not yet been received
+    uint16_t rx_next_frame_id; // the next frame that has not yet been received
+    uint16_t rx_max_frame_id;  // the most future stored frame id
 
-    struct embc_rb8_s tx_buf;
-    struct embc_rb8_s rx_buf;
+    struct embc_mrb_s tx_buf;
+    struct embc_mrb_s rx_buf;
     struct embc_rb8_s tx_link_buf;
 
     struct tx_frame_s * tx_frames;
@@ -91,23 +117,25 @@ int32_t embc_dl_send(struct embc_dl_s * self,
     // todo consider mutex?
     uint16_t idx = self->tx_frame_next_id & (self->tx_frame_count - 1);
     struct tx_frame_s * f = &self->tx_frames[idx];
+    uint16_t frame_id = self->tx_frame_next_id;
 
     if (f->state != TX_FRAME_ST_IDLE) {
         return EMBC_ERROR_NOT_ENOUGH_MEMORY;
     }
+
+    if (!embc_framer_validate_data(frame_id, metadata, msg_size)) {
+        EMBC_LOGW("embc_framer_send invalid parameters");
+        return EMBC_ERROR_PARAMETER_INVALID;
+    }
+
     uint16_t frame_sz = msg_size + EMBC_FRAMER_OVERHEAD_SIZE;
-    uint8_t * b = embc_rb8_insert(&self->tx_buf, frame_sz);
+    uint8_t * b = embc_mrb_alloc(&self->tx_buf, frame_sz);
     if (!b) {
         return EMBC_ERROR_NOT_ENOUGH_MEMORY;
     }
 
-    uint16_t frame_id = self->tx_frame_next_id;
     int32_t rv = embc_framer_construct_data(b, frame_id, metadata, msg, msg_size);
-    if (rv) {
-        EMBC_LOGW("embc_framer_send construct failed");
-        embc_rb8_pop(&self->tx_buf, frame_sz);
-        return rv;
-    }
+    EMBC_ASSERT(0 == rv);  // embc_framer_validate already checked
 
     // queue transmit frame for send_data()
     f->last_send_time_ms = self->ll_instance.time_get_ms(self->ll_instance.user_data);
@@ -189,45 +217,121 @@ static void send_link_pending(struct embc_dl_s * self) {
 }
 
 static void send_link(struct embc_dl_s * self, enum embc_framer_type_e frame_type, uint16_t frame_id) {
+    if (!embc_framer_validate_link(frame_type, frame_id)) {
+        return;
+    }
     uint8_t * b = embc_rb8_insert(&self->tx_link_buf, EMBC_FRAMER_LINK_SIZE);
     if (!b) {
         EMBC_LOG_WARN("link buffer full");
         return;
     }
-    int rv = embc_framer_construct_link(b, frame_type, frame_id);
-    if (rv) {
-        EMBC_LOGW("send_link construct failed");
-        embc_rb8_pop(&self->tx_link_buf, EMBC_FRAMER_LINK_SIZE);
-        return;
-    }
+    int32_t rv = embc_framer_construct_link(b, frame_type, frame_id);
+    EMBC_ASSERT(0 == rv); // already checked with embc_framer_validate_link()
     // queued for send_link_pending
+}
+
+static void on_recv_msg_done(struct embc_dl_s * self, uint32_t metadata, uint8_t *msg, uint32_t msg_size) {
+    if (self->ul_instance.recv_fn) {
+        self->ul_instance.recv_fn(self->ul_instance.user_data, metadata, msg, msg_size);
+    }
+    self->rx_status.msg_bytes += msg_size;
+    ++self->rx_status.data_frames;
 }
 
 static void on_recv_data(void * user_data, uint16_t frame_id, uint32_t metadata,
                          uint8_t *msg, uint32_t msg_size) {
     struct embc_dl_s * self = (struct embc_dl_s *) user_data;
+    uint16_t this_idx = frame_id & (self->rx_frame_count - 1U);
+    uint16_t window_end = (self->rx_next_frame_id + self->rx_frame_count) & EMBC_FRAMER_FRAME_ID_MAX;
 
-    if (self->rx_frame_id == frame_id) {
-        // next expected frame, error free operation case
-        send_link(self, EMBC_FRAMER_FT_ACK_ALL, frame_id);
-        self->rx_frame_id = (self->rx_frame_id + 1) & EMBC_FRAMER_FRAME_ID_MAX;
-        ++self->rx_status.data_frames;
-        self->rx_status.msg_bytes += msg_size;
-        if (self->ul_instance.recv_fn) {
-            self->ul_instance.recv_fn(self->ul_instance.user_data, metadata, msg, msg_size);
+    if (self->rx_next_frame_id == frame_id) {
+        // next expected frame, recv immediately without putting into ring buffer.
+        self->rx_frames[this_idx].state = RX_FRAME_ST_IDLE;
+        on_recv_msg_done(self, metadata, msg, msg_size);
+        self->rx_next_frame_id = (self->rx_next_frame_id + 1) & EMBC_FRAMER_FRAME_ID_MAX;
+        if (self->rx_max_frame_id == frame_id) {
+            // no errors, normal operating mode
+            self->rx_max_frame_id = self->rx_next_frame_id;
+            send_link(self, EMBC_FRAMER_FT_ACK_ALL, frame_id);
+            embc_mrb_clear(&self->rx_buf);
+            return;
+        } else {
+            // catch up if possible
+            while (1) {
+                this_idx = self->rx_next_frame_id & (self->rx_frame_count - 1U);
+                if (self->rx_frames[this_idx].state != RX_FRAME_ST_ACK) {
+                    break;
+                }
+                self->rx_frames[this_idx].state = RX_FRAME_ST_IDLE;
+                uint8_t * b = self->rx_frames[this_idx].buf;
+                metadata = decode_u32(b + 2) & 0x00ffffffU;
+                msg_size = b[5] + 1;
+                on_recv_msg_done(self, metadata, b + 6, msg_size);
+                self->rx_next_frame_id = (self->rx_next_frame_id + 1) & EMBC_FRAMER_FRAME_ID_MAX;
+                self->rx_max_frame_id = self->rx_next_frame_id;
+            }
+            frame_id = (self->rx_next_frame_id - 1U) & EMBC_FRAMER_FRAME_ID_MAX;
+            send_link(self, EMBC_FRAMER_FT_ACK_ALL, frame_id);
+
+            // pop old frames from the buffer.
+            while (1) {
+                uint32_t sz = 0;
+                uint8_t * b = embc_mrb_peek(&self->rx_buf, &sz);
+                if (b) {
+                    frame_id = decode_u16(b);
+                    if (embc_framer_frame_id_subtract(self->rx_next_frame_id, frame_id) > 0) {
+                        embc_mrb_pop(&self->rx_buf, &sz);
+                    } else {
+                        break;
+                    }
+                } else {
+                    break;
+                }
+            }
         }
-        return;
-    } else if (frame_id < self->rx_frame_id) {
-        // we already have this frame
-        send_link(self, EMBC_FRAMER_FT_ACK_ALL, frame_id);
-    } else if (frame_id >= (self->rx_frame_id + self->rx_frame_count)) {
-        // todo handle wrap
-        // too far in the future, nack
+    } else if (embc_framer_frame_id_subtract(frame_id, self->rx_next_frame_id) < 0) {
+        // we already have this frame.
+        // ack with most recent successfully received frame_id
+        send_link(self, EMBC_FRAMER_FT_ACK_ALL, (self->rx_next_frame_id - 1) & EMBC_FRAMER_FRAME_ID_MAX);
+    } else if (embc_framer_frame_id_subtract(window_end, frame_id) <= 0) {
+        EMBC_LOGW("received frame too far into the future");
         send_link(self, EMBC_FRAMER_FT_NACK_FRAME_ID, frame_id);
     } else {
-        // store to our buffer
-        send_link(self, EMBC_FRAMER_FT_ACK_ONE, frame_id);
-        // todo
+        // future frame
+        if (embc_framer_frame_id_subtract(frame_id, self->rx_max_frame_id) > 0) {
+            self->rx_max_frame_id = frame_id;
+        }
+
+        // nack missing frames not already NACK'ed
+        uint16_t next_frame_id = self->rx_next_frame_id;
+        while (1) {
+            if (next_frame_id == frame_id) {
+                break;
+            }
+            uint16_t next_idx = self->rx_next_frame_id & (self->rx_frame_count - 1U);
+            if (self->rx_frames[next_idx].state == RX_FRAME_ST_IDLE) {
+                self->rx_frames[next_idx].state = RX_FRAME_ST_NACK;
+                send_link(self, EMBC_FRAMER_FT_NACK_FRAME_ID, next_idx);
+            }
+            next_frame_id = (next_frame_id + 1) & EMBC_FRAMER_FRAME_ID_MAX;
+        }
+
+        // attempt to store
+        uint8_t * b = embc_mrb_alloc(&self->rx_buf, 6 + msg_size);
+        if (!b) {
+            EMBC_LOGW("rx frame, but no memory available");
+            // should never run out of memory.  Could attempt frame reorder.
+            self->rx_frames[this_idx].state = RX_FRAME_ST_NACK;
+            send_link(self, EMBC_FRAMER_FT_NACK_FRAME_ID, frame_id);
+        } else {
+            encode_u16(b, frame_id);
+            encode_u32(b + 2, metadata);
+            b[5] = msg_size - 1;
+            embc_memcpy(b + 6, msg, msg_size);
+            self->rx_frames[this_idx].state = RX_FRAME_ST_ACK;
+            self->rx_frames[this_idx].buf = b;
+            send_link(self, EMBC_FRAMER_FT_ACK_ONE, frame_id);
+        }
     }
 }
 
@@ -264,12 +368,16 @@ static bool retire_tx_frame(struct embc_dl_s * self) {
         self->tx_frame_last_id = (self->tx_frame_last_id + 1) & EMBC_FRAMER_FRAME_ID_MAX;
         ++self->tx_status.data_frames;
         f->state = TX_FRAME_ST_IDLE;
-        if (f->buf != embc_rb8_tail(&self->tx_buf)) {
-            EMBC_LOGE("tx buffer lost sync");
-            // todo
+        uint32_t frame_sz = 0;
+        uint8_t * frame = embc_mrb_pop(&self->tx_buf, &frame_sz);
+        if (!frame) {
+            EMBC_LOGE("tx buffer lost sync: empty");
+        } else if (frame != f->buf) {
+            EMBC_LOGE("tx buffer lost sync: mismatch");
+        } else if (tx_buf_frame_sz(f) != frame_sz) {
+            EMBC_LOGE("tx buffer lost sync: size mismatch");
         } else {
-            uint16_t frame_sz = tx_buf_frame_sz(f);
-            embc_rb8_pop(&self->tx_buf, frame_sz);
+            // success
         }
         return true;
     }
@@ -346,7 +454,7 @@ static void on_recv_link(void * user_data, enum embc_framer_type_e frame_type, u
 
 static void on_framing_error(void * user_data) {
     struct embc_dl_s * self = (struct embc_dl_s *) user_data;
-    send_link(self, EMBC_FRAMER_FT_NACK_FRAMING_ERROR, self->rx_frame_id);
+    send_link(self, EMBC_FRAMER_FT_NACK_FRAMING_ERROR, self->rx_next_frame_id);
 }
 
 void embc_dl_ll_recv(struct embc_dl_s * self,
@@ -480,10 +588,10 @@ struct embc_dl_s * embc_dl_initialize(
     embc_rb8_init(&self->tx_link_buf, (uint8_t *) (mem + offset), tx_link_buffer_size);
     offset += tx_link_buffer_size;
 
-    embc_rb8_init(&self->tx_buf, (uint8_t *) (mem + offset), tx_buffer_size);
+    embc_mrb_init(&self->tx_buf, (uint8_t *) (mem + offset), tx_buffer_size);
     offset += tx_buffer_size;
 
-    embc_rb8_init(&self->rx_buf, (uint8_t *) (mem + offset), config->rx_buffer_size);
+    embc_mrb_init(&self->rx_buf, (uint8_t *) (mem + offset), config->rx_buffer_size);
     // offset += config->rx_buffer_size;
 
     self->tx_timeout_ms = config->tx_timeout_ms;
@@ -503,9 +611,10 @@ void embc_dl_register_upper_layer(struct embc_dl_s * self, struct embc_dl_api_s 
 void embc_dl_reset(struct embc_dl_s * self) {
     self->tx_frame_last_id = 0;
     self->tx_frame_next_id = 0;
-    self->rx_frame_id = 0;
-    embc_rb8_clear(&self->tx_buf);
-    embc_rb8_clear(&self->rx_buf);
+    self->rx_next_frame_id = 0;
+    self->rx_max_frame_id = 0;
+    embc_mrb_clear(&self->tx_buf);
+    embc_mrb_clear(&self->rx_buf);
     embc_rb8_clear(&self->tx_link_buf);
 
     for (uint16_t f = 0; f < self->tx_frame_count; ++f) {

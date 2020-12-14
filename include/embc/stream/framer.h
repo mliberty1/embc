@@ -24,12 +24,12 @@
 #ifndef EMBC_STREAM_FRAMER_H__
 #define EMBC_STREAM_FRAMER_H__
 
+#include <stdint.h>
+#include <stdbool.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-
-#include <stdint.h>
 
 /// The value for the first start of frame byte.
 #define EMBC_FRAMER_SOF1 ((uint8_t) 0x55)
@@ -138,6 +138,16 @@ void embc_framer_ll_recv(struct embc_framer_s * self,
 void embc_framer_reset(struct embc_framer_s * self);
 
 /**
+ * @brief Validate the embc_framer_construct_data() parameters.
+ *
+ * @param frame_id
+ * @param frame_id The frame id for the frame.
+ * @param msg_size The size of msg_buffer in bytes.
+ * @return True if parameters are valid, otherwise false.
+ */
+bool embc_framer_validate_data(uint16_t frame_id, uint32_t metadata, uint32_t msg_size);
+
+/**
  * @brief Construct a data frame.
  *
  * @param b The output buffer, which must be at least msg_size + EMBC_FRAMER_OVERHEAD_SIZE bytes.
@@ -149,6 +159,15 @@ void embc_framer_reset(struct embc_framer_s * self);
  */
 int32_t embc_framer_construct_data(uint8_t * b, uint16_t frame_id, uint32_t metadata,
                                    uint8_t const *msg, uint32_t msg_size);
+
+/**
+ * @brief Validate the embc_framer_construct_link() parameters.
+ *
+ * @param frame_type The link frame type.
+ * @param frame_id The frame id.
+ * @return True if parameters are valid, otherwise false.
+ */
+bool embc_framer_validate_link(enum embc_framer_type_e frame_type, uint16_t frame_id);
 
 /**
  * @brief Construct a link frame.

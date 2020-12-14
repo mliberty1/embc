@@ -250,15 +250,22 @@ void embc_framer_reset(struct embc_framer_s * self) {
     embc_memset(&self->status, 0, sizeof(self->status));
 }
 
-int32_t embc_framer_construct_data(uint8_t * b, uint16_t frame_id, uint32_t metadata,
-                                   uint8_t const *msg, uint32_t msg_size) {
+bool embc_framer_validate_data(uint16_t frame_id, uint32_t metadata, uint32_t msg_size) {
     if ((msg_size < 1) || (msg_size > 256)) {
-        return EMBC_ERROR_PARAMETER_INVALID;
+        return false;
     }
     if (frame_id > EMBC_FRAMER_FRAME_ID_MAX) {
-        return EMBC_ERROR_PARAMETER_INVALID;
+        return false;
     }
     if (metadata > EMBC_FRAMER_MESSAGE_ID_MAX) {
+        return false;
+    }
+    return true;
+}
+
+int32_t embc_framer_construct_data(uint8_t * b, uint16_t frame_id, uint32_t metadata,
+                                   uint8_t const *msg, uint32_t msg_size) {
+    if (!embc_framer_validate_data(frame_id, metadata, msg_size)) {
         return EMBC_ERROR_PARAMETER_INVALID;
     }
     b[0] = EMBC_FRAMER_SOF1;
@@ -278,11 +285,18 @@ int32_t embc_framer_construct_data(uint8_t * b, uint16_t frame_id, uint32_t meta
     return 0;
 }
 
-int32_t embc_framer_construct_link(uint8_t * b, enum embc_framer_type_e frame_type, uint16_t frame_id) {
+bool embc_framer_validate_link(enum embc_framer_type_e frame_type, uint16_t frame_id) {
     if ((frame_type < 0) | (frame_type >= 8)) {
-        return EMBC_ERROR_PARAMETER_INVALID;
+        return false;
     }
     if (frame_id > EMBC_FRAMER_FRAME_ID_MAX) {
+        return false;
+    }
+    return true;
+}
+
+int32_t embc_framer_construct_link(uint8_t * b, enum embc_framer_type_e frame_type, uint16_t frame_id) {
+    if (!embc_framer_validate_link(frame_type, frame_id)) {
         return EMBC_ERROR_PARAMETER_INVALID;
     }
     switch (frame_type) {
