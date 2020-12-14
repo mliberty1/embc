@@ -431,7 +431,7 @@ struct embc_dl_ll_s {
  */
 struct embc_dl_s * embc_dl_initialize(
         struct embc_dl_config_s const * config,
-        struct embc_dl_ll_s * ll_instance);
+        struct embc_dl_ll_s const * ll_instance);
 
 /**
  * @brief Register callbacks for the upper-layer.

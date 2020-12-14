@@ -120,9 +120,9 @@ static int setup(void ** state) {
     };
 
     struct embc_dl_api_s ul = {
-            .user_data = self,
-            .reset_fn = on_reset,
-            .recv_fn = on_recv,
+        .user_data = self,
+        .reset_fn = on_reset,
+        .recv_fn = on_recv,
     };
 
     self->send_available = EMBC_FRAMER_MAX_SIZE;

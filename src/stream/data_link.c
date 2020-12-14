@@ -139,7 +139,7 @@ int32_t embc_dl_send(struct embc_dl_s * self,
 
     // queue transmit frame for send_data()
     f->last_send_time_ms = self->ll_instance.time_get_ms(self->ll_instance.user_data);
-    f->send_count = 1;
+    f->send_count = 0;
     f->buf = b;
     f->state = TX_FRAME_ST_SEND;
     self->tx_status.msg_bytes += msg_size;
@@ -535,7 +535,7 @@ static uint32_t to_power_of_two(uint32_t v) {
 
 struct embc_dl_s * embc_dl_initialize(
         struct embc_dl_config_s const * config,
-        struct embc_dl_ll_s * ll_instance) {
+        struct embc_dl_ll_s const * ll_instance) {
     if (!config || !ll_instance) {
         EMBC_LOGE("invalid arguments");
         return 0;
