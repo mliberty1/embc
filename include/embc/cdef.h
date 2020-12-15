@@ -180,6 +180,17 @@
  * as the parameters occur multiple times in the macro!
  */
 #define EMBC_ROUND_UP_TO_MULTIPLE(x, m) (( ((x) + ( EMBC_SIGNUM(x) * (m - 1) )) / m) * m)
+
+/**
+ * @brief Round an unsigned integer value up to the nearest multiple.
+ *
+ * @param x The integer value to round up towards positive infinity.
+ * @param m The multiple for rounding.
+ * @return The value of x rounded up to m.  The output is undefined
+ *      for negative values of x.
+ *
+ * @see EMBC_ROUND_UP_TO_MULTIPLE() for signed integers.
+ */
 #define EMBC_ROUND_UP_TO_MULTIPLE_UNSIGNED(x, m) (( ((x) + (m - 1) ) / m) * m)
 
 /**

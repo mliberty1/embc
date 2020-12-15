@@ -29,10 +29,10 @@ static void u8_unsafe(void **state) {
     uint8_t * p1 = b;
     uint8_t const * p2 = b;
     embc_bbuf_unsafe_encode_u8(&p1, 42);
-    assert_int_equal(b + 1, p1);
+    assert_ptr_equal(b + 1, p1);
     assert_int_equal(42, *b);
     assert_int_equal(42, embc_bbuf_unsafe_decode_u8(&p2));
-    assert_int_equal(p1, p2);
+    assert_ptr_equal(p1, p2);
 }
 
 static void u16_unsafe_be(void **state) {
@@ -41,11 +41,11 @@ static void u16_unsafe_be(void **state) {
     uint8_t * p1 = b;
     uint8_t const * p2 = b;
     embc_bbuf_unsafe_encode_u16_be(&p1, 0x1122);
-    assert_int_equal(b + 2, p1);
+    assert_ptr_equal(b + 2, p1);
     assert_int_equal(0x11, b[0]);
     assert_int_equal(0x22, b[1]);
     assert_int_equal(0x1122, embc_bbuf_unsafe_decode_u16_be(&p2));
-    assert_int_equal(p1, p2);
+    assert_ptr_equal(p1, p2);
 }
 
 static void u16_unsafe_le(void **state) {
@@ -54,11 +54,11 @@ static void u16_unsafe_le(void **state) {
     uint8_t * p1 = b;
     uint8_t const * p2 = b;
     embc_bbuf_unsafe_encode_u16_le(&p1, 0x1122);
-    assert_int_equal(b + 2, p1);
+    assert_ptr_equal(b + 2, p1);
     assert_int_equal(0x22, b[0]);
     assert_int_equal(0x11, b[1]);
     assert_int_equal(0x1122, embc_bbuf_unsafe_decode_u16_le(&p2));
-    assert_int_equal(p1, p2);
+    assert_ptr_equal(p1, p2);
 }
 
 static void u32_unsafe_be(void **state) {
@@ -67,13 +67,13 @@ static void u32_unsafe_be(void **state) {
     uint8_t * p1 = b;
     uint8_t const * p2 = b;
     embc_bbuf_unsafe_encode_u32_be(&p1, 0x11223344);
-    assert_int_equal(b + 4, p1);
+    assert_ptr_equal(b + 4, p1);
     assert_int_equal(0x11, b[0]);
     assert_int_equal(0x22, b[1]);
     assert_int_equal(0x33, b[2]);
     assert_int_equal(0x44, b[3]);
     assert_int_equal(0x11223344, embc_bbuf_unsafe_decode_u32_be(&p2));
-    assert_int_equal(p1, p2);
+    assert_ptr_equal(p1, p2);
 }
 
 static void u32_unsafe_le(void **state) {
@@ -82,13 +82,13 @@ static void u32_unsafe_le(void **state) {
     uint8_t * p1 = b;
     uint8_t const * p2 = b;
     embc_bbuf_unsafe_encode_u32_le(&p1, 0x11223344);
-    assert_int_equal(b + 4, p1);
+    assert_ptr_equal(b + 4, p1);
     assert_int_equal(0x44, b[0]);
     assert_int_equal(0x33, b[1]);
     assert_int_equal(0x22, b[2]);
     assert_int_equal(0x11, b[3]);
     assert_int_equal(0x11223344, embc_bbuf_unsafe_decode_u32_le(&p2));
-    assert_int_equal(p1, p2);
+    assert_ptr_equal(p1, p2);
 }
 
 static void u64_unsafe_be(void **state) {
@@ -97,7 +97,7 @@ static void u64_unsafe_be(void **state) {
     uint8_t * p1 = b;
     uint8_t const * p2 = b;
     embc_bbuf_unsafe_encode_u64_be(&p1, 0x1122334455667788llu);
-    assert_int_equal(b + 8, p1);
+    assert_ptr_equal(b + 8, p1);
     assert_int_equal(0x11, b[0]);
     assert_int_equal(0x22, b[1]);
     assert_int_equal(0x33, b[2]);
@@ -107,7 +107,7 @@ static void u64_unsafe_be(void **state) {
     assert_int_equal(0x77, b[6]);
     assert_int_equal(0x88, b[7]);
     assert_int_equal(0x1122334455667788llu, embc_bbuf_unsafe_decode_u64_be(&p2));
-    assert_int_equal(p1, p2);
+    assert_ptr_equal(p1, p2);
 }
 
 static void u64_unsafe_le(void **state) {
@@ -116,7 +116,7 @@ static void u64_unsafe_le(void **state) {
     uint8_t * p1 = b;
     uint8_t const * p2 = b;
     embc_bbuf_unsafe_encode_u64_le(&p1, 0x1122334455667788llu);
-    assert_int_equal(b + 8, p1);
+    assert_ptr_equal(b + 8, p1);
     assert_int_equal(0x88, b[0]);
     assert_int_equal(0x77, b[1]);
     assert_int_equal(0x66, b[2]);
@@ -126,7 +126,7 @@ static void u64_unsafe_le(void **state) {
     assert_int_equal(0x22, b[6]);
     assert_int_equal(0x11, b[7]);
     assert_int_equal(0x1122334455667788llu, embc_bbuf_unsafe_decode_u64_le(&p2));
-    assert_int_equal(p1, p2);
+    assert_ptr_equal(p1, p2);
 }
 
 int main(void) {

@@ -30,7 +30,8 @@
 EMBC_CPP_GUARD_START
 
 /**
- * \defgroup list list
+ * @ingroup embc
+ * \defgroup embc_list list
  *
  * \brief A doubly-linked mutable circular list.
  *

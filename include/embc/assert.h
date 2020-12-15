@@ -65,6 +65,6 @@
 #define EMBC_FATAL(msg) embc_fatal(__FILE__, __LINE__, msg)
 
 
-/* @} */
+/** @} */
 
 #endif /* EMBC_ASSERT_H_ */

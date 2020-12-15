@@ -186,6 +186,6 @@ EMBC_API void embc_free(void * ptr);
 
 EMBC_CPP_GUARD_END
 
-/* @} */
+/** @} */
 
 #endif /* EMBC_PLATFORM_H_ */

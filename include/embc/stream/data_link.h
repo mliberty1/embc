@@ -249,9 +249,9 @@ extern "C" {
  *    - Selective Repeat Automated Repeat Request (SR-ARQ)
  *      - [wikipedia](https://en.wikipedia.org/wiki/Selective_Repeat_ARQ)
  *    - PPP:
- *      [wikipedia](https://en.wikipedia.org/wiki/Point-to-Point_Protocol),
- *      [RFC](https://tools.ietf.org/html/rfc1661),
- *      [Segger embOS/embNet PPP/PPPoE](https://www.segger.com/products/connectivity/emnet/add-ons/ppppppoe/)
+ *      - [wikipedia](https://en.wikipedia.org/wiki/Point-to-Point_Protocol),
+ *      - [RFC](https://tools.ietf.org/html/rfc1661),
+ *      - [Segger embOS/embNet PPP/PPPoE](https://www.segger.com/products/connectivity/emnet/add-ons/ppppppoe/)
  *    - HDLC
  *      - [wikipedia](https://en.wikipedia.org/wiki/High-Level_Data_Link_Control)
  *    - Constant Overhead Byte Stuffing (COBS):
@@ -263,14 +263,14 @@ extern "C" {
  *      - [SerialFiller](https://github.com/gbmhunter/SerialFiller)
  *      - [TinyFrame](https://github.com/MightyPork/TinyFrame)
  *      - [P2P UART Network](https://github.com/bowen-liu/P2P-UART-Network)
+ *
+ * @{
  */
 
 /// opaque data link instance.
 struct embc_dl_s;
 
-
-#define EMBC_DL_INFLIGHT_MAX (EMBC_FRAMER_COUNT / 2 - 1)
-
+/// The data link configuration options.
 struct embc_dl_config_s {
     uint32_t tx_link_size;    // in frames, normally the same as rx_window_size
     uint32_t tx_window_size;  // in frames
@@ -279,6 +279,7 @@ struct embc_dl_config_s {
     uint32_t tx_timeout_ms;   // transmit timeout in milliseconds
 };
 
+/// The data link transmit status.
 struct embc_dl_tx_status_s {
     uint64_t bytes;
     uint64_t msg_bytes;
@@ -286,6 +287,7 @@ struct embc_dl_tx_status_s {
     uint64_t retransmissions;
 };
 
+/// The data link receive status.
 struct embc_dl_rx_status_s {
     uint64_t msg_bytes;
     uint64_t data_frames;
@@ -472,5 +474,7 @@ int32_t embc_dl_status_get(
 #ifdef __cplusplus
 }
 #endif
+
+/** @} */
 
 #endif  /* EMBC_FRAMER_H__ */

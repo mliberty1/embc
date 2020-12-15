@@ -72,6 +72,7 @@
     X(SYNCHRONIZATION,          "The target is not synchronized with the originator.") \
 
 
+/// The macro used to define the error code enum.
 #define EMBC_ERROR_ENUM(NAME, TEXT) EMBC_ERROR_ ## NAME,
 
 /**
@@ -82,6 +83,7 @@ enum embc_error_code_e {
     EMBC_ERROR_CODE_COUNT
 };
 
+/// A shorter, less confusing alias for success.
 #define EMBC_SUCCESS EMBC_ERROR_SUCCESS
 
 

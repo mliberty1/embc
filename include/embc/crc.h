@@ -85,4 +85,6 @@ EMBC_API uint32_t embc_crc32(uint32_t crc, uint8_t const *data, uint32_t length)
 
 EMBC_CPP_GUARD_END
 
+/** @} */
+
 #endif /* EMBC_CRC_H__ */

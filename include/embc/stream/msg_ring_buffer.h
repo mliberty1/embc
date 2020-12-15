@@ -23,13 +23,23 @@
 #ifndef EMBC_STREAM_MESSAGE_RING_BUFFER_H__
 #define EMBC_STREAM_MESSAGE_RING_BUFFER_H__
 
+#include <stdint.h>
+#include <stdbool.h>
+
+/**
+ * @ingroup embc
+ * @defgroup embc_mrb Ring buffer for variable-length messages.
+ *
+ * @brief Provide a simple ring buffer for first-in, first-out messages.
+ *
+ * @{
+ */
+
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-#include <stdint.h>
-#include <stdbool.h>
-
+/// The message ring buffer instance.
 struct embc_mrb_s {
     volatile uint32_t head;
     volatile uint32_t tail;
@@ -38,7 +48,20 @@ struct embc_mrb_s {
     uint32_t buf_size;  // Size of buf in bytes
 };
 
+/**
+ * @brief Initialize the message ring buffer.
+ *
+ * @param self The ring buffer instance.
+ * @param buffer The underlying memory to use for this buffer.
+ * @param buffer_size The size of buffer in bytes.
+ */
 void embc_mrb_init(struct embc_mrb_s * self, uint8_t * buffer, uint16_t buffer_size);
+
+/**
+ * @brief Clear all data from the memory buffer.
+ *
+ * @param self The ring buffer instance.
+ */
 void embc_mrb_clear(struct embc_mrb_s * self);
 
 /**
@@ -54,7 +77,7 @@ uint8_t * embc_mrb_alloc(struct embc_mrb_s * self, uint32_t size);
  * @brief Peek at the next message from the buffer.
  *
  * @param self The message ring buffer instance.
- * @param size[out] The size of buffer in bytes.
+ * @param[out] size The size of buffer in bytes.
  * @return The buffer or NULL on empty.
  */
 uint8_t * embc_mrb_peek(struct embc_mrb_s * self, uint32_t * size);
@@ -63,7 +86,7 @@ uint8_t * embc_mrb_peek(struct embc_mrb_s * self, uint32_t * size);
  * @brief Pop the next message from the buffer.
  *
  * @param self The message ring buffer instance.
- * @param size[out] The size of buffer in bytes.
+ * @param[out] size The size of buffer in bytes.
  * @return The buffer or NULL on empty.
  */
 uint8_t * embc_mrb_pop(struct embc_mrb_s * self, uint32_t * size);
@@ -72,5 +95,7 @@ uint8_t * embc_mrb_pop(struct embc_mrb_s * self, uint32_t * size);
 #ifdef __cplusplus
 }
 #endif
+
+/** @} */
 
 #endif  /* EMBC_STREAM_MESSAGE_RING_BUFFER_H__ */

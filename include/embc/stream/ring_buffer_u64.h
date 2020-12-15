@@ -23,13 +23,23 @@
 #ifndef EMBC_STREAM_RING_BUFFER_U64_H__
 #define EMBC_STREAM_RING_BUFFER_U64_H__
 
+#include <stdint.h>
+#include <stdbool.h>
+
+/**
+ * @ingroup embc
+ * @defgroup embc_rbu64 Ring buffer for u64 data values.
+ *
+ * @brief Provide a simple, fast u64 FIFO buffer.
+ *
+ * @{
+ */
+
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-#include <stdint.h>
-#include <stdbool.h>
-
+/// The ring buffer containing unsigned 64-bit integers.
 struct embc_rb64_s {
     uint32_t head;
     uint32_t tail;
@@ -116,5 +126,7 @@ static inline bool embc_rb64_discard(struct embc_rb64_s * self, uint32_t count) 
 #ifdef __cplusplus
 }
 #endif
+
+/** @} */
 
 #endif  /* EMBC_STREAM_RING_BUFFER_U64_H__ */

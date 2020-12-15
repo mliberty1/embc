@@ -68,7 +68,7 @@ EMBC_CPP_GUARD_START
 #endif
 
 /**
- * @def __FILENAME__
+ * @def \_\_FILENAME\_\_
  *
  * @brief The filename to display for logging.
  *

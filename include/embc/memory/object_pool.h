@@ -26,7 +26,7 @@
 
 /**
  * @ingroup embc
- * @defgroup embc_pool Memory pool for objects (class instances).
+ * @defgroup embc_objpool Memory pool for objects (class instances).
  *
  * @brief A reference counted memory pool for fixed-size objects.
  *

@@ -40,7 +40,7 @@ void my_printf(const char * format, ...) {
     va_start(arg, format);
     vsnprintf(str, sizeof(str), format, arg);
     va_end(arg);
-    check_expected(str);
+    check_expected_ptr(str);
 }
 
 static void test_logf(void **state) {

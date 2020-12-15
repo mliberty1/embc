@@ -31,6 +31,15 @@
 extern "C" {
 #endif
 
+/**
+ * @ingroup embc
+ * @defgroup embc_framer Reliable byte stream framing.
+ *
+ * @brief Provide reliable byte stream framing with robust error detection.
+ *
+ * @{
+ */
+
 /// The value for the first start of frame byte.
 #define EMBC_FRAMER_SOF1 ((uint8_t) 0x55)
 /// The value for the second start of frame byte.
@@ -48,12 +57,11 @@ extern "C" {
     EMBC_FRAMER_FOOTER_SIZE)
 /// The maximum available number of ports
 #define EMBC_FRAMER_LINK_SIZE (8)
-#define EMBC_FRAMER_MIN_SIZE (EMBC_FRAMER_HEADER_SIZE + EMBC_FRAMER_FOOTER_SIZE + 1)
 #define EMBC_FRAMER_OVERHEAD_SIZE (EMBC_FRAMER_HEADER_SIZE + EMBC_FRAMER_FOOTER_SIZE)
 #define EMBC_FRAMER_FRAME_ID_MAX ((1 << 11) - 1)
 #define EMBC_FRAMER_MESSAGE_ID_MAX ((1 << 24) - 1)
 
-
+/// The frame types.
 enum embc_framer_type_e {
     EMBC_FRAMER_FT_DATA = 0x0,
     EMBC_FRAMER_FT_ACK_ALL = 0x1,
@@ -65,6 +73,7 @@ enum embc_framer_type_e {
     EMBC_FRAMER_FT_RESET = 0x7,
 };
 
+/// The framer status.
 struct embc_framer_status_s {
     uint64_t total_bytes;
     uint64_t ignored_bytes;
@@ -76,7 +85,7 @@ struct embc_framer_status_s {
  */
 struct embc_framer_api_s {
     /// The arbitrary user data.
-    void * user_data;
+    void *user_data;
 
     /**
      * @brief The function to call on data frames.
@@ -87,7 +96,7 @@ struct embc_framer_api_s {
      * @param msg The message buffer.
      * @param msg_size The size of msg_buffer in bytes.
      */
-    void (*data_fn)(void * user_data, uint16_t frame_id, uint32_t metadata,
+    void (*data_fn)(void *user_data, uint16_t frame_id, uint32_t metadata,
                     uint8_t *msg, uint32_t msg_size);
 
     /**
@@ -97,16 +106,17 @@ struct embc_framer_api_s {
      * @param frame_type The frame type.
      * @param frame_id The frame id.
      */
-    void (*link_fn)(void * user_data, enum embc_framer_type_e frame_type, uint16_t frame_id);
+    void (*link_fn)(void *user_data, enum embc_framer_type_e frame_type, uint16_t frame_id);
 
     /**
      * @brief The function to call on any framing errors.
      *
      * @param user_data The arbitrary user data.
      */
-    void (*framing_error_fn)(void * user_data);
+    void (*framing_error_fn)(void *user_data);
 };
 
+/// The framer instance.
 struct embc_framer_s {
     struct embc_framer_api_s api;
     uint8_t state;    // embc_framer_state_e
@@ -125,8 +135,8 @@ struct embc_framer_s {
  *      duration of the callback.
  * @param buffer_size The size of buffer in total_bytes.
  */
-void embc_framer_ll_recv(struct embc_framer_s * self,
-                         uint8_t const * buffer, uint32_t buffer_size);
+void embc_framer_ll_recv(struct embc_framer_s *self,
+                         uint8_t const *buffer, uint32_t buffer_size);
 
 /**
  * @brief Reset the framer state.
@@ -135,7 +145,7 @@ void embc_framer_ll_recv(struct embc_framer_s * self,
  *
  * The caller must initialize the ul parameter correctly.
  */
-void embc_framer_reset(struct embc_framer_s * self);
+void embc_framer_reset(struct embc_framer_s *self);
 
 /**
  * @brief Validate the embc_framer_construct_data() parameters.
@@ -157,7 +167,7 @@ bool embc_framer_validate_data(uint16_t frame_id, uint32_t metadata, uint32_t ms
  * @param msg_size The size of msg_buffer in bytes.
  * @return 0 or error code.
  */
-int32_t embc_framer_construct_data(uint8_t * b, uint16_t frame_id, uint32_t metadata,
+int32_t embc_framer_construct_data(uint8_t *b, uint16_t frame_id, uint32_t metadata,
                                    uint8_t const *msg, uint32_t msg_size);
 
 /**
@@ -177,7 +187,7 @@ bool embc_framer_validate_link(enum embc_framer_type_e frame_type, uint16_t fram
  * @param frame_id The frame id.
  * @return 0 or error code.
  */
-int32_t embc_framer_construct_link(uint8_t * b, enum embc_framer_type_e frame_type, uint16_t frame_id);
+int32_t embc_framer_construct_link(uint8_t *b, enum embc_framer_type_e frame_type, uint16_t frame_id);
 
 /**
  * @brief Compute the difference between frame ids.
@@ -188,5 +198,10 @@ int32_t embc_framer_construct_link(uint8_t * b, enum embc_framer_type_e frame_ty
  */
 int32_t embc_framer_frame_id_subtract(uint16_t a, uint16_t b);
 
+#ifdef __cplusplus
+}
+#endif
+
+/** @} */
 
 #endif  /* EMBC_STREAM_FRAMER_H__ */

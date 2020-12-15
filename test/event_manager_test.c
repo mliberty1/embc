@@ -15,7 +15,7 @@ struct state_s {
 };
 
 void cbk_full(void * user_data, int32_t event_id) {
-    check_expected_ptr(user_data);
+    (void) user_data;
     check_expected(event_id);
 }
 
@@ -60,7 +60,6 @@ static void test_single_event(void **state) {
     assert_int_equal(8, embc_evm_interval_next(s->evm, 2));
 
     embc_evm_process(s->evm, 9);
-    expect_value(cbk_full, user_data, s);
     expect_value(cbk_full, event_id, 1);
     embc_evm_process(s->evm, 10);
 }

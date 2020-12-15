@@ -102,11 +102,11 @@ static void alloc_multiple(void ** state) {
 
 
 static void constructor(void * obj) {
-    check_expected(obj);
+    check_expected_ptr(obj);
 }
 
 static void destructor(void * obj) {
-    check_expected(obj);
+    check_expected_ptr(obj);
 }
 
 static void constructor_destructor(void ** state) {

@@ -48,4 +48,6 @@
 #define PRIXS __PRIS_PREFIX "X"
 #define PRIoS __PRIS_PREFIX "o"
 
+/** @} */
+
 #endif /* EMBC_INTTYPES_H_ */

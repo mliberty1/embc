@@ -169,8 +169,8 @@
  * @brief Assert that a value is less than or equal to zero.
  *
  * @param x The function argument to check.
- * @param xmin The minimum value, inclusive.
- * @param xmax The maximum value, inclusive.
+ * @param x_min The minimum value, inclusive.
+ * @param x_max The maximum value, inclusive.
  */
 #define EMBC_DBC_RANGE_INT(x, x_min, x_max)  do { \
     int x__ = (x); \

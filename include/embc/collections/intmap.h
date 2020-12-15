@@ -29,7 +29,8 @@
 EMBC_CPP_GUARD_START
 
 /**
- * \defgroup intmap intmap
+ * @ingroup embc
+ * \defgroup embc_intmap intmap
  *
  * \brief Provide a map from integers to void *.
  *

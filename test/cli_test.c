@@ -35,24 +35,24 @@ static void myprint(void * cookie, const char * s) {
 
 static int myexec(void * cookie, const char * cmdline) {
     (void) cookie;
-    check_expected(cmdline);
+    check_expected_ptr(cmdline);
     return mock_type(int32_t);
 }
 
 static int exec_args1(void * cookie, int argc, char *argv[]) {
     (void) cookie;
     check_expected(argc);
-    check_expected(argv[0]);
+    check_expected_ptr(argv[0]);
     return mock_type(int32_t);
 }
 
 static int exec_args4(void * cookie, int argc, char *argv[]) {
     (void) cookie;
     check_expected(argc);
-    check_expected(argv[0]);
-    check_expected(argv[1]);
-    check_expected(argv[2]);
-    check_expected(argv[3]);
+    check_expected_ptr(argv[0]);
+    check_expected_ptr(argv[1]);
+    check_expected_ptr(argv[2]);
+    check_expected_ptr(argv[3]);
     return mock_type(int32_t);
 }
 
