@@ -79,6 +79,7 @@ EMBC_API uint16_t embc_crc_ccitt_16(uint16_t crc, uint8_t const *data, uint32_t 
  * @return The computed CRC-32.
  *
  * @see http://create.stephan-brumme.com/crc32/
+ * @see https://pycrc.org
  */
 EMBC_API uint32_t embc_crc32(uint32_t crc, uint8_t const *data, uint32_t length);
 
