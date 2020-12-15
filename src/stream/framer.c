@@ -15,7 +15,7 @@
  */
 
 
-#define EMBC_LOG_LEVEL EMBC_LOG_LEVEL_ALL
+#define EMBC_LOG_LEVEL EMBC_LOG_LEVEL_INFO
 #include "embc/stream/framer.h"
 #include "embc/ec.h"
 #include "embc/crc.h"
@@ -120,7 +120,7 @@ static void reprocess_buffer(struct embc_framer_s * self) {
 static void handle_frame(struct embc_framer_s * self) {
     uint8_t frame_type = parse_frame_type(self->buf);
     if (self->buf_offset != self->length) {
-        EMBC_LOGE("consume frame length error: %d != %d",
+        EMBC_LOGW("consume frame length error: %d != %d",
                   (int) self->buf_offset, (int) self->length);
         reprocess_buffer(self);
     } else {
@@ -164,7 +164,7 @@ static void recv(struct embc_framer_s * self, struct recv_buf_s * buf) {
             case ST_SOF2:
                 self->length = 0;
                 if (self->buf[1] == EMBC_FRAMER_SOF2) {
-                    // EMBC_LOGD("SOF");
+                    EMBC_LOGD3("SOF");
                     self->state = ST_FRAME_TYPE;
                 } else if (self->buf[1] == EMBC_FRAMER_SOF1) {
                     // allow duplicate SOF1 bytes
@@ -219,12 +219,12 @@ static void recv(struct embc_framer_s * self, struct recv_buf_s * buf) {
                 }
                 if (self->buf_offset >= self->length) {
                     if (!validate_crc(self->buf)) {
-                        EMBC_LOGW("crc invalid");
+                        EMBC_LOGI("crc invalid");
                         ++self->status.resync;
                         reprocess_buffer(self);
                         break;
                     } else {
-                        // EMBC_LOGD("frame received, %d bytes", (int) self->length);
+                        EMBC_LOGD3("frame received, %d bytes", (int) self->length);
                         self->is_sync = true;
                         handle_frame(self);
                     }
@@ -235,7 +235,7 @@ static void recv(struct embc_framer_s * self, struct recv_buf_s * buf) {
 }
 
 void embc_framer_ll_recv(struct embc_framer_s * self, uint8_t const * buffer, uint32_t buffer_size) {
-    // EMBC_LOGI("received %d bytes", (int) buffer_size);
+    EMBC_LOGD3("received %d bytes", (int) buffer_size);
     self->status.total_bytes += buffer_size;
     struct recv_buf_s buf = {
             .buf = buffer,

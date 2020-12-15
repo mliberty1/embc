@@ -194,13 +194,14 @@ static void send(struct host_s *host) {
 }
 
 static void action(struct stream_tester_s * self) {
+#if 0
     self->time_ms += 1 ; // rand() & 0x03;
     send(&self->a);
-    return;
+#else
     uint8_t action = rand() & 3;
     switch (action) {
         case 0:
-            // self->time_ms += rand() & 0x03;
+            self->time_ms += rand() & 0x03;
             break;
         case 1:
             send(&self->a);
@@ -211,6 +212,7 @@ static void action(struct stream_tester_s * self) {
         case 3:
             break;
     }
+#endif
 }
 
 static void process_host(struct host_s * host) {
@@ -227,15 +229,50 @@ static void process_host(struct host_s * host) {
     //uint64_t r_bit_error = rand_u64() % host->stream_tester->bit_error_rate;
 
     if (host->stream_tester->byte_drop_rate) {
-        uint64_t r_byte_drop = rand_u60() % host->stream_tester->byte_drop_rate;
-        while (msg->msg_size && (msg->msg_size >= r_byte_drop)) {
+        while (msg->msg_size > 1) {
+            uint64_t r = rand_u60() % host->stream_tester->byte_drop_rate;
+            if (r > msg->msg_size) {
+                break;  // do not drop any bytes this time
+            }
+            // Compute the dropped byte index
             uint16_t idx = rand_u15() % msg->msg_size;
             if ((idx + 1U) == msg->msg_size) {
                 --msg->msg_size;
             } else {
                 embc_memcpy(msg->msg_buffer + idx, msg->msg_buffer + idx + 1, msg->msg_size - (idx + 1U));
             }
-            --r_byte_drop;
+        }
+    }
+
+    if (host->stream_tester->byte_insert_rate) {
+        while (msg->msg_size < EMBC_FRAMER_MAX_SIZE) {
+            uint64_t r = rand_u60() % host->stream_tester->byte_insert_rate;
+            if (r > msg->msg_size) {
+                break;  // do not insert this time
+            }
+            // Compute the inserted byte and index
+            uint8_t b = (uint8_t) (rand_u15() & 0xff);
+            uint16_t idx = rand_u15() % (msg->msg_size + 1);
+            if (idx == msg->msg_size) {
+                msg->msg_buffer[msg->msg_size] = b;
+            } else {
+                embc_memcpy(msg->msg_buffer + idx + 1, msg->msg_buffer + idx, msg->msg_size - idx);
+                msg->msg_buffer[idx] = b;
+            }
+            ++msg->msg_size;
+        }
+    }
+
+    if (host->stream_tester->bit_error_rate) {
+        while (1) {
+            uint64_t r = rand_u60() % host->stream_tester->bit_error_rate;
+            if (r > (msg->msg_size * 8)) {
+                break;  // do not insert this time
+            }
+            // Compute the inserted byte and index
+            uint8_t bit_idx = (uint8_t) (rand_u15() & 0x7);
+            uint16_t byte_idx = rand_u15() % (msg->msg_size + 1);
+            msg->msg_buffer[byte_idx] ^= (1 << bit_idx);
         }
     }
 
@@ -276,16 +313,18 @@ int main(void) {
         .tx_link_size = 64,
     };
 
-    printf("RAND_MAX = %ull\n", RAND_MAX);
+    // printf("RAND_MAX = %ull\n", RAND_MAX);
     embc_allocator_set(hal_alloc, hal_free);
     embc_log_initialize(app_log_printf_);
-    srand(1);
+    srand(2);
     embc_memset(&s_, 0, sizeof(s_));
     embc_list_initialize(&s_.msg_free);
     host_initialize(&s_.a, &s_, 'a', &s_.b, &config);
     host_initialize(&s_.b, &s_, 'b', &s_.a, &config);
 
-    s_.byte_drop_rate = 1000;
+    s_.byte_drop_rate = 2000;
+    s_.byte_insert_rate = 2000;
+    s_.bit_error_rate = 10000;
 
     while (1) {
         action(&s_);

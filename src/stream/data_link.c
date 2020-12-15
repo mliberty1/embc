@@ -27,7 +27,7 @@
  *   - flush frame if not completed with a timeout duration.
  */
 
-#define EMBC_LOG_LEVEL EMBC_LOG_LEVEL_ALL
+#define EMBC_LOG_LEVEL EMBC_LOG_LEVEL_INFO
 #include "embc/stream/data_link.h"
 #include "embc/stream/msg_ring_buffer.h"
 #include "embc/stream/ring_buffer_u64.h"
@@ -190,9 +190,9 @@ static void send_data(struct embc_dl_s * self, uint16_t frame_id) {
         EMBC_LOGE("send_data(%d), count=%d", (int) frame_id, (int) f->send_count);
         // todo something is horribly wrong.
     } else {
-        EMBC_LOGD("send_data(%d) buf->%d, count=%d, last=%d, next=%d",
-                  (int) frame_id, (int) tx_buf_frame_id(f), (int) f->send_count,
-                  (int) self->tx_frame_last_id, (int) self->tx_frame_next_id);
+        EMBC_LOGD3("send_data(%d) buf->%d, count=%d, last=%d, next=%d",
+                   (int) frame_id, (int) tx_buf_frame_id(f), (int) f->send_count,
+                   (int) self->tx_frame_last_id, (int) self->tx_frame_next_id);
         f->last_send_time_ms = self->ll_instance.time_get_ms(self->ll_instance.user_data);
         self->ll_instance.send(self->ll_instance.user_data, f->buf, frame_sz);
     }
@@ -270,7 +270,7 @@ static void on_recv_data(void * user_data, uint16_t frame_id, uint32_t metadata,
         on_recv_msg_done(self, metadata, msg, msg_size);
         self->rx_next_frame_id = (self->rx_next_frame_id + 1) & EMBC_FRAMER_FRAME_ID_MAX;
         if (self->rx_max_frame_id == frame_id) {
-            EMBC_LOGD("on_recv_data(%d), ACK_ALL", (int) frame_id);
+            EMBC_LOGD2("on_recv_data(%d), ACK_ALL", (int) frame_id);
             self->rx_max_frame_id = self->rx_next_frame_id;
             send_link(self, EMBC_FRAMER_FT_ACK_ALL, frame_id);
         } else {
@@ -280,7 +280,7 @@ static void on_recv_data(void * user_data, uint16_t frame_id, uint32_t metadata,
                 if (f->state != RX_FRAME_ST_ACK) {
                     break;
                 }
-                EMBC_LOGD("on_recv_data(%d), catch up", (int) self->rx_next_frame_id);
+                EMBC_LOGD2("on_recv_data(%d), catch up", (int) self->rx_next_frame_id);
                 f->state = RX_FRAME_ST_IDLE;
                 on_recv_msg_done(self, f->metadata, f->msg, 1 + (uint16_t) f->msg_size);
                 self->rx_next_frame_id = (self->rx_next_frame_id + 1) & EMBC_FRAMER_FRAME_ID_MAX;
@@ -291,14 +291,14 @@ static void on_recv_data(void * user_data, uint16_t frame_id, uint32_t metadata,
     } else if (embc_framer_frame_id_subtract(frame_id, self->rx_next_frame_id) < 0) {
         // we already have this frame.
         // ack with most recent successfully received frame_id
-        EMBC_LOGD("on_recv_data(%d) old frame next=%d", (int) frame_id, (int) self->rx_next_frame_id);
+        EMBC_LOGD3("on_recv_data(%d) old frame next=%d", (int) frame_id, (int) self->rx_next_frame_id);
         send_link(self, EMBC_FRAMER_FT_ACK_ALL, (self->rx_next_frame_id - 1) & EMBC_FRAMER_FRAME_ID_MAX);
     } else if (embc_framer_frame_id_subtract(window_end, frame_id) <= 0) {
         EMBC_LOGW("on_recv_data(%d) frame too far into the future: next=%d, end=%d",
                   (int) frame_id, (int) self->rx_next_frame_id, (int) window_end);
         send_link(self, EMBC_FRAMER_FT_NACK_FRAME_ID, frame_id);
     } else {
-        EMBC_LOGD("on_recv_data(%d) future frame: next=%d, end=%d",
+        EMBC_LOGD3("on_recv_data(%d) future frame: next=%d, end=%d",
                   (int) frame_id, (int) self->rx_next_frame_id, (int) window_end);
         // future frame
         if (embc_framer_frame_id_subtract(frame_id, self->rx_max_frame_id) > 0) {
@@ -605,6 +605,7 @@ void embc_dl_register_upper_layer(struct embc_dl_s * self, struct embc_dl_api_s 
 }
 
 void embc_dl_reset(struct embc_dl_s * self) {
+    EMBC_LOGI("reset");
     self->tx_frame_last_id = 0;
     self->tx_frame_next_id = 0;
     self->rx_next_frame_id = 0;
@@ -626,7 +627,7 @@ void embc_dl_reset(struct embc_dl_s * self) {
 }
 
 int32_t embc_dl_finalize(struct embc_dl_s * self) {
-    EMBC_LOGD("finalize");
+    EMBC_LOGI("finalize");
     if (self) {
         embc_free(self);
     }
