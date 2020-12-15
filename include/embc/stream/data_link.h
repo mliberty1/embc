@@ -33,32 +33,30 @@ extern "C" {
 
 /**
  * @ingroup embc
- * @defgroup embc_data_link Reliable data link layer for byte streams.
+ * @defgroup embc_data_link Data link layer for byte streams.
  *
  * @brief Provide reliable framing and retransmission over byte
- *      streams, such as UART and sockets.
+ *      streams, such as UARTs.
  *
- * This module provides reliable message transmission over byte streams.
- * Framing multi-byte messages over a byte-oriented interface is a common
- * problem for UART and network communications.  In addition to framing and
- * deframing messages, this module provides reliable delivery through frame
- * retransmission.  The maximum payload size is limited to 256 total_bytes,
- * but larger messages are segmented over multiple frames and then
- * reassembled at the application layer.
+ * This module provides a reliable data link layer for message transmission
+ * over byte streams.  The data link uses
+ * Selective Repeat Automated Repeat Request (SR-ARQ).  The protocol
+ * features rapid no acknowledgements (NACK) which helps minimize the
+ * RAM buffering requirements for the protocol.
+ *
+ * The framing is provided by the @ref embc_framer.
  *
  * The features of this data link include:
  *
- * - Robust framing using SOF byte, length, and CRC32.
+ * - Robust framing using SOF bytes, length, and CRC32.
  * - Fast recovery on errors for minimal RAM usage.
- * - Reliable transmission with acknowledgements.
+ * - Reliable transmission with acknowledgements and not acknowledgements.
  * - Guaranteed in-order delivery.
- * - Data corruption detection with not-acknowledgements.
  * - Multiple pending transmit frames for maximum throughput.
- * - Three (3) priority levels to ensure critical communications,
- *   can jump in front of bulk data.
- * - Multiple multiplexed endpoints using "ports".
- * - Large message support using segmentation and reassembly.
- * - Raw loopback for bit-error rate testing.
+ * - 24-bits of arbitrary metadata per frame to support:
+ *   - multiplexing using "ports"
+ *   - Segmentation and reassembly with start & stop bits.
+ *   - Message identification
  * - Full statistics, including frames transferred.
  *
  * For extremely fast transmitters (UART CDC over USB), the maximum number of
@@ -72,143 +70,73 @@ extern "C" {
  * - data frame
  * - link frame used by acks, nacks, and reset
  *
- * The data frame format is variable length:
- *
- * <table class="doxtable message">
- *  <tr><th>7</td><th>6</td><th>5</td><th>4</td>
- *      <th>3</td><th>2</td><th>1</td><th>0</td></tr>
- *  <tr><td colspan="8">SOF1[7:0]</td></tr>
- *  <tr><td colspan="8">SOF2[7:0]</td></tr>
- *  <tr>
- *      <td colspan="3">frame_type=000</td>
- *      <td colspan="1">rsv=0</td>
- *      <td colspan="1">rsv=0</td>
- *      <td colspan="3">frame_id[10:8]</td>
- *  </tr>
- *  <tr><td colspan="8">length[7:0]</td></tr>
- *  <tr><td colspan="8">frame_id[7:0]</td></tr>
- *  <tr><td colspan="8">metadata[7:0]</td></tr>
- *  <tr><td colspan="8">metadata[15:8]</td></tr>
- *  <tr><td colspan="8">metadata[23:16]</td></tr>
- *  <tr><td colspan="8">... payload ...</td></tr>
- *  <tr><td colspan="8">frame_crc[7:0]</td></tr>
- *  <tr><td colspan="8">frame_crc[15:8]</td></tr>
- *  <tr><td colspan="8">frame_crc[23:16]</td></tr>
- *  <tr><td colspan="8">frame_crc[31:24]</td></tr>
- *  <tr><td colspan="8">EOF (optional)</td></tr>
- * </table>
- *
- * - "SOF1" is the start of frame byte.  Although SOF1 and SOF2 are not unique
- *   and also not escaped, the SOF bytes drastically reduces the framing
- *   search space.  The SOF1 value can be selected for autobaud detection.
- *   Typical values are 0x55 and 0xAA.
- * - "SOF2" is the second start of frame byte.  The SOF2 value can be selected
- *   to ensure proper UART framing.  Typical values are 0x00.
- * - "frame_type" is the frame type identifier.
- *   - 000: data
- *   - 100: acknowledge (ACK)
- *   - 110: not acknowledge (NACK)
- *   - all other values are invalid and must be discarded.
- * - "frame_id" contains an identifier that is temporally unique for all
- *   DATA frames across all ports.  The frame_id increments sequentially with
- *   each new frame and is assigned by the framer implementation.
- * - "length" is the payload length (not full frame length) in total_bytes, minus 1.
- *   The maximum payload length is 256 total_bytes.  Since the frame overhead is 9
- *   total_bytes, the actual frame length ranges from 9 to 265 total_bytes.
- * - "metadata" contains arbitrary 24-bit data that is transmitted along with the
- *   message payload.  The metadata format is usually assigned by the higher-level
- *   protocol or application.  The embc/stream/transport.h defines this field
- *   for the optional transport level.  Common "metadata" uses include:
- *   - "port" to multiplex multiple message types or endpoints onto
- *     this single byte stream, similar to a TCP port.
- *   - "start" and "stop" bits to segment and reassemble messages larger than
- *     the frame payload size.  For example,
- *     10 is start, 01 is end, 00 is middle and 11 is a single frame message.
- *   - "unique_id" that is unique for all messages in flight for a prot.
- * - "payload" contains the arbitrary payload of "length" total_bytes.
- * - "frame_crc" contains the CRC32 computed over the header and payload.
- *   The SOF, frame_crc and EOF total_bytes are excluded from the calculation.
- * - "EOF" contains an optional end of frame byte which allows for reliable
- *   receiver timeouts and receiver framer reset.   The value for
- *   EOF and SOF are the same.  Repeated SOF/EOF total_bytes between frames are ignored
- *   by the framer and can be used for autobaud detection.
- *
- * Framing is performed by first searching for the sync byte.  The CRC-32-CCITT
- * is computed over the entire frame from the first non-SOF byte through
- * payload, using the length byte to determine the total byte count.  If the
- * frame_crc total_bytes match the computed CRC, then the entire frame is valid.
- *
- * The link frame format is a fixed-length frame with
- * 8 total_bytes:
- *
- * <table class="doxtable message">
- *  <tr><th>7</td><th>6</td><th>5</td><th>4</td>
- *      <th>3</td><th>2</td><th>1</td><th>0</td></tr>
- *  <tr><td colspan="8">SOF1[7:0]</td></tr>
- *  <tr><td colspan="8">SOF2[7:0]</td></tr>
- *  <tr>
- *      <td colspan="3">frame_type</td>
- *      <td colspan="1">rsv=0</td>
- *      <td colspan="1">rsv=0</td>
- *      <td colspan="3">frame_id[10:8]</td>
- *  </tr>
- *  <tr><td colspan="8">frame_id[7:0]</td></tr>
- *  <tr><td colspan="8">frame_crc[7:0]</td></tr>
- *  <tr><td colspan="8">frame_crc[15:8]</td></tr>
- *  <tr><td colspan="8">frame_crc[23:16]</td></tr>
- *  <tr><td colspan="8">frame_crc[31:24]</td></tr>
- * </table>
- *
- * The link frame frame_types are:
- *
- * - ACK_ALL: Receiver has all frame_ids up to and including the
- *   indicated frame_id.
- * - ACK_ONE: Receiver has received frame_id, but is missing
- *   one or more previous frame_ids.
- * - NACK_ONE: Receiver did not correctly receive the frame_id.
- * - NACK_FRAMING_ERROR: A framing error occurred.  The frame_id
- *   indicates the most recent, correctly received frame.
- *   Note that this may not be lowest frame_id.
- * - RESET: Reset all state.
+ * See @ref embc_framer for the frame details.
  *
  *
- * Retranmissions
+ * ## Why another protocol?
  *
- * This data link layer
+ * As described below, this data link layer implements 1990's
+ * technology.  A number of decent protocols UART-style protocols
+ * exist, but performance is not great.  When designs need
+ * robust performance, TCP/IP is the proven solution.  Unfortunately,
+ * TCP/IP through a stack like lwIP requires significant code
+ * space and RAM.  Also performance is not great.  This library
+ * easily and efficiently handles 3 Mbaud connections.
+ *
+ *
+ * ## Retranmissions
+ *
+ * This data link layer provides reliable message delivery with
+ * error detection and retransmissions.  The implemention uses
+ * Selective Repeat Automated Repeat Request (SR-ARQ), similar to
+ * what TCP of TCP/IP uses.
  *
  * The transmitter constructs and sends frames with an incrementing frame_id
  * that rolls over to zero after reaching the maximum.  When the receiver
- * receives the next frame in the sequence, it sends an ACK back to the
- * sender.  When the sender receives an ACK, it can recycle the frame buffers
- * for all frame_ids up to the ACK.
+ * receives the next frame in the sequence, it sends an ACK_ALL back to the
+ * sender.  When the sender receives an ACK_ALL, it can recycle the frame
+ * buffers for all frame_ids up to the ACK_ALL.
+ *
+ * If the receiver sees a skip in frame_id values, it immediately sends
+ * a NACK for the missing frame along with an ACK_ONE for the valid frame.
+ * When the receive finally receives the missing frame_id, it will respond
+ * with ACK_ALL with the frame_id for the group.
  *
  * The transmitter can have at most frame_id_max / 2 frames - 1 outstanding,
- * which we call frame_pend_max.  The receiver can then treat
+ * which we call frame_pend_max.  The receiver treats
  * frame_id - frame_pend_max (computed with wrap) as the "past" and
  * frame_id + frame_pend_max (computed with wrap) as the "future".
  *
- * When the receiver receives a "past" frame, the receiver discards it but
- * does send an ACK to the transmitter.
+ * When the receiver receives a "past" frame, the receiver discards the frame
+ * but does send an ACK to the transmitter.
  * If the receiver receives a "future" frame beyond the expected next frame_id,
- * the the receiver must have missed at least one frame. The receiver
- * immediately sends a NACK containing the frame_id of the last successfully
- * received frame. The receiver then discards all future frames until it
- * finally receives the expected frame_id.  The receiver continues to send
- * NACKs for each future frame received.  The transmitter will receive
- * multiple NACKs, but it can use cause_frame_id to differentiate
- * the duplicated NACKs.  Even with frames still in flight, the transmitter
- * can retransmit and ignore the NACKs that will be returned for any
- * frames still in flight.
+ * the the receiver must have missed at least one frame.  If the skipped
+ * frame was previously idle, then the receiver immediately sends a
+ * NACK_FRAME_ID for the skipped frame and marks it as NACKed.
+ * If it is skipped again, the
+ * receiver does not generate a NACK_FRAME_ID.  Retranmission then relies
+ * upon the transmitter timeout.
  *
- * If the receiver receives a framing error or the frame_id does not increment,
- * it immediately sends a NACK containing the frame_id of the expected frame.
+ * If the received frame is beyond the receive window, then the receiver
+ * response with NACK.  Otherwise, it response with ACK_ONE and stores
+ * the frame to a buffer.  The receiver will continue to store other
+ * future frames and reply with ACK_ONE.  When it finally receives the
+ * skipped frame, it replies with ACK_ALL with the most recent frame_id
+ * corresponding with no skips.
  *
- * When the transmitter receives a NACK, it may either complete the current
- * frame transmission or immediately halt it.  The transmitter should then
- * retransmit starting with the frame_id + 1 indicated in the NACK.  The
- * transmitter knows the outstanding frames, and should expect to receive
- * NACKs for them.  Since the transmitter knows the expected NACKs, it can
- * safely ignore them.
+ * If the receiver receives a framing error,
+ * it immediately sends a NACK_FRAMING_ERROR containing the frame_id
+ * of the expected frame.
+ *
+ * When the transmitter receives a NACK, it normally complete the current
+ * frame transmission.  The transmitter should then
+ * retransmit starting with the frame_id indicated in the NACK.  The
+ * transmitter knows the outstanding frames.
+ *
+ * The transmitter also contains a timeout.  If the transmitter does not
+ * receive an ACK without the timeout, it will retransmit the frame.
+ * The transmitter will retransmit indefinitely, but will indicate an
+ * error after a threshold.
  *
  * This framer contains support for backpressure by providing notifications
  * when the recipient acknowledge the frame transmission.
@@ -216,7 +144,7 @@ extern "C" {
  * send frames based upon memory availability and application complexity.
  *
  *
- * Bandwidth analysis
+ * ## Bandwidth analysis
  *
  * The protocol provides support for up to 2 ^ 11 / 2  - 1 = 1023 frames in flight.
  * With maximum payload size of 256 total_bytes and 10 total_bytes overhead on a 3 Mbaud link,
@@ -227,14 +155,29 @@ extern "C" {
  * However, the transmitter must have a transmit buffer of at least 272,118 total_bytes,
  * too much for many intended microcontrollers.  A typical microcontroller may
  * allocate 32 outstanding frames, which is 8512 total_bytes.  To prevent stalling the
- * link with full payloads, the receive must ACK within:
+ * link with full payloads, the transmitter receive must ACK within:
  *
  *     (32 * (256 + 10)) / (3000000 / 10) = 28 milliseconds
  *
- * While direct communication between microcontrollers with fast interrupt handling
- * can use even smaller buffers, this delay is reasonable for communication
- * between a microcontroller and a host computer over USB CDC.
+ * For memory efficiency, the protocol uses a variable message sized
+ * ring buffer to store the transmit messages, which keeps bandwidth
+ * fast even for small-sized messages.  The receive side uses
+ * dedicated, full-frame-sized buffers.  In the common case where
+ * the microcontroller to host path contains far more data than the
+ * host to microcontroller path, this allows a reduced microcontroller
+ * memory footprint.  Maintaining a variable length received buffer
+ * is much more complicated due to out of order reception and
+ * message retirement.
  *
+ * The required RAM buffer is a function of the
+ * [bandwidth-delay product](https://en.wikipedia.org/wiki/Bandwidth-delay_product).
+ * You typically want at least twice the bandwidth-delay product of buffering
+ * with SR-ARQ to keep maximum data rates.  Less demanding applications
+ * can reduce the RAM buffer.
+ *
+ * Direct communication between microcontrollers with fast interrupt handling
+ * and low delays can use small buffers.  Communication to a host computer
+ * requires larger buffers due to the host computer delay variability.
  * Under Windows, you may want to ensure that your timer resolution is set to
  * 1 millisecond or less.  You can use
  * [TimerTool](https://github.com/tebjan/TimerTool) to check.
@@ -242,13 +185,14 @@ extern "C" {
  *
  * ## References
  *
- *    - Overview:
+ *    - Overview
  *      - [Eli Bendersky](http://eli.thegreenplace.net/2009/08/12/framing-in-serial-communications),
  *      - [StackOverflow](http://stackoverflow.com/questions/815758/simple-serial-point-to-point-communication-protocol)
  *      - [Daniel Beer](https://dlbeer.co.nz/articles/packet.html)
  *    - Selective Repeat Automated Repeat Request (SR-ARQ)
  *      - [wikipedia](https://en.wikipedia.org/wiki/Selective_Repeat_ARQ)
- *    - PPP:
+ *      - [Bandwidth-delay product @ wikipedia](https://en.wikipedia.org/wiki/Bandwidth-delay_product)
+ *    - PPP
  *      - [wikipedia](https://en.wikipedia.org/wiki/Point-to-Point_Protocol),
  *      - [RFC](https://tools.ietf.org/html/rfc1661),
  *      - [Segger embOS/embNet PPP/PPPoE](https://www.segger.com/products/connectivity/emnet/add-ons/ppppppoe/)
@@ -257,7 +201,7 @@ extern "C" {
  *    - Constant Overhead Byte Stuffing (COBS):
  *      - [wikipedia](https://en.wikipedia.org/wiki/Consistent_Overhead_Byte_Stuffing)
  *      - [Embedded Related post](https://www.embeddedrelated.com/showarticle/113.php)
- *    - Alternatives:
+ *    - Alternatives
  *      - [Microcontroller Interconnect Network](https://github.com/min-protocol/min)
  *      - [Telemetry](https://github.com/Overdrivr/Telemetry)
  *      - [SerialFiller](https://github.com/gbmhunter/SerialFiller)

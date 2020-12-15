@@ -33,9 +33,113 @@ extern "C" {
 
 /**
  * @ingroup embc
- * @defgroup embc_framer Reliable byte stream framing.
+ * @defgroup embc_framer Framer for byte streams
  *
  * @brief Provide reliable byte stream framing with robust error detection.
+ *
+ * This framer protocol provides two different frame formats:
+ * - data frame
+ * - link frame used by acks, nacks, and reset
+ *
+ * The data frame format is variable length:
+ *
+ * <table class="doxtable message">
+ *  <tr><th>7</td><th>6</td><th>5</td><th>4</td>
+ *      <th>3</td><th>2</td><th>1</td><th>0</td></tr>
+ *  <tr><td colspan="8">SOF1[7:0]</td></tr>
+ *  <tr><td colspan="8">SOF2[7:0]</td></tr>
+ *  <tr>
+ *      <td colspan="3">frame_type=000</td>
+ *      <td colspan="1">rsv=0</td>
+ *      <td colspan="1">rsv=0</td>
+ *      <td colspan="3">frame_id[10:8]</td>
+ *  </tr>
+ *  <tr><td colspan="8">length[7:0]</td></tr>
+ *  <tr><td colspan="8">frame_id[7:0]</td></tr>
+ *  <tr><td colspan="8">metadata[7:0]</td></tr>
+ *  <tr><td colspan="8">metadata[15:8]</td></tr>
+ *  <tr><td colspan="8">metadata[23:16]</td></tr>
+ *  <tr><td colspan="8">... payload ...</td></tr>
+ *  <tr><td colspan="8">frame_crc[7:0]</td></tr>
+ *  <tr><td colspan="8">frame_crc[15:8]</td></tr>
+ *  <tr><td colspan="8">frame_crc[23:16]</td></tr>
+ *  <tr><td colspan="8">frame_crc[31:24]</td></tr>
+ *  <tr><td colspan="8">EOF (optional)</td></tr>
+ * </table>
+ *
+ * - "SOF1" is the start of frame byte.  Although SOF1 and SOF2 are not unique
+ *   and also not escaped, the SOF bytes drastically reduces the framing
+ *   search space.  The SOF1 value can be selected for autobaud detection.
+ *   Typical values are 0x55 and 0xAA.
+ * - "SOF2" is the second start of frame byte.  The SOF2 value can be selected
+ *   to ensure proper UART framing.  Typical values are 0x00.
+ * - "frame_type" is the frame type identifier.
+ *   - 000: data
+ *   - 100: acknowledge (ACK)
+ *   - 110: not acknowledge (NACK)
+ *   - all other values are invalid and must be discarded.
+ * - "frame_id" contains an identifier that is temporally unique for all
+ *   DATA frames across all ports.  The frame_id increments sequentially with
+ *   each new frame and is assigned by the framer implementation.
+ * - "length" is the payload length (not full frame length) in total_bytes, minus 1.
+ *   The maximum payload length is 256 total_bytes.  Since the frame overhead is 9
+ *   total_bytes, the actual frame length ranges from 9 to 265 total_bytes.
+ * - "metadata" contains arbitrary 24-bit data that is transmitted along with the
+ *   message payload.  The metadata format is usually assigned by the higher-level
+ *   protocol or application.  The optional @ref embc_transport defines this field.
+ *   Common "metadata" uses include:
+ *   - "port" to multiplex multiple message types or endpoints onto
+ *     this single byte stream, similar to a TCP port.
+ *   - "start" and "stop" bits to segment and reassemble messages larger than
+ *     the frame payload size.  For example,
+ *     10 is start, 01 is end, 00 is middle and 11 is a single frame message.
+ *   - "unique_id" that is unique for all messages in flight for a prot.
+ * - "payload" contains the arbitrary payload of "length" total_bytes.
+ * - "frame_crc" contains the CRC32 computed over the header and payload.
+ *   The SOF, frame_crc and EOF total_bytes are excluded from the calculation.
+ * - "EOF" contains an optional end of frame byte which allows for reliable
+ *   receiver timeouts and receiver framer reset.   The value for
+ *   EOF and SOF are the same.  Repeated SOF/EOF total_bytes between frames are ignored
+ *   by the framer and can be used for autobaud detection.
+ *
+ * Framing is performed by first searching for the sync byte.  The CRC-32-CCITT
+ * is computed over the entire frame from the first non-SOF byte through
+ * payload, using the length byte to determine the total byte count.  If the
+ * frame_crc total_bytes match the computed CRC, then the entire frame is valid.
+ *
+ * The link frame format is a fixed-length frame with
+ * 8 total_bytes:
+ *
+ * <table class="doxtable message">
+ *  <tr><th>7</td><th>6</td><th>5</td><th>4</td>
+ *      <th>3</td><th>2</td><th>1</td><th>0</td></tr>
+ *  <tr><td colspan="8">SOF1[7:0]</td></tr>
+ *  <tr><td colspan="8">SOF2[7:0]</td></tr>
+ *  <tr>
+ *      <td colspan="3">frame_type</td>
+ *      <td colspan="1">rsv=0</td>
+ *      <td colspan="1">rsv=0</td>
+ *      <td colspan="3">frame_id[10:8]</td>
+ *  </tr>
+ *  <tr><td colspan="8">frame_id[7:0]</td></tr>
+ *  <tr><td colspan="8">frame_crc[7:0]</td></tr>
+ *  <tr><td colspan="8">frame_crc[15:8]</td></tr>
+ *  <tr><td colspan="8">frame_crc[23:16]</td></tr>
+ *  <tr><td colspan="8">frame_crc[31:24]</td></tr>
+ * </table>
+ *
+ * The link frame frame_types are used by the data link layer
+ * to manage retransmissions.  The types are:
+ *
+ * - ACK_ALL: Receiver has all frame_ids up to and including the
+ *   indicated frame_id.
+ * - ACK_ONE: Receiver has received frame_id, but is missing
+ *   one or more previous frame_ids.
+ * - NACK_FRAME_ID: Receiver did not correctly receive the frame_id.
+ * - NACK_FRAMING_ERROR: A framing error occurred.  The frame_id
+ *   indicates the most recent, correctly received frame.
+ *   Note that this may not be lowest frame_id.
+ * - RESET: Reset all state.
  *
  * @{
  */

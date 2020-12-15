@@ -177,7 +177,7 @@ static void send_data(struct embc_dl_s * self, uint16_t frame_id) {
 
     uint32_t send_sz = self->ll_instance.send_available(self->ll_instance.user_data);
     if (send_sz < frame_sz) {
-        // todo - support partial send, modify process, too
+        // todo - consider support partial send, modify process, too
         return;
     }
 

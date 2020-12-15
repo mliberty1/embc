@@ -24,32 +24,35 @@
 #ifndef EMBC_STREAM_TRANSPORT_H__
 #define EMBC_STREAM_TRANSPORT_H__
 
+#include <stdint.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-
-#include <stdint.h>
-
+/**
+* @ingroup embc
+* @defgroup embc_transport Transport layer for byte streams
+*
+* @{
+*/
 
 enum embc_transport_seq_e {
-    EMBC_TRANSPORT_SEQ_MIDDLE = 0,
-    EMBC_TRANSPORT_SEQ_STOP = 1,
-    EMBC_TRANSPORT_SEQ_START = 2,
-    EMBC_TRANSPORT_SEQ_SINGLE = 3,
+EMBC_TRANSPORT_SEQ_MIDDLE = 0,
+EMBC_TRANSPORT_SEQ_STOP = 1,
+EMBC_TRANSPORT_SEQ_START = 2,
+EMBC_TRANSPORT_SEQ_SINGLE = 3,
 };
 
 /**
- * @brief The metadata fields
- */
+* @brief The metadata fields
+*/
 struct embc_transport_metadata_s {
     uint8_t port_id;
     uint8_t seq;        // enum embc_transport_seq_e
     uint8_t message_id;
     uint8_t appdata;
 };
-
-
 
 #if 0
 /**
@@ -68,6 +71,7 @@ enum embc_framer_port0_cmd_e {
 };
 #endif
 
+/** @} */
 
 #ifdef __cplusplus
 }
