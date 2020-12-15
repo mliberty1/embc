@@ -272,7 +272,6 @@ int main(void) {
         .tx_window_size = 64,
         .tx_buffer_size = (1 << 13),
         .rx_window_size = 64,
-        .rx_buffer_size = (1 << 13),
         .tx_timeout_ms = 10,
         .tx_link_size = 64,
     };

@@ -276,7 +276,6 @@ struct embc_dl_config_s {
     uint32_t tx_window_size;  // in frames
     uint32_t tx_buffer_size;  // in bytes
     uint32_t rx_window_size;  // in frames
-    uint32_t rx_buffer_size;  // in bytes
     uint32_t tx_timeout_ms;   // transmit timeout in milliseconds
 };
 

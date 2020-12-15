@@ -82,9 +82,11 @@ struct tx_frame_s {
 };
 
 struct rx_frame_s {
-    uint8_t * buf;
     uint8_t state;
-    uint8_t reserved;
+    uint8_t msg_size;  // minus 1
+    uint16_t frame_id;
+    uint32_t metadata;
+    uint8_t msg[EMBC_FRAMER_PAYLOAD_MAX_SIZE];
 };
 
 struct embc_dl_s {
@@ -97,7 +99,7 @@ struct embc_dl_s {
     uint16_t rx_max_frame_id;  // the most future stored frame id
 
     struct embc_mrb_s tx_buf;
-    struct embc_mrb_s rx_buf;
+    // rx_frames also contain the rx buffers
     struct embc_rb64_s tx_link_buf;
 
     struct tx_frame_s * tx_frames;
@@ -255,60 +257,36 @@ static void on_recv_data(void * user_data, uint16_t frame_id, uint32_t metadata,
     uint16_t this_idx = frame_id & (self->rx_frame_count - 1U);
     uint16_t window_end = (self->rx_next_frame_id + self->rx_frame_count) & EMBC_FRAMER_FRAME_ID_MAX;
 
-    if (self->rx_next_frame_id == frame_id) {
+    if (frame_id != (frame_id & EMBC_FRAMER_FRAME_ID_MAX)) {
+        EMBC_LOGE("on_recv_data(%d) invalid frame_id", (int) frame_id);
+    } else if ((0 == msg_size) || (msg_size > EMBC_FRAMER_PAYLOAD_MAX_SIZE)) {
+        // should never happen, but check to be safe
+        EMBC_LOGE("on_recv_data(%d) invalid msg_size %d", (int) frame_id, (int) msg_size);
+        send_link(self, EMBC_FRAMER_FT_NACK_FRAME_ID, frame_id);
+        return;
+    } else if (self->rx_next_frame_id == frame_id) {
         // next expected frame, recv immediately without putting into ring buffer.
         self->rx_frames[this_idx].state = RX_FRAME_ST_IDLE;
-        self->rx_frames[this_idx].buf = NULL;
         on_recv_msg_done(self, metadata, msg, msg_size);
         self->rx_next_frame_id = (self->rx_next_frame_id + 1) & EMBC_FRAMER_FRAME_ID_MAX;
         if (self->rx_max_frame_id == frame_id) {
-            EMBC_LOGD("on_recv_data(%d), no errors", (int) frame_id);
+            EMBC_LOGD("on_recv_data(%d), ACK_ALL", (int) frame_id);
             self->rx_max_frame_id = self->rx_next_frame_id;
             send_link(self, EMBC_FRAMER_FT_ACK_ALL, frame_id);
-            embc_mrb_clear(&self->rx_buf);
-            return;
         } else {
             while (1) {
                 this_idx = self->rx_next_frame_id & (self->rx_frame_count - 1U);
-                if (self->rx_frames[this_idx].state != RX_FRAME_ST_ACK) {
+                struct rx_frame_s * f = &self->rx_frames[this_idx];
+                if (f->state != RX_FRAME_ST_ACK) {
                     break;
                 }
                 EMBC_LOGD("on_recv_data(%d), catch up", (int) self->rx_next_frame_id);
-
-                uint8_t * b = self->rx_frames[this_idx].buf;
-                uint16_t buf_frame_id = decode_u16(b);
-                metadata = decode_u32(b + 2) & 0x00ffffffU;
-                msg_size = b[5] + 1;
-                if (buf_frame_id != self->rx_next_frame_id) {
-                    EMBC_LOGW("frame_id mismatch: %d != %d, metadata=%d, msg_size=%d",
-                              (int) buf_frame_id, (int) self->rx_next_frame_id,
-                              (int) metadata, (int) msg_size);
-                }
-                self->rx_frames[this_idx].state = RX_FRAME_ST_IDLE;
-                self->rx_frames[this_idx].buf = NULL;
-                on_recv_msg_done(self, metadata, b + 6, msg_size);
+                f->state = RX_FRAME_ST_IDLE;
+                on_recv_msg_done(self, f->metadata, f->msg, 1 + (uint16_t) f->msg_size);
                 self->rx_next_frame_id = (self->rx_next_frame_id + 1) & EMBC_FRAMER_FRAME_ID_MAX;
-                self->rx_max_frame_id = self->rx_next_frame_id;
             }
             frame_id = (self->rx_next_frame_id - 1U) & EMBC_FRAMER_FRAME_ID_MAX;
             send_link(self, EMBC_FRAMER_FT_ACK_ALL, frame_id);
-
-            // pop old frames from the buffer.
-            while (1) {
-                uint32_t sz = 0;
-                uint8_t * b = embc_mrb_peek(&self->rx_buf, &sz);
-                if (b) {
-                    frame_id = decode_u16(b);
-                    if (embc_framer_frame_id_subtract(self->rx_next_frame_id, frame_id) > 0) {
-                        EMBC_LOGD("on_recv_data, buffer pop %d", (int) frame_id);
-                        embc_mrb_pop(&self->rx_buf, &sz);
-                    } else {
-                        break;
-                    }
-                } else {
-                    break;
-                }
-            }
         }
     } else if (embc_framer_frame_id_subtract(frame_id, self->rx_next_frame_id) < 0) {
         // we already have this frame.
@@ -336,29 +314,18 @@ static void on_recv_data(void * user_data, uint16_t frame_id, uint32_t metadata,
             uint16_t next_idx = next_frame_id & (self->rx_frame_count - 1U);
             if (self->rx_frames[next_idx].state == RX_FRAME_ST_IDLE) {
                 self->rx_frames[next_idx].state = RX_FRAME_ST_NACK;
-                self->rx_frames[this_idx].buf = NULL;
                 send_link(self, EMBC_FRAMER_FT_NACK_FRAME_ID, next_frame_id);
             }
             next_frame_id = (next_frame_id + 1) & EMBC_FRAMER_FRAME_ID_MAX;
         }
 
-        // attempt to store
-        uint8_t * b = embc_mrb_alloc(&self->rx_buf, 6 + msg_size);
-        if (!b) {
-            EMBC_LOGW("rx frame, but no memory available");
-            // should never run out of memory.  Could attempt frame reorder.
-            self->rx_frames[this_idx].state = RX_FRAME_ST_NACK;
-            self->rx_frames[this_idx].buf = NULL;
-            send_link(self, EMBC_FRAMER_FT_NACK_FRAME_ID, frame_id);
-        } else {
-            encode_u16(b, frame_id);
-            encode_u32(b + 2, metadata);
-            b[5] = msg_size - 1;
-            embc_memcpy(b + 6, msg, msg_size);
-            self->rx_frames[this_idx].state = RX_FRAME_ST_ACK;
-            self->rx_frames[this_idx].buf = b;
-            send_link(self, EMBC_FRAMER_FT_ACK_ONE, frame_id);
-        }
+        // store
+        self->rx_frames[this_idx].state = RX_FRAME_ST_ACK;
+        self->rx_frames[this_idx].msg_size = msg_size - 1;
+        self->rx_frames[this_idx].frame_id = frame_id;
+        self->rx_frames[this_idx].metadata = metadata;
+        embc_memcpy(self->rx_frames[this_idx].msg, msg, msg_size);
+        send_link(self, EMBC_FRAMER_FT_ACK_ONE, frame_id);
     }
 }
 
@@ -608,10 +575,6 @@ struct embc_dl_s * embc_dl_initialize(
     sz = EMBC_ROUND_UP_TO_MULTIPLE_UNSIGNED(sz, tx_buffer_size);
     offset += sz;
 
-    size_t rx_buffer_offset = offset;
-    sz = EMBC_ROUND_UP_TO_MULTIPLE_UNSIGNED(sz, config->rx_buffer_size);
-    offset += sz;
-
     struct embc_dl_s * self = (struct embc_dl_s *) embc_alloc_clr(offset);
     if (!self) {
         EMBC_LOGE("alloc failed");
@@ -626,7 +589,6 @@ struct embc_dl_s * embc_dl_initialize(
     self->rx_frames = (struct rx_frame_s *) (mem + rx_frame_buf_offset);
     embc_rb64_init(&self->tx_link_buf, (uint64_t *) (mem + tx_link_buffer_offset), tx_link_size);
     embc_mrb_init(&self->tx_buf, (uint8_t *) (mem + tx_buffer_offset), tx_buffer_size);
-    embc_mrb_init(&self->rx_buf, (uint8_t *) (mem + rx_buffer_offset), config->rx_buffer_size);
 
     self->tx_timeout_ms = config->tx_timeout_ms;
     self->ll_instance = *ll_instance;
@@ -648,7 +610,6 @@ void embc_dl_reset(struct embc_dl_s * self) {
     self->rx_next_frame_id = 0;
     self->rx_max_frame_id = 0;
     embc_mrb_clear(&self->tx_buf);
-    embc_mrb_clear(&self->rx_buf);
     embc_rb64_clear(&self->tx_link_buf);
 
     for (uint16_t f = 0; f < self->tx_frame_count; ++f) {
