@@ -21,7 +21,7 @@
 #include <cmocka.h>
 #include <string.h>
 #include "embc/stream/data_link.h"
-#include "embc/stream/ring_buffer_u8.h"
+#include "embc/stream/ring_buffer_u64.h"
 #include <stdio.h>
 
 #define SEND_BUFFER_SIZE (1 << 13)
@@ -48,8 +48,8 @@ static uint8_t PAYLOAD_MAX[] = {
 struct test_s {
     struct embc_dl_s * dl;
     uint32_t send_available;
-    struct embc_rb8_s link_buf;
-    uint8_t link_buffer_[512];
+    struct embc_rb64_s link_buf;
+    uint64_t link_buffer_[64];
     uint32_t time_ms;
 };
 
@@ -62,10 +62,9 @@ static void ll_send(void * user_data, uint8_t const * buffer, uint32_t buffer_si
     struct test_s * self = (struct test_s *) user_data;
     if (buffer[2] & 0xE0) {
         while (buffer_size) {
-            assert_true(embc_rb8_size(&self->link_buf) >= EMBC_FRAMER_LINK_SIZE);
-            uint8_t *b = embc_rb8_tail(&self->link_buf);
-            assert_memory_equal(buffer, b, EMBC_FRAMER_LINK_SIZE);
-            embc_rb8_pop(&self->link_buf, EMBC_FRAMER_LINK_SIZE);
+            uint64_t u64 = 0;
+            assert_true(embc_rb64_pop(&self->link_buf, &u64));
+            assert_memory_equal(buffer, (uint8_t *) &u64, EMBC_FRAMER_LINK_SIZE);
             buffer += EMBC_FRAMER_LINK_SIZE;
             buffer_size -= EMBC_FRAMER_LINK_SIZE;
         }
@@ -109,7 +108,7 @@ static int setup(void ** state) {
         .rx_window_size = 64,
         .rx_buffer_size = (1 << 13),
         .tx_timeout_ms = 10,
-        .tx_link_buffer_size = 128,
+        .tx_link_size = 64,
     };
 
     struct embc_dl_ll_s ll = {
@@ -130,7 +129,7 @@ static int setup(void ** state) {
     assert_non_null(self->dl);
     embc_dl_register_upper_layer(self->dl, &ul);
 
-    embc_rb8_init(&self->link_buf, self->link_buffer_, sizeof(self->link_buffer_));
+    embc_rb64_init(&self->link_buf, self->link_buffer_, sizeof(self->link_buffer_) / sizeof(uint64_t));
 
     *state = self;
     return 0;
@@ -178,8 +177,9 @@ static void send_and_expect(struct test_s *self,
 }
 
 static void expect_send_link(struct test_s *self, enum embc_framer_type_e frame_type, uint16_t frame_id) {
-    uint8_t * b = embc_rb8_insert(&self->link_buf, EMBC_FRAMER_LINK_SIZE);
-    assert_int_equal(0, embc_framer_construct_link(b, frame_type, frame_id));
+    uint64_t u64 = 0;
+    assert_int_equal(0, embc_framer_construct_link((uint8_t *) &u64, frame_type, frame_id));
+    assert_true(embc_rb64_push(&self->link_buf, u64));
 }
 
 static void recv_link(struct test_s *self, enum embc_framer_type_e frame_type, uint16_t frame_id) {

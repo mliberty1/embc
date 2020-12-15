@@ -55,10 +55,10 @@ static inline uint16_t parse_data_payload_length(uint8_t const * frame) {
     return 1 + ((uint16_t) frame[3]);
 }
 
-static inline uint16_t parse_data_metadata(uint8_t const * frame) {
+static inline uint32_t parse_data_metadata(uint8_t const * frame) {
     return ((uint32_t) frame[5])
         | (((uint32_t) frame[6]) << 8)
-        | (((uint32_t) frame[7]) << 16);;
+        | (((uint32_t) frame[7]) << 16);
 }
 
 static bool validate_crc(uint8_t const * frame) {
@@ -126,11 +126,11 @@ static void handle_frame(struct embc_framer_s * self) {
     } else {
         if (frame_type == EMBC_FRAMER_FT_DATA) {
             if (self->api.data_fn) {
-                self->api.data_fn(self->api.user_data,
-                                  parse_data_frame_id(self->buf),
-                                  parse_data_metadata(self->buf),
-                                  self->buf + EMBC_FRAMER_HEADER_SIZE,
-                                  parse_data_payload_length(self->buf));
+                uint16_t frame_id = parse_data_frame_id(self->buf);
+                uint32_t metadata = parse_data_metadata(self->buf);
+                uint16_t payload_length = parse_data_payload_length(self->buf);
+                self->api.data_fn(self->api.user_data, frame_id, metadata,
+                                  self->buf + EMBC_FRAMER_HEADER_SIZE, payload_length);
             }
         } else {
             if (self->api.link_fn) {
@@ -154,7 +154,9 @@ static void recv(struct embc_framer_s * self, struct recv_buf_s * buf) {
                 if (self->buf[0] == EMBC_FRAMER_SOF1) {
                     self->state = ST_SOF2;
                 } else {
-                    EMBC_LOGW("Expected SOF1 got 0x%02x", self->buf[0]);
+                    if (self->is_sync) {
+                        EMBC_LOGW("Expected SOF1 got 0x%02x", self->buf[0]);
+                    }
                     handle_framing_error_discard(self);
                 }
                 break;

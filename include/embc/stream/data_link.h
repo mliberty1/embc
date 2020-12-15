@@ -272,7 +272,7 @@ struct embc_dl_s;
 #define EMBC_DL_INFLIGHT_MAX (EMBC_FRAMER_COUNT / 2 - 1)
 
 struct embc_dl_config_s {
-    uint32_t tx_link_buffer_size;  // in bytes
+    uint32_t tx_link_size;    // in frames, normally the same as rx_window_size
     uint32_t tx_window_size;  // in frames
     uint32_t tx_buffer_size;  // in bytes
     uint32_t rx_window_size;  // in frames

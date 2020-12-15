@@ -180,6 +180,7 @@
  * as the parameters occur multiple times in the macro!
  */
 #define EMBC_ROUND_UP_TO_MULTIPLE(x, m) (( ((x) + ( EMBC_SIGNUM(x) * (m - 1) )) / m) * m)
+#define EMBC_ROUND_UP_TO_MULTIPLE_UNSIGNED(x, m) (( ((x) + (m - 1) ) / m) * m)
 
 /**
  * @brief Find the container instance given a member pointer.

@@ -46,7 +46,6 @@ set(SOURCES
         stream/data_link.c
         stream/framer.c
         stream/msg_ring_buffer.c
-        stream/ring_buffer_u8.c
         ${PLATFORM_SRC}
 )
 
