@@ -250,6 +250,27 @@ struct embc_dl_status_s {
 };
 
 /**
+ * @brief The events signalled by the data link layer to the next higher layer.
+ */
+enum embc_dl_event_e {
+    /// An unknown event occurred (should never happen).
+    EMBC_DL_EV_UNKNOWN,
+
+    /// The remote host issued a reset command.
+    EMBC_DL_EV_REMOTE_RESET,
+
+    /// The remote host is no longer responding.
+    EMBC_DL_EV_REMOTE_UNRESPONSIVE,
+
+    /**
+     * @brief This data link implementation encountered an unrecoverable internal error.
+     *
+     * After cleanup up the system, call embc_dl_reset() before resuming communication.
+     */
+    EMBC_DL_EV_INTERNAL_ERROR,
+};
+
+/**
  * @brief The API event callbacks to the upper layer.
  */
 struct embc_dl_api_s {
@@ -260,8 +281,9 @@ struct embc_dl_api_s {
      * @brief The function called when the remote host issues a reset.
      *
      * @param user_data The arbitrary user data.
+     * @param event The signaled event.
      */
-    void (*reset_fn)(void *user_data);
+    void (*event_fn)(void *user_data, enum embc_dl_event_e event);
 
     /**
      * @brief The function called upon message receipt.

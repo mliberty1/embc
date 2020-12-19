@@ -22,3 +22,6 @@ ADD_CMOCKA_TEST(ring_buffer_u64_test)
 
 add_executable(stream_tester stream_tester.c $<TARGET_OBJECTS:embc_objlib>)
 add_dependencies(stream_tester embc_objlib test_objlib)
+
+add_executable(host host.c uart.c $<TARGET_OBJECTS:embc_objlib>)
+add_dependencies(host embc_objlib test_objlib)

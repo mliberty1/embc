@@ -79,9 +79,10 @@ static uint32_t ll_send_available(void * user_data) {
     return self->send_available; // todo
 }
 
-static void on_reset(void *user_data) {
+static void on_event(void *user_data, enum embc_dl_event_e event) {
     struct test_s * self = (struct test_s *) user_data;
-    check_expected_ptr(self);
+    (void)
+    check_expected(event);
 }
 
 static void on_recv(void *user_data, uint32_t metadata, uint8_t *msg_buffer, uint32_t msg_size) {
@@ -119,7 +120,7 @@ static int setup(void ** state) {
 
     struct embc_dl_api_s ul = {
         .user_data = self,
-        .reset_fn = on_reset,
+        .event_fn = on_event,
         .recv_fn = on_recv,
     };
 

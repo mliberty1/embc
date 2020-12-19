@@ -186,9 +186,11 @@ static void send_data(struct embc_dl_s * self, uint16_t frame_id) {
         ++self->tx_status.retransmissions;
     }
     f->send_count += 1;
-    if (f->send_count > 10) {
+    if (f->send_count > 25) {
         EMBC_LOGE("send_data(%d), count=%d", (int) frame_id, (int) f->send_count);
-        // todo something is horribly wrong.
+        if (self->ul_instance.event_fn) {
+            self->ul_instance.event_fn(self->ul_instance.user_data, EMBC_DL_EV_REMOTE_UNRESPONSIVE);
+        }
     } else {
         EMBC_LOGD3("send_data(%d) buf->%d, count=%d, last=%d, next=%d",
                    (int) frame_id, (int) tx_buf_frame_id(f), (int) f->send_count,
@@ -426,7 +428,10 @@ static void handle_nack_framing_error(struct embc_dl_s * self, uint16_t frame_id
 static void handle_reset(struct embc_dl_s * self, uint16_t frame_id) {
     (void) self;
     (void) frame_id;
-    // todo
+    EMBC_LOGI("received remote host reset");
+    if (self->ul_instance.event_fn) {
+        self->ul_instance.event_fn(self->ul_instance.user_data, EMBC_DL_EV_REMOTE_RESET);
+    }
 }
 
 static void on_recv_link(void * user_data, enum embc_framer_type_e frame_type, uint16_t frame_id) {

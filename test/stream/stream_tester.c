@@ -25,7 +25,7 @@
 
 struct msg_s {
     uint32_t metadata;
-    uint8_t msg_buffer[EMBC_FRAMER_MAX_SIZE];  // hold messages and frames
+    uint8_t msg_buffer[EMBC_FRAMER_MAX_SIZE + 1];  // hold messages and frames
     uint32_t msg_size;
     struct embc_list_s item;
 };
@@ -131,11 +131,11 @@ static uint32_t ll_send_available(void * user_data) {
     return EMBC_FRAMER_MAX_SIZE;  // todo support a fixed length.
 }
 
-static void on_reset(void *user_data) {
+static void on_event(void *user_data, enum embc_dl_event_e event) {
     struct host_s * host = (struct host_s *) user_data;
     (void) host;
-    EMBC_LOGE("on_reset_fn\n");
-    EMBC_FATAL("on_reset_fn\n");
+    EMBC_LOGE("on_event(%d)\n", (int) event);
+    EMBC_FATAL("on_event_fn\n");
 }
 
 static void on_recv(void *user_data, uint32_t metadata,
@@ -170,7 +170,7 @@ static void host_initialize(struct host_s *host, struct stream_tester_s * parent
 
     struct embc_dl_api_s ul = {
             .user_data = host,
-            .reset_fn = on_reset,
+            .event_fn = on_event,
             .recv_fn = on_recv,
     };
     embc_dl_register_upper_layer(host->dl, &ul);
