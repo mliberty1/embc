@@ -29,6 +29,7 @@
 
 
 #define COM_PORT_PREFIX         "\\\\.\\"
+// NOTE: reduce latency timer to 1 milliseconds for FTDI chips.
 
 
 enum host_type_e {
@@ -192,7 +193,7 @@ int main(int argc, char * argv[]) {
             .tx_window_size = 16,
             .tx_buffer_size = (1 << 12),
             .rx_window_size = 64,
-            .tx_timeout_ms = 10,
+            .tx_timeout_ms = 15,
             .tx_link_size = 64,
     };
 
@@ -260,6 +261,19 @@ int main(int argc, char * argv[]) {
     EMBC_ASSERT_ALLOC(h_.dl);
     embc_dl_register_upper_layer(h_.dl, &ul);
 
+    if (!SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_TIME_CRITICAL)) {
+        EMBC_LOGE("Could not elevate thread priority: %d", (int) GetLastError());
+    }
+
+    uint32_t time_last_ms = uart_time_get_ms(h_.uart);
+    //struct uart_status_s uart_status;
+    //struct uart_status_s uart_last_status;
+    struct embc_dl_status_s dl_status;
+    struct embc_dl_status_s dl_last_status;
+
+    //uart_status_get(h_.uart, &uart_last_status);
+    embc_dl_status_get(h_.dl, &dl_last_status);
+
     while (1) {
         handle_count = 0;
         uart_handles(h_.uart, &handle_count, &handles[handle_count]);
@@ -285,5 +299,19 @@ int main(int argc, char * argv[]) {
                 }
                 break;
         }
+
+        uint32_t time_ms = uart_time_get_ms(h_.uart);
+        if ((time_ms - time_last_ms) > 1000) {
+            //uart_status_get(h_.uart, &uart_status);
+            embc_dl_status_get(h_.dl, &dl_status);
+            EMBC_LOGI("retransmissions=%lu, tx %d, rx %d",
+                      (unsigned long int) dl_status.tx.retransmissions,
+                      (int) (dl_status.tx.msg_bytes - dl_last_status.tx.msg_bytes),
+                      (int) (dl_status.rx.msg_bytes - dl_last_status.rx.msg_bytes));
+            time_last_ms = time_ms;
+            //uart_last_status = uart_status;
+            dl_last_status = dl_status;
+        }
+
     }
 }

@@ -32,11 +32,6 @@ struct buf_s {
     uint8_t buf[];
 };
 
-struct uart_stats_s {
-    uint64_t write_bytes;
-    uint64_t read_bytes;
-};
-
 struct uart_s {
     HANDLE handle;
     uart_recv_fn recv_fn;
@@ -47,10 +42,7 @@ struct uart_s {
     uint32_t send_remaining;
     uint32_t buffer_size;
     uint32_t recv_buffer_count;
-
-    struct uart_stats_s stats;
-    struct uart_stats_s stats_last;
-    uint32_t stats_last_ms;
+    struct uart_status_s status;
 };
 
 // https://stackoverflow.com/questions/1387064/how-to-get-the-error-message-from-the-error-code-returned-by-getlasterror
@@ -308,7 +300,8 @@ static void process_read(struct uart_s *self) {
         embc_list_remove_head(&self->buf_read);
         if (rc) {
             if (read_count) {
-                self->stats.read_bytes += read_count;
+                self->status.read_bytes += read_count;
+                ++self->status.read_buffer_count;
                 self->recv_fn(self->recv_user_data, buf->buf, read_count);
             }
         } else if (last_error == ERROR_TIMEOUT) {
@@ -339,7 +332,8 @@ static void process_write(struct uart_s *self) {
             break;  // still in progress
         }
         self->send_remaining += buf->size;
-        self->stats.write_bytes += buf->size;
+        self->status.write_bytes += buf->size;
+        ++self->status.write_buffer_count;
         embc_list_remove_head(&self->buf_write);
         buf_free(self, buf);
         EMBC_LOGD3("write complete");
@@ -368,15 +362,6 @@ void uart_handles(struct uart_s *self, uint32_t * handle_count, void ** handles)
 void uart_process(struct uart_s *self) {
     process_read(self);
     process_write(self);
-
-    uint32_t time_ms = uart_time_get_ms(self);
-    if ((time_ms - self->stats_last_ms) > 1000) {
-        EMBC_LOGD1("wrote %d bytes, read %d bytes",
-                   (int) (self->stats.write_bytes - self->stats_last.write_bytes),
-                   (int) (self->stats.read_bytes - self->stats_last.read_bytes));
-        self->stats_last_ms = time_ms;
-        self->stats_last = self->stats;
-    }
 }
 
 uint32_t uart_time_get_ms(struct uart_s *self) {
@@ -384,4 +369,9 @@ uint32_t uart_time_get_ms(struct uart_s *self) {
     SYSTEMTIME time;
     GetSystemTime(&time);
     return (time.wSecond * 1000) + time.wMilliseconds;
+}
+
+int32_t uart_status_get(struct uart_s *self, struct uart_status_s * stats) {
+    *stats = self->status;
+    return 0;
 }

@@ -41,6 +41,13 @@ struct uart_config_s {
     void *recv_user_data;
 };
 
+struct uart_status_s {
+    uint64_t write_bytes;
+    uint64_t write_buffer_count;
+    uint64_t read_bytes;
+    uint64_t read_buffer_count;
+};
+
 struct uart_s;
 
 struct uart_s *uart_alloc();
@@ -58,6 +65,8 @@ void uart_process(struct uart_s *self);
 uint32_t uart_time_get_ms(struct uart_s *self);
 
 void uart_handles(struct uart_s *self, uint32_t * handle_count, void ** handles);
+
+int32_t uart_status_get(struct uart_s *self, struct uart_status_s * stats);
 
 #ifdef __cplusplus
 }
