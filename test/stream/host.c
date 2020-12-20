@@ -304,8 +304,9 @@ int main(int argc, char * argv[]) {
         if ((time_ms - time_last_ms) > 1000) {
             //uart_status_get(h_.uart, &uart_status);
             embc_dl_status_get(h_.dl, &dl_status);
-            EMBC_LOGI("retransmissions=%lu, tx %d, rx %d",
+            EMBC_LOGI("retry=%lu, resync=%lu, tx=%d, rx=%d",
                       (unsigned long int) dl_status.tx.retransmissions,
+                      (unsigned long int) dl_status.rx_framer.resync,
                       (int) (dl_status.tx.msg_bytes - dl_last_status.tx.msg_bytes),
                       (int) (dl_status.rx.msg_bytes - dl_last_status.rx.msg_bytes));
             time_last_ms = time_ms;
