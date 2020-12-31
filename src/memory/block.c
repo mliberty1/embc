@@ -92,7 +92,7 @@ void embc_mblock_free(struct embc_mblock_s * self, void * buffer, int32_t size) 
     EMBC_ASSERT(b >= s->mem);
     EMBC_ASSERT(b < (s->mem + s->mem_size));
     int32_t blocks = size_to_blocks(s, size);
-    int32_t idx_start = (b - s->mem) / s->block_size;
+    int32_t idx_start = ((int32_t) (b - s->mem)) / s->block_size;
     for (int idx = idx_start; idx < idx_start + blocks; ++idx) {
         int32_t bit = s->bitmap[idx / 8] >> (idx & 0x7);
         EMBC_ASSERT(bit);  // ensure already allocated

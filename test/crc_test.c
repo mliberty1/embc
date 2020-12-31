@@ -50,7 +50,7 @@ static void crc_ccitt_8_well_known(void **state) {
 
 static void crc_ccitt_8_incremental(void **state) {
     (void) state;
-    uint16_t crc = 0;
+    uint8_t crc = 0;
     crc = embc_crc_ccitt_8(crc, MSG4, 5);
     crc = embc_crc_ccitt_8(crc, MSG4 + 5, sizeof(MSG4) - 5);
     assert_int_equal(0x2f, crc);

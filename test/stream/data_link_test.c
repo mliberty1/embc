@@ -48,7 +48,7 @@ static uint8_t PAYLOAD_MAX[] = {
 struct test_s {
     struct embc_dl_s * dl;
     uint32_t send_available;
-    struct embc_rb64_s link_buf;
+    struct embc_rbu64_s link_buf;
     uint64_t link_buffer_[64];
     uint32_t time_ms;
 };
@@ -63,7 +63,7 @@ static void ll_send(void * user_data, uint8_t const * buffer, uint32_t buffer_si
     if (buffer[2] & 0xE0) {
         while (buffer_size) {
             uint64_t u64 = 0;
-            assert_true(embc_rb64_pop(&self->link_buf, &u64));
+            assert_true(embc_rbu64_pop(&self->link_buf, &u64));
             assert_memory_equal(buffer, (uint8_t *) &u64, EMBC_FRAMER_LINK_SIZE);
             buffer += EMBC_FRAMER_LINK_SIZE;
             buffer_size -= EMBC_FRAMER_LINK_SIZE;
@@ -81,7 +81,7 @@ static uint32_t ll_send_available(void * user_data) {
 
 static void on_event(void *user_data, enum embc_dl_event_e event) {
     struct test_s * self = (struct test_s *) user_data;
-    (void)
+    (void) self;
     check_expected(event);
 }
 
@@ -129,7 +129,7 @@ static int setup(void ** state) {
     assert_non_null(self->dl);
     embc_dl_register_upper_layer(self->dl, &ul);
 
-    embc_rb64_init(&self->link_buf, self->link_buffer_, sizeof(self->link_buffer_) / sizeof(uint64_t));
+    embc_rbu64_init(&self->link_buf, self->link_buffer_, sizeof(self->link_buffer_) / sizeof(uint64_t));
 
     *state = self;
     return 0;
@@ -179,7 +179,7 @@ static void send_and_expect(struct test_s *self,
 static void expect_send_link(struct test_s *self, enum embc_framer_type_e frame_type, uint16_t frame_id) {
     uint64_t u64 = 0;
     assert_int_equal(0, embc_framer_construct_link((uint8_t *) &u64, frame_type, frame_id));
-    assert_true(embc_rb64_push(&self->link_buf, u64));
+    assert_true(embc_rbu64_push(&self->link_buf, u64));
 }
 
 static void recv_link(struct test_s *self, enum embc_framer_type_e frame_type, uint16_t frame_id) {

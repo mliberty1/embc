@@ -62,7 +62,7 @@ static void test_alloc_until_full(void ** state) {
     assert_ptr_equal(self->b + 4, embc_mrb_alloc(&self->mrb, 8));
     assert_ptr_equal(self->b + 16, embc_mrb_alloc(&self->mrb, 8));
     assert_ptr_equal(NULL, embc_mrb_alloc(&self->mrb, 8));
-    assert_ptr_equal(self->b + 28, embc_mrb_alloc(&self->mrb, 3));
+    assert_ptr_equal(self->b + 28, embc_mrb_alloc(&self->mrb, 2));
     assert_ptr_equal(NULL, embc_mrb_alloc(&self->mrb, 1));
 
     uint32_t sz = 0;
@@ -71,7 +71,7 @@ static void test_alloc_until_full(void ** state) {
     assert_ptr_equal(self->b + 16, embc_mrb_pop(&self->mrb, &sz));
     assert_int_equal(8, sz);
     assert_ptr_equal(self->b + 28, embc_mrb_pop(&self->mrb, &sz));
-    assert_int_equal(3, sz);
+    assert_int_equal(2, sz);
 }
 
 static void test_alloc_sizes(void ** state) {
@@ -79,7 +79,7 @@ static void test_alloc_sizes(void ** state) {
     uint8_t * b;
     uint32_t sz_out = 0;
 
-    for (uint32_t sz = 1; sz < ((SZ / 2) - 5); ++sz) {
+    for (uint32_t sz = 1; sz < ((SZ / 2) - 6); ++sz) {
         for (int i = 0; i < 32; ++i) {
             b = embc_mrb_alloc(&self->mrb, sz);
             assert_non_null(b);

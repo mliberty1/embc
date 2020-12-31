@@ -35,13 +35,15 @@
 enum host_type_e {
     HOST_TYPE_CONTROLLER,
     HOST_TYPE_REPEATER,
+    HOST_TYPE_RECEIVER,
     HOST_TYPE_UART,
 };
 
 
 static const char * HOST_TYPES[] = {
-    "controller",  // Connected to repeater, or UART TX->RX
-    "repeater",    // Connect to controller or another repeater
+    "controller",  // Connected to repeater, or UART TX->RX.
+    "repeater",    // Connect to controller or another repeater.
+    "receiver",    // Receive and discard.
     "uart",        // raw UART send/receive
 };
 
@@ -83,6 +85,7 @@ static void hal_free(void * ptr) {
 
 static void app_log_printf_(const char *format, ...) {
     va_list arg;
+    printf("%d ", uart_time_get_ms(NULL));
     va_start(arg, format);
     vprintf(format, arg);
     va_end(arg);
@@ -105,6 +108,10 @@ static void on_recv(void *user_data, uint32_t metadata,
             EMBC_ASSERT(!embc_list_is_empty(&host->msg_expect));
             struct embc_list_s * item = embc_list_remove_head(&host->msg_expect);
             struct msg_s * msg_expect = EMBC_CONTAINER_OF(item, struct msg_s, item);
+            if (metadata != msg_expect->metadata) {
+                EMBC_LOGE("metadata mismatch: 0x%06x != 0x%06x",
+                          metadata, msg_expect->metadata);
+            }
             EMBC_ASSERT(metadata == msg_expect->metadata);
             EMBC_ASSERT(msg_size == msg_expect->msg_size);
             EMBC_ASSERT(0 == memcmp(msg, msg_expect->msg_buf, msg_size));
@@ -115,6 +122,9 @@ static void on_recv(void *user_data, uint32_t metadata,
             rv = embc_dl_send(host->dl, metadata, msg, msg_size);
             EMBC_ASSERT(0 == rv);
             break;
+
+        case HOST_TYPE_RECEIVER:
+            break;  // do nothing (discard)
 
         default:
             EMBC_FATAL("invalid host_type");
@@ -153,7 +163,7 @@ static struct msg_s * msg_alloc(struct host_s * self) {
 
 static void generate_and_send(struct host_s * host) {
     struct msg_s * msg = msg_alloc(host);
-    msg->msg_size = 1 + (rand() & 0xff);
+    msg->msg_size = 256; // 1 + (rand() & 0xff);
     msg->metadata = host->metadata;
     // msg->metadata = rand() & 0x00ffffff;
     for (uint16_t idx = 0; idx < msg->msg_size; ++idx) {
@@ -162,6 +172,7 @@ static void generate_and_send(struct host_s * host) {
     int32_t rv = embc_dl_send(host->dl, msg->metadata, msg->msg_buf, msg->msg_size);
     if (rv) {
         EMBC_LOGE("embc_dl_send error %d: %s", (int) rv, embc_error_code_description(rv));
+        embc_list_add_tail(&host->msg_free, &msg->item);
     } else {
         host->metadata = (host->metadata + 1) & 0x00ffffff;
         embc_list_add_tail(&host->msg_expect, &msg->item);
@@ -190,8 +201,8 @@ int main(int argc, char * argv[]) {
     uint8_t uart_buffer[EMBC_FRAMER_MAX_SIZE];
 
     struct embc_dl_config_s config = {
-            .tx_window_size = 16,
-            .tx_buffer_size = (1 << 12),
+            .tx_window_size = 8,
+            .tx_buffer_size = 1 << 12,
             .rx_window_size = 64,
             .tx_timeout_ms = 15,
             .tx_link_size = 64,
@@ -266,12 +277,12 @@ int main(int argc, char * argv[]) {
     }
 
     uint32_t time_last_ms = uart_time_get_ms(h_.uart);
-    //struct uart_status_s uart_status;
-    //struct uart_status_s uart_last_status;
+    struct uart_status_s uart_status;
+    struct uart_status_s uart_last_status;
     struct embc_dl_status_s dl_status;
     struct embc_dl_status_s dl_last_status;
 
-    //uart_status_get(h_.uart, &uart_last_status);
+    uart_status_get(h_.uart, &uart_last_status);
     embc_dl_status_get(h_.dl, &dl_last_status);
 
     while (1) {
@@ -287,11 +298,14 @@ int main(int argc, char * argv[]) {
         embc_dl_process(h_.dl);
         switch (h_.host_type) {
             case HOST_TYPE_CONTROLLER:
-                if ((uart_send_available(h_.uart) >= EMBC_FRAMER_MAX_SIZE) && (embc_list_length(&h_.msg_expect) < 16) ) {
+                if ((uart_send_available(h_.uart) >= EMBC_FRAMER_MAX_SIZE) &&
+                        (embc_list_length(&h_.msg_expect) < (int32_t) config.tx_window_size) ) {
                     generate_and_send(&h_);
                 }
                 break;
             case HOST_TYPE_REPEATER:
+                break;
+            case HOST_TYPE_RECEIVER:
                 break;
             case HOST_TYPE_UART:
                 if (uart_send_available(h_.uart) >= EMBC_FRAMER_MAX_SIZE) {
@@ -301,17 +315,24 @@ int main(int argc, char * argv[]) {
         }
 
         uint32_t time_ms = uart_time_get_ms(h_.uart);
-        if ((time_ms - time_last_ms) > 1000) {
-            //uart_status_get(h_.uart, &uart_status);
-            embc_dl_status_get(h_.dl, &dl_status);
-            EMBC_LOGI("retry=%lu, resync=%lu, tx=%d, rx=%d",
-                      (unsigned long int) dl_status.tx.retransmissions,
-                      (unsigned long int) dl_status.rx_framer.resync,
-                      (int) (dl_status.tx.msg_bytes - dl_last_status.tx.msg_bytes),
-                      (int) (dl_status.rx.msg_bytes - dl_last_status.rx.msg_bytes));
+        if ((time_ms - time_last_ms) >= 1000) {
+            if (h_.host_type == HOST_TYPE_UART) {
+                uart_status_get(h_.uart, &uart_status);
+                EMBC_LOGI("tx=%d, rx=%d",
+                          (int) (uart_status.write_bytes - uart_last_status.write_bytes),
+                          (int) (uart_status.read_bytes - uart_last_status.read_bytes));
+                uart_last_status = uart_status;
+            } else {
+                embc_dl_status_get(h_.dl, &dl_status);
+                EMBC_LOGI("retry=%lu, resync=%lu, tx=%d, rx=%d",
+                          (unsigned long int) dl_status.tx.retransmissions,
+                          (unsigned long int) dl_status.rx_framer.resync,
+                          (int) (dl_status.tx.msg_bytes - dl_last_status.tx.msg_bytes),
+                          (int) (dl_status.rx.msg_bytes - dl_last_status.rx.msg_bytes));
+                dl_last_status = dl_status;
+            }
             time_last_ms = time_ms;
             //uart_last_status = uart_status;
-            dl_last_status = dl_status;
         }
 
     }

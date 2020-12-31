@@ -27,14 +27,14 @@
 
 
 struct test_s {
-    struct embc_rb64_s rb;
+    struct embc_rbu64_s rb;
     uint64_t b[SZ];  // must be at least 16
 };
 
 static int setup(void ** state) {
     struct test_s *self = NULL;
     self = (struct test_s *) test_calloc(1, sizeof(struct test_s));
-    embc_rb64_init(&self->rb, self->b, sizeof(self->b) / sizeof(uint64_t));
+    embc_rbu64_init(&self->rb, self->b, sizeof(self->b) / sizeof(uint64_t));
     *state = self;
     return 0;
 }
@@ -51,57 +51,92 @@ static void test_initial_state(void ** state) {
     assert_int_equal(0, self->rb.tail);
     assert_int_equal(SZ, self->rb.buf_size);
     assert_ptr_equal(self->b, self->rb.buf);
-    assert_int_equal(0, embc_rb64_size(&self->rb));
-    assert_int_equal(SZ - 1, embc_rb64_empty_size(&self->rb));
-    assert_int_equal(SZ - 1, embc_rb64_capacity(&self->rb));
-    assert_ptr_equal(self->b, embc_rb64_head(&self->rb));
-    assert_ptr_equal(self->b, embc_rb64_tail(&self->rb));
+    assert_int_equal(0, embc_rbu64_size(&self->rb));
+    assert_int_equal(SZ - 1, embc_rbu64_empty_size(&self->rb));
+    assert_int_equal(SZ - 1, embc_rbu64_capacity(&self->rb));
+    assert_ptr_equal(self->b, embc_rbu64_head(&self->rb));
+    assert_ptr_equal(self->b, embc_rbu64_tail(&self->rb));
 }
 
 #define assert_pop_equal(rb, expected_value) { \
     uint64_t x__ = 0;                          \
-    assert_true(embc_rb64_pop(rb, &x__));      \
+    assert_true(embc_rbu64_pop(rb, &x__));      \
     assert_int_equal(expected_value, x__);     \
 }
 
 static void test_push_until_full(void ** state) {
     struct test_s *self = (struct test_s *) *state;
     uint64_t x = 0;
-    embc_rb64_init(&self->rb, self->b, 4);
-    assert_true(embc_rb64_push(&self->rb, 1));
-    assert_true(embc_rb64_push(&self->rb, 2));
-    assert_true(embc_rb64_push(&self->rb, 3));
-    assert_false(embc_rb64_push(&self->rb, 4));
+    embc_rbu64_init(&self->rb, self->b, 4);
+    assert_true(embc_rbu64_push(&self->rb, 1));
+    assert_true(embc_rbu64_push(&self->rb, 2));
+    assert_true(embc_rbu64_push(&self->rb, 3));
+    assert_false(embc_rbu64_push(&self->rb, 4));
     assert_pop_equal(&self->rb, 1);
-    assert_true(embc_rb64_push(&self->rb, 4));
-    assert_false(embc_rb64_push(&self->rb, 5));
+    assert_true(embc_rbu64_push(&self->rb, 4));
+    assert_false(embc_rbu64_push(&self->rb, 5));
     assert_pop_equal(&self->rb, 2);
-    assert_true(embc_rb64_push(&self->rb, 5));
+    assert_true(embc_rbu64_push(&self->rb, 5));
     assert_pop_equal(&self->rb, 3);
     assert_pop_equal(&self->rb, 4);
     assert_pop_equal(&self->rb, 5);
-    assert_false(embc_rb64_pop(&self->rb, &x));
+    assert_false(embc_rbu64_pop(&self->rb, &x));
 }
 
 static void test_clear(void ** state) {
     struct test_s *self = (struct test_s *) *state;
-    assert_true(embc_rb64_push(&self->rb, 1));
-    assert_int_equal(1, embc_rb64_size(&self->rb));
-    embc_rb64_clear(&self->rb);
-    assert_int_equal(0, embc_rb64_size(&self->rb));
-    assert_int_equal(0, self->rb.head);
-    assert_int_equal(0, self->rb.tail);
+    assert_true(embc_rbu64_push(&self->rb, 1));
+    assert_int_equal(1, embc_rbu64_size(&self->rb));
+    embc_rbu64_clear(&self->rb);
+    assert_int_equal(0, embc_rbu64_size(&self->rb));
+    assert_int_equal(self->rb.tail, self->rb.head);
+}
+
+static void test_add(void ** state) {
+    struct test_s *self = (struct test_s *) *state;
+    uint64_t x[] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11};
+    embc_rbu64_init(&self->rb, self->b, 8);
+    assert_true(embc_rbu64_add(&self->rb, &x[0], 4));
+    assert_false(embc_rbu64_add(&self->rb, &x[4], 4));
+    assert_true(embc_rbu64_add(&self->rb, &x[4], 3));
+    for (uint64_t i = 0; i < 7; ++i) {
+        uint64_t z = 0;
+        assert_true(embc_rbu64_pop(&self->rb, &z));
+        assert_int_equal(i, z);
+    }
+}
+
+static void test_add_empty(void ** state) {
+    struct test_s *self = (struct test_s *) *state;
+    uint64_t x[] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11};
+    assert_true(embc_rbu64_add(&self->rb, x, 0));
+    assert_int_equal(0, embc_rbu64_size(&self->rb));
 }
 
 static void test_discard_simple(void ** state) {
     struct test_s *self = (struct test_s *) *state;
-    embc_rb64_init(&self->rb, self->b, 4);
+    embc_rbu64_init(&self->rb, self->b, 4);
 
-    assert_true(embc_rb64_push(&self->rb, 1));
-    assert_true(embc_rb64_push(&self->rb, 2));
-    assert_true(embc_rb64_push(&self->rb, 3));
-    assert_true(embc_rb64_discard(&self->rb, 2));
+    assert_true(embc_rbu64_push(&self->rb, 1));
+    assert_true(embc_rbu64_push(&self->rb, 2));
+    assert_true(embc_rbu64_push(&self->rb, 3));
+    assert_true(embc_rbu64_discard(&self->rb, 2));
     assert_pop_equal(&self->rb, 3);
+}
+
+static void test_add_wrap(void ** state) {
+    struct test_s *self = (struct test_s *) *state;
+    uint64_t x[] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11};
+    embc_rbu64_init(&self->rb, self->b, 8);
+    assert_true(embc_rbu64_add(&self->rb, &x[0], 6));
+    assert_true(embc_rbu64_discard(&self->rb, 5));
+    assert_true(embc_rbu64_add(&self->rb, &x[6], 6));
+    assert_false(embc_rbu64_add(&self->rb, x, 1));
+    for (uint64_t i = 5; i < 12; ++i) {
+        uint64_t z = 0;
+        assert_true(embc_rbu64_pop(&self->rb, &z));
+        assert_int_equal(i, z);
+    }
 }
 
 int main(void) {
@@ -110,7 +145,10 @@ int main(void) {
             cmocka_unit_test_setup_teardown(test_initial_state, setup, teardown),
             cmocka_unit_test_setup_teardown(test_push_until_full, setup, teardown),
             cmocka_unit_test_setup_teardown(test_clear, setup, teardown),
+            cmocka_unit_test_setup_teardown(test_add, setup, teardown),
+            cmocka_unit_test_setup_teardown(test_add_empty, setup, teardown),
             cmocka_unit_test_setup_teardown(test_discard_simple, setup, teardown),
+            cmocka_unit_test_setup_teardown(test_add_wrap, setup, teardown),
     };
 
     return cmocka_run_group_tests(tests, NULL, NULL);

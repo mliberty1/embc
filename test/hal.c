@@ -25,7 +25,6 @@
 #include <string.h> // memset
 #include <stdarg.h>
 #include <stdio.h>
-#include <unistd.h>
 
 
 static void * hal_alloc(embc_size_t size_bytes) {

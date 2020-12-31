@@ -371,7 +371,7 @@ static inline embc_size_t embc_buffer_read_remaining(struct embc_buffer_s * buff
  */
 static inline void embc_buffer_cursor_set(struct embc_buffer_s * buffer, embc_size_t index) {
     EMBC_ASSERT((index >= 0) && (index <= buffer->length));
-    buffer->cursor = index;
+    buffer->cursor = (uint16_t) index;
 }
 
 /**

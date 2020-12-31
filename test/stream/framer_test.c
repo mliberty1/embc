@@ -207,7 +207,7 @@ static void test_data_max_length(void ** state) {
     struct test_s *self = (struct test_s *) *state;
     uint8_t b[256];
     for (size_t i = 0; i < sizeof(b); ++i) {
-        b[i] = i;
+        b[i] = (uint8_t) (i & 0xff);
     }
     send_data(self, 1, 2, b, sizeof(b));
 }

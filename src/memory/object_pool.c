@@ -89,7 +89,7 @@ static struct embc_object_pool_size_s embc_object_pool_size(int32_t obj_count, i
 
 int32_t embc_object_pool_instance_size(int32_t obj_count, int32_t obj_size) {
     struct embc_object_pool_size_s sz = embc_object_pool_size(obj_count, obj_size);
-    return sz.sz;
+    return (int32_t) sz.sz;
 }
 
 int32_t embc_object_pool_initialize(

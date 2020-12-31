@@ -106,7 +106,8 @@ void embc_buffer_allocator_initialize(
             uint8_t ** d = (uint8_t **) &b->data; // discard const
             *d = buffers_ptr + HDR_SZ;
             uint16_t * capacity = (uint16_t *) &b->capacity;  // discard const
-            *capacity = pool->payload_size;
+            EMBC_ASSERT(pool->payload_size <= 0xffff);
+            *capacity = (uint16_t) pool->payload_size;
             buffer_init(b);
             embc_list_initialize(&b->item);
             embc_list_add_tail(&pool->buffers, &b->item);
@@ -202,7 +203,7 @@ void embc_buffer_write(struct embc_buffer_s * buffer,
         EMBC_ASSERT(size <= embc_buffer_write_remaining(buffer));
         uint8_t * ptr = buffer->data + buffer->cursor;
         embc_memcpy(ptr, data, size);
-        buffer->cursor += size;
+        buffer->cursor += (uint16_t) size;
         write_update_length(buffer);
     }
 }
@@ -218,7 +219,7 @@ void embc_buffer_copy(struct embc_buffer_s * destination,
         uint8_t *dst = destination->data + destination->cursor;
         uint8_t *src = source->data + source->cursor;
         embc_memcpy(dst, src, size);
-        destination->cursor += size;
+        destination->cursor += (uint16_t) size;
         write_update_length(destination);
     }
 }
@@ -297,7 +298,7 @@ void embc_buffer_read(struct embc_buffer_s * buffer,
         EMBC_ASSERT(size <= embc_buffer_read_remaining(buffer));
         uint8_t * ptr = buffer->data + buffer->cursor;
         embc_memcpy(data, ptr, size);
-        buffer->cursor += size;
+        buffer->cursor += (uint16_t) size;
     }
 }
 
@@ -341,19 +342,19 @@ void embc_buffer_erase(struct embc_buffer_s * buffer,
                        embc_size_t start,
                        embc_size_t end) {
     EMBC_DBC_NOT_NULL(buffer);
-    EMBC_DBC_RANGE_INT(start, 0, buffer->length - 1);
-    EMBC_DBC_RANGE_INT(end, 0, buffer->length);
+    EMBC_DBC_RANGE_TYPE(embc_size_t, start, 0, buffer->length - 1);
+    EMBC_DBC_RANGE_TYPE(embc_size_t, end, 0, buffer->length);
     embc_size_t length = end - start;
     if (length > 0) {
         for (embc_size_t k = start; k < (buffer->length - length); ++k) {
             buffer->data[k] = buffer->data[k + length];
         }
         if (buffer->cursor >= end) {
-            buffer->cursor -= length;
+            buffer->cursor -= (uint16_t) length;
         } else if (buffer->cursor > start) {
-            buffer->cursor = start;
+            buffer->cursor = (uint16_t) start;
         }
-        buffer->length -= length;
+        buffer->length -= (uint16_t) length;
 
     }
 }

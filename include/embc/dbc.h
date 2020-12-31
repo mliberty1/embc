@@ -166,7 +166,7 @@
 #define EMBC_DBC_LTE_ZERO(x) EMBC_DBC_LTE(x, 0)
 
 /**
- * @brief Assert that a value is less than or equal to zero.
+ * @brief Assert that a value is within a range.
  *
  * @param x The function argument to check.
  * @param x_min The minimum value, inclusive.
@@ -176,6 +176,22 @@
     int x__ = (x); \
     int x_min__ = (x_min); \
     int x_max__ = (x_max); \
+    EMBC_DBC_ASSERT(x__ >= x_min__, #x " too small"); \
+    EMBC_DBC_ASSERT(x__ <= x_max__, #x " too big"); \
+} while(0)
+
+/**
+ * @brief Assert that a value is within a range.
+ *
+ * @param type The type for the argumnet
+ * @param x The function argument to check.
+ * @param x_min The minimum value, inclusive.
+ * @param x_max The maximum value, inclusive.
+ */
+#define EMBC_DBC_RANGE_TYPE(type, x, x_min, x_max)  do { \
+    type x__ = (x); \
+    type x_min__ = (x_min); \
+    type x_max__ = (x_max); \
     EMBC_DBC_ASSERT(x__ >= x_min__, #x " too small"); \
     EMBC_DBC_ASSERT(x__ <= x_max__, #x " too big"); \
 } while(0)

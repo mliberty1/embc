@@ -35,30 +35,7 @@
 #include "embc/ec.h"
 #include "embc/log.h"
 #include "embc/platform.h"
-
-
-static inline void encode_u16(uint8_t * b, uint16_t value) {
-    b[0] = (value >> 0) & 0xff;
-    b[1] = (value >> 8) & 0xff;
-}
-
-static inline void encode_u32(uint8_t * b, uint32_t value) {
-    b[0] = (value >> 0) & 0xff;
-    b[1] = (value >> 8) & 0xff;
-    b[2] = (value >> 16) & 0xff;
-    b[3] = (value >> 24) & 0xff;
-}
-
-static inline uint16_t decode_u16(uint8_t * b) {
-    return ((uint16_t) b[0]) | (((uint16_t) b[1]) << 8);
-}
-
-static inline uint32_t decode_u32(uint8_t * b) {
-    return ((uint32_t) b[0])
-        | (((uint32_t) b[1]) << 8)
-        | (((uint32_t) b[2]) << 16)
-        | (((uint32_t) b[3]) << 24);
-}
+#include <inttypes.h>
 
 
 enum tx_frame_state_e {
@@ -100,7 +77,7 @@ struct embc_dl_s {
 
     struct embc_mrb_s tx_buf;
     // rx_frames also contain the rx buffers
-    struct embc_rb64_s tx_link_buf;
+    struct embc_rbu64_s tx_link_buf;
 
     struct tx_frame_s * tx_frames;
     uint16_t tx_frame_count;
@@ -108,36 +85,47 @@ struct embc_dl_s {
     struct rx_frame_s * rx_frames;
     uint16_t rx_frame_count;
 
+    embc_dl_lock lock;
+    embc_dl_unlock unlock;
+
     struct embc_framer_s rx_framer;
     struct embc_dl_rx_status_s rx_status;
     struct embc_dl_tx_status_s tx_status;
 };
 
+static void lock_default() {
+}
+
+static void unlock_default() {
+}
+
 int32_t embc_dl_send(struct embc_dl_s * self,
                      uint32_t metadata,
                      uint8_t const *msg, uint32_t msg_size) {
-    // todo consider mutex?
+    self->lock();
     uint16_t frame_id = self->tx_frame_next_id;
     uint16_t idx = frame_id & (self->tx_frame_count - 1);
     struct tx_frame_s * f = &self->tx_frames[idx];
 
     if (embc_framer_frame_id_subtract(frame_id, self->tx_frame_last_id) >= self->tx_frame_count) {
-        EMBC_LOGW("embc_dl_send(%d) too many frames outstanding", (int) metadata);
+        EMBC_LOGW("embc_dl_send(0x%02" PRIx32 ") too many frames outstanding", metadata);
+        self->unlock();
         return EMBC_ERROR_NOT_ENOUGH_MEMORY;
     }
 
     if (!embc_framer_validate_data(frame_id, metadata, msg_size)) {
         EMBC_LOGW("embc_framer_send invalid parameters");
+        self->unlock();
         return EMBC_ERROR_PARAMETER_INVALID;
     }
 
     uint16_t frame_sz = msg_size + EMBC_FRAMER_OVERHEAD_SIZE;
     uint8_t * b = embc_mrb_alloc(&self->tx_buf, frame_sz);
     if (!b) {
-        EMBC_LOGW("embc_dl_send(%d) out of buffer space", (int) metadata);
+        EMBC_LOGW("embc_dl_send(0x%06" PRIx32 ") out of buffer space", metadata);
+        self->unlock();
         return EMBC_ERROR_NOT_ENOUGH_MEMORY;
     }
-
     int32_t rv = embc_framer_construct_data(b, frame_id, metadata, msg, msg_size);
     EMBC_ASSERT(0 == rv);  // embc_framer_validate already checked
 
@@ -146,12 +134,12 @@ int32_t embc_dl_send(struct embc_dl_s * self,
     f->send_count = 0;
     f->buf = b;
     f->state = TX_FRAME_ST_SEND;
+
     self->tx_status.msg_bytes += msg_size;
     self->tx_status.bytes += frame_sz;
     self->tx_frame_next_id = (frame_id + 1) & EMBC_FRAMER_FRAME_ID_MAX;
-
     // frame queued for send_data()
-    // todo notify process?
+    self->unlock();
     return 0;
 }
 
@@ -201,7 +189,7 @@ static void send_data(struct embc_dl_s * self, uint16_t frame_id) {
 }
 
 static void send_link_pending(struct embc_dl_s * self) {
-    uint32_t pending_sz = embc_rb64_size(&self->tx_link_buf);
+    uint32_t pending_sz = embc_rbu64_size(&self->tx_link_buf);
     uint32_t send_sz = self->ll_instance.send_available(self->ll_instance.user_data) / EMBC_FRAMER_LINK_SIZE;
     if (pending_sz <= send_sz) {
         send_sz = pending_sz;
@@ -215,19 +203,19 @@ static void send_link_pending(struct embc_dl_s * self) {
         // wrap around, send in two parts
         uint32_t sz = self->tx_link_buf.buf_size - self->tx_link_buf.tail;
         self->ll_instance.send(self->ll_instance.user_data,
-                               (uint8_t *) embc_rb64_tail(&self->tx_link_buf),
+                               (uint8_t *) embc_rbu64_tail(&self->tx_link_buf),
                                sz * EMBC_FRAMER_LINK_SIZE);
-        embc_rb64_discard(&self->tx_link_buf, sz);
+        embc_rbu64_discard(&self->tx_link_buf, sz);
         send_sz -= sz;
         self->ll_instance.send(self->ll_instance.user_data,
                                (uint8_t *) self->tx_link_buf.buf,
                                send_sz * EMBC_FRAMER_LINK_SIZE);
-        embc_rb64_discard(&self->tx_link_buf, send_sz);
+        embc_rbu64_discard(&self->tx_link_buf, send_sz);
     } else {
         self->ll_instance.send(self->ll_instance.user_data,
-                               (uint8_t *) embc_rb64_tail(&self->tx_link_buf),
+                               (uint8_t *) embc_rbu64_tail(&self->tx_link_buf),
                                send_sz * EMBC_FRAMER_LINK_SIZE);
-        embc_rb64_discard(&self->tx_link_buf, send_sz);
+        embc_rbu64_discard(&self->tx_link_buf, send_sz);
     }
 }
 
@@ -240,7 +228,7 @@ static void send_link(struct embc_dl_s * self, enum embc_framer_type_e frame_typ
     if (rv) {
         EMBC_LOGE("send_link error: %d", (int) rv);
         return;
-    } else if (!embc_rb64_push(&self->tx_link_buf, b)) {
+    } else if (!embc_rbu64_push(&self->tx_link_buf, b)) {
         EMBC_LOG_WARN("link buffer full");
     }
 }
@@ -508,9 +496,11 @@ static void tx_transmit(struct embc_dl_s * self) {
 }
 
 void embc_dl_process(struct embc_dl_s * self) {
+    self->lock();
     send_link_pending(self);
     tx_timeout(self);
     tx_transmit(self);
+    self->unlock();
 }
 
 static uint32_t to_power_of_two(uint32_t v) {
@@ -537,16 +527,15 @@ struct embc_dl_s * embc_dl_initialize(
         return 0;
     }
 
-    uint32_t tx_link_size = config->tx_link_size;
-    if (tx_link_size < 8) {
-        EMBC_LOGW("increasing tx_link_size to 8 (was %d)", (int) tx_link_size);
-        tx_link_size = 8;
+    uint32_t tx_link_u64_size = config->tx_link_size;
+    if (!tx_link_u64_size) {
+        tx_link_u64_size = config->rx_window_size;
     }
 
     uint32_t tx_buffer_size = config->tx_buffer_size;
     if (tx_buffer_size <= EMBC_FRAMER_MAX_SIZE) {
         // must buffer at least one message
-        tx_buffer_size = EMBC_FRAMER_MAX_SIZE + 1;
+        tx_buffer_size = EMBC_FRAMER_MAX_SIZE + 8 + 1;
     }
 
     uint32_t tx_window_size = to_power_of_two(config->tx_window_size);
@@ -573,7 +562,9 @@ struct embc_dl_s * embc_dl_initialize(
     offset += sz;
 
     size_t tx_link_buffer_offset = offset;
-    sz = EMBC_ROUND_UP_TO_MULTIPLE_UNSIGNED(sz, tx_link_size * EMBC_FRAMER_LINK_SIZE);
+    EMBC_ASSERT(EMBC_FRAMER_LINK_SIZE == sizeof(uint64_t));
+    EMBC_ASSERT((tx_link_buffer_offset & 0x7) == 0);
+    sz = tx_link_u64_size * EMBC_FRAMER_LINK_SIZE;
     offset += sz;
 
     size_t tx_buffer_offset = offset;
@@ -587,12 +578,15 @@ struct embc_dl_s * embc_dl_initialize(
     }
     EMBC_LOGI("initialize");
 
+    self->lock = lock_default;
+    self->unlock = unlock_default;
+
     uint8_t * mem = (uint8_t *) self;
     self->tx_frame_count = tx_window_size;
     self->tx_frames = (struct tx_frame_s *) (mem + tx_frame_buf_offset);
     self->rx_frame_count = rx_window_size;
     self->rx_frames = (struct rx_frame_s *) (mem + rx_frame_buf_offset);
-    embc_rb64_init(&self->tx_link_buf, (uint64_t *) (mem + tx_link_buffer_offset), tx_link_size);
+    embc_rbu64_init(&self->tx_link_buf, (uint64_t *) (mem + tx_link_buffer_offset), tx_link_u64_size);
     embc_mrb_init(&self->tx_buf, (uint8_t *) (mem + tx_buffer_offset), tx_buffer_size);
 
     self->tx_timeout_ms = config->tx_timeout_ms;
@@ -602,21 +596,25 @@ struct embc_dl_s * embc_dl_initialize(
     self->rx_framer.api.link_fn = on_recv_link;
     self->rx_framer.api.data_fn = on_recv_data;
     embc_dl_reset(self);
+
     return self;
 }
 
 void embc_dl_register_upper_layer(struct embc_dl_s * self, struct embc_dl_api_s const * ul) {
+    self->lock();
     self->ul_instance = *ul;
+    self->unlock();
 }
 
 void embc_dl_reset(struct embc_dl_s * self) {
     EMBC_LOGI("reset");
+    self->lock();
     self->tx_frame_last_id = 0;
     self->tx_frame_next_id = 0;
     self->rx_next_frame_id = 0;
     self->rx_max_frame_id = 0;
     embc_mrb_clear(&self->tx_buf);
-    embc_rb64_clear(&self->tx_link_buf);
+    embc_rbu64_clear(&self->tx_link_buf);
 
     for (uint16_t f = 0; f < self->tx_frame_count; ++f) {
         self->tx_frames[f].state = TX_FRAME_ST_IDLE;
@@ -629,12 +627,16 @@ void embc_dl_reset(struct embc_dl_s * self) {
     embc_framer_reset(&self->rx_framer);
     embc_memset(&self->rx_status, 0, sizeof(self->rx_status));
     embc_memset(&self->tx_status, 0, sizeof(self->tx_status));
+    self->unlock();
 }
 
 int32_t embc_dl_finalize(struct embc_dl_s * self) {
     EMBC_LOGI("finalize");
     if (self) {
+        embc_dl_unlock unlock = self->unlock;
+        self->lock();
         embc_free(self);
+        unlock();
     }
     return 0;
 }
@@ -645,9 +647,16 @@ int32_t embc_dl_status_get(
     if (!status) {
         return EMBC_ERROR_PARAMETER_INVALID;
     }
+    self->lock();
     status->version = 1;
     status->rx = self->rx_status;
     status->rx_framer = self->rx_framer.status;
     status->tx = self->tx_status;
+    self->unlock();
     return 0;
+}
+
+void embc_dl_register_lock(struct embc_dl_s * self, embc_dl_lock lock, embc_dl_unlock unlock) {
+    self->lock = lock ? lock : lock_default;
+    self->unlock = unlock ? unlock : unlock_default;
 }

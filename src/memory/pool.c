@@ -59,7 +59,7 @@ static struct embc_pool_size_s embc_pool_size(int32_t block_count, int32_t block
 
 int32_t embc_pool_instance_size(int32_t block_count, int32_t block_size) {
     struct embc_pool_size_s sz = embc_pool_size(block_count, block_size);
-    return sz.sz;
+    return (int32_t) sz.sz;
 }
 
 int32_t embc_pool_initialize(
