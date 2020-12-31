@@ -133,7 +133,7 @@ static inline bool embc_rbu8_add(struct embc_rbu8_s * self, uint8_t const * buff
     if (count > embc_rbu8_empty_size(self)) {
         return false;
     }
-    if ((self->head + count) > self->buf_size) {
+    if ((self->head + count) >= self->buf_size) {
         uint32_t sz = self->buf_size - self->head;
         embc_memcpy(embc_rbu8_head(self), buffer, sz * sizeof(*buffer));
         self->head = 0;

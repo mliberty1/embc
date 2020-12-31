@@ -288,7 +288,8 @@ int32_t embc_framer_construct_data(uint8_t * b, uint16_t frame_id, uint32_t meta
 }
 
 bool embc_framer_validate_link(enum embc_framer_type_e frame_type, uint16_t frame_id) {
-    if ((frame_type < 0) | (frame_type >= 8)) {
+    int32_t frame_type_i32 = (int32_t) frame_type;
+    if ((frame_type_i32 < 0) | (frame_type_i32 >= 8)) {
         return false;
     }
     if (frame_id > EMBC_FRAMER_FRAME_ID_MAX) {

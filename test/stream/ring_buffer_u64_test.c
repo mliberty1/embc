@@ -139,6 +139,16 @@ static void test_add_wrap(void ** state) {
     }
 }
 
+static void test_add_full(void ** state) {
+    struct test_s *self = (struct test_s *) *state;
+    uint64_t x[] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11};
+    embc_rbu64_init(&self->rb, self->b, 8);
+    assert_true(embc_rbu64_add(&self->rb, &x[0], 4));
+    assert_true(embc_rbu64_discard(&self->rb, 4));
+    assert_true(embc_rbu64_add(&self->rb, &x[4], 4));
+    assert_true(embc_rbu64_discard(&self->rb, 4));
+}
+
 int main(void) {
     hal_test_initialize();
     const struct CMUnitTest tests[] = {
@@ -149,6 +159,7 @@ int main(void) {
             cmocka_unit_test_setup_teardown(test_add_empty, setup, teardown),
             cmocka_unit_test_setup_teardown(test_discard_simple, setup, teardown),
             cmocka_unit_test_setup_teardown(test_add_wrap, setup, teardown),
+            cmocka_unit_test_setup_teardown(test_add_full, setup, teardown),
     };
 
     return cmocka_run_group_tests(tests, NULL, NULL);
