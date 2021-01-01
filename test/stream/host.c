@@ -15,14 +15,13 @@
  */
 
 // #include "embc/stream/transport.h"
-#include "embc/stream/data_link.h"
-#include "embc/stream/framer.h"
+#include "embc/host/uart_data_link.h"
 #include "embc/stream/ring_buffer_u8.h"
 #include "embc/collections/list.h"
 #include "embc/cstr.h"
 #include "embc/ec.h"
 #include "embc/log.h"
-#include "./uart.h"
+// #include "embc/host/uart.h"
 #include <stdio.h>
 #include <stdarg.h>
 #include <windows.h>
@@ -36,7 +35,6 @@ enum host_type_e {
     HOST_TYPE_CONTROLLER,
     HOST_TYPE_REPEATER,
     HOST_TYPE_RECEIVER,
-    HOST_TYPE_UART,
 };
 
 
@@ -44,7 +42,6 @@ static const char * HOST_TYPES[] = {
     "controller",  // Connected to repeater, or UART TX->RX.
     "repeater",    // Connect to controller or another repeater.
     "receiver",    // Receive and discard.
-    "uart",        // raw UART send/receive
 };
 
 struct msg_s {
@@ -58,12 +55,17 @@ struct host_s {
     // struct embc_transport_s transport;
     int host_type;
     uint32_t metadata;
-    struct embc_dl_s * dl;
+    struct embc_udl_s * dl;
     struct embc_list_s msg_free;
     struct embc_list_s msg_expect;
     struct embc_list_s msg_write;
     struct embc_list_s msg_read;
-    struct uart_s * uart;
+
+    uint32_t tx_window_size;
+    uint32_t time_last_ms;
+    struct embc_dl_status_s dl_status;
+
+    HANDLE ctrl_event;
 };
 
 struct host_s h_;
@@ -85,7 +87,7 @@ static void hal_free(void * ptr) {
 
 static void app_log_printf_(const char *format, ...) {
     va_list arg;
-    printf("%d ", uart_time_get_ms(NULL));
+    printf("%d ", embc_time_get_ms());
     va_start(arg, format);
     vprintf(format, arg);
     va_end(arg);
@@ -119,7 +121,7 @@ static void on_recv(void *user_data, uint32_t metadata,
             break;
 
         case HOST_TYPE_REPEATER:
-            rv = embc_dl_send(host->dl, metadata, msg, msg_size);
+            rv = embc_udl_send(host->dl, metadata, msg, msg_size);
             EMBC_ASSERT(0 == rv);
             break;
 
@@ -130,22 +132,6 @@ static void on_recv(void *user_data, uint32_t metadata,
             EMBC_FATAL("invalid host_type");
             break;
     }
-}
-
-static uint32_t ll_time_get_ms(void * user_data) {
-    return uart_time_get_ms((struct uart_s *) user_data);
-}
-
-static void ll_send(void * user_data, uint8_t const * buffer, uint32_t buffer_size) {
-    struct host_s * host = (struct host_s *) user_data;
-    if (uart_send_available(host->uart) >= buffer_size) {
-        uart_write(host->uart, buffer, buffer_size);
-    }
-}
-
-static uint32_t ll_send_available(void * user_data) {
-    struct host_s * host = (struct host_s *) user_data;
-    return uart_send_available(host->uart);
 }
 
 static struct msg_s * msg_alloc(struct host_s * self) {
@@ -169,7 +155,7 @@ static void generate_and_send(struct host_s * host) {
     for (uint16_t idx = 0; idx < msg->msg_size; ++idx) {
         msg->msg_buf[idx] = rand() & 0xff;
     }
-    int32_t rv = embc_dl_send(host->dl, msg->metadata, msg->msg_buf, msg->msg_size);
+    int32_t rv = embc_udl_send(host->dl, msg->metadata, msg->msg_buf, msg->msg_size);
     if (rv) {
         EMBC_LOGE("embc_dl_send error %d: %s", (int) rv, embc_error_code_description(rv));
         embc_list_add_tail(&host->msg_free, &msg->item);
@@ -179,26 +165,55 @@ static void generate_and_send(struct host_s * host) {
     }
 }
 
-static void on_uart_recv(void *user_data, uint8_t *buffer, uint32_t buffer_size) {
-    (void) user_data;
-    embc_dl_ll_recv(h_.dl, buffer, buffer_size);
+static void on_process(void * user_data) {
+    struct host_s * self = (struct host_s *) user_data;
+
+    struct embc_dl_status_s dl_status;
+
+    switch (h_.host_type) {
+        case HOST_TYPE_CONTROLLER:
+            if ((embc_udl_send_available(h_.dl) >= EMBC_FRAMER_MAX_SIZE) &&
+                (embc_list_length(&h_.msg_expect) < (int32_t) self->tx_window_size) ) {
+                generate_and_send(&h_);
+            }
+            break;
+        case HOST_TYPE_REPEATER:
+            break;
+        case HOST_TYPE_RECEIVER:
+            break;
+    }
+
+    uint32_t time_ms = embc_time_get_ms();
+    if ((time_ms - self->time_last_ms) >= 1000) {
+        embc_udl_status_get(h_.dl, &dl_status);
+                EMBC_LOGI("retry=%lu, resync=%lu, tx=%d, rx=%d",
+                          (unsigned long int) dl_status.tx.retransmissions,
+                          (unsigned long int) dl_status.rx_framer.resync,
+                          (int) (dl_status.tx.msg_bytes - self->dl_status.tx.msg_bytes),
+                          (int) (dl_status.rx.msg_bytes - self->dl_status.rx.msg_bytes));
+        self->dl_status = dl_status;
+        self->time_last_ms = time_ms;
+    }
+}
+
+BOOL WINAPI CtrlHandler(DWORD fdwCtrlType) {
+    (void) fdwCtrlType;
+    SetEvent(h_.ctrl_event);
+    return TRUE;
 }
 
 #define ARG_CONSUME(count)   argc -= count; argv += count
 
 static const char USAGE[] =
 "usage: host.exe --port <port> --type <host_type>\n"
-"    port: The COM port path, such as \\\\.\\COM3\n"
+"    port: The COM port path, such as COM3\n"
 "    type: The host type, one of [controller, repeater, uart]"
 "\n";
 
 // usage: --port <name> --type <host_type>
 
 int main(int argc, char * argv[]) {
-    uint32_t handle_count;
-    HANDLE handles[16];
     char port_name[1024];
-    uint8_t uart_buffer[EMBC_FRAMER_MAX_SIZE];
 
     struct embc_dl_config_s config = {
             .tx_window_size = 8,
@@ -208,13 +223,6 @@ int main(int argc, char * argv[]) {
             .tx_link_size = 64,
     };
 
-    struct embc_dl_ll_s ll = {
-            .user_data = &h_,
-            .time_get_ms = ll_time_get_ms,
-            .send = ll_send,
-            .send_available = ll_send_available,
-    };
-
     struct embc_dl_api_s ul = {
             .user_data = &h_,
             .event_fn = on_event,
@@ -222,7 +230,7 @@ int main(int argc, char * argv[]) {
     };
 
     embc_memset(&h_, 0, sizeof(h_));
-    snprintf(port_name, sizeof(port_name), "%s", "\\\\.\\COM4");
+    snprintf(port_name, sizeof(port_name), "%s", "COM3");
     ARG_CONSUME(1);
     while (argc) {
         if ((argc >= 2) && (0 == strcmpi(argv[0], "--port"))) {
@@ -241,99 +249,31 @@ int main(int argc, char * argv[]) {
         }
     }
 
+    h_.ctrl_event = CreateEvent(NULL, TRUE, FALSE, NULL);
+    EMBC_ASSERT_ALLOC(h_.ctrl_event);
+    if (!SetConsoleCtrlHandler(CtrlHandler, TRUE)) {
+        EMBC_LOGW("Could not set control handler");
+    }
+
     // printf("RAND_MAX = %ull\n", RAND_MAX);
     embc_allocator_set(hal_alloc, hal_free);
     embc_log_initialize(app_log_printf_);
     srand(2);
 
-    embc_memset(uart_buffer, EMBC_FRAMER_SOF1, sizeof(uart_buffer));
-    h_.uart = uart_alloc();
     embc_list_initialize(&h_.msg_free);
     embc_list_initialize(&h_.msg_expect);
     embc_list_initialize(&h_.msg_write);
     embc_list_initialize(&h_.msg_read);
+    h_.tx_window_size = config.tx_window_size;
 
-    struct uart_config_s uart_config = {
-        .baudrate = 3000000,
-        .send_size_total = 3 * EMBC_FRAMER_MAX_SIZE,
-        .buffer_size = EMBC_FRAMER_MAX_SIZE,
-        .recv_buffer_count = 16,
-        .recv_fn = on_uart_recv,
-        .recv_user_data = &h_,
-    };
-
-    int32_t rv = uart_open(h_.uart, port_name, &uart_config);
-    if (rv) {
-        printf("uart_open returned %d\n", rv);
-        exit(1);
-    }
-
-    h_.dl = embc_dl_initialize(&config, &ll);
+    h_.dl = embc_udl_initialize(&config, port_name, 3000000);
     EMBC_ASSERT_ALLOC(h_.dl);
-    embc_dl_register_upper_layer(h_.dl, &ul);
+    EMBC_ASSERT(0 == embc_udl_start(h_.dl, &ul, on_process, &h_));
 
-    if (!SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_TIME_CRITICAL)) {
-        EMBC_LOGE("Could not elevate thread priority: %d", (int) GetLastError());
-    }
+    h_.time_last_ms = embc_time_get_ms();
+    embc_udl_status_get(h_.dl, &h_.dl_status);
 
-    uint32_t time_last_ms = uart_time_get_ms(h_.uart);
-    struct uart_status_s uart_status;
-    struct uart_status_s uart_last_status;
-    struct embc_dl_status_s dl_status;
-    struct embc_dl_status_s dl_last_status;
-
-    uart_status_get(h_.uart, &uart_last_status);
-    embc_dl_status_get(h_.dl, &dl_last_status);
-
-    while (1) {
-        handle_count = 0;
-        uart_handles(h_.uart, &handle_count, &handles[handle_count]);
-        if (handle_count) {
-            WaitForMultipleObjects(handle_count, handles, FALSE, 1);
-        } else {
-            Sleep(1);
-        }
-
-        uart_process(h_.uart);
-        embc_dl_process(h_.dl);
-        switch (h_.host_type) {
-            case HOST_TYPE_CONTROLLER:
-                if ((uart_send_available(h_.uart) >= EMBC_FRAMER_MAX_SIZE) &&
-                        (embc_list_length(&h_.msg_expect) < (int32_t) config.tx_window_size) ) {
-                    generate_and_send(&h_);
-                }
-                break;
-            case HOST_TYPE_REPEATER:
-                break;
-            case HOST_TYPE_RECEIVER:
-                break;
-            case HOST_TYPE_UART:
-                if (uart_send_available(h_.uart) >= EMBC_FRAMER_MAX_SIZE) {
-                    uart_write(h_.uart, uart_buffer, sizeof(uart_buffer));
-                }
-                break;
-        }
-
-        uint32_t time_ms = uart_time_get_ms(h_.uart);
-        if ((time_ms - time_last_ms) >= 1000) {
-            if (h_.host_type == HOST_TYPE_UART) {
-                uart_status_get(h_.uart, &uart_status);
-                EMBC_LOGI("tx=%d, rx=%d",
-                          (int) (uart_status.write_bytes - uart_last_status.write_bytes),
-                          (int) (uart_status.read_bytes - uart_last_status.read_bytes));
-                uart_last_status = uart_status;
-            } else {
-                embc_dl_status_get(h_.dl, &dl_status);
-                EMBC_LOGI("retry=%lu, resync=%lu, tx=%d, rx=%d",
-                          (unsigned long int) dl_status.tx.retransmissions,
-                          (unsigned long int) dl_status.rx_framer.resync,
-                          (int) (dl_status.tx.msg_bytes - dl_last_status.tx.msg_bytes),
-                          (int) (dl_status.rx.msg_bytes - dl_last_status.rx.msg_bytes));
-                dl_last_status = dl_status;
-            }
-            time_last_ms = time_ms;
-            //uart_last_status = uart_status;
-        }
-
-    }
+    WaitForSingleObject(h_.ctrl_event, INFINITE);
+    embc_udl_finalize(h_.dl);
+    return 0;
 }

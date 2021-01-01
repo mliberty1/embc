@@ -437,11 +437,19 @@ int32_t embc_dl_status_get(
         struct embc_dl_s * self,
         struct embc_dl_status_s * status);
 
-/// The function used to lock the mutex
-typedef void (*embc_dl_lock)();
+/**
+ * @brief The function used to lock the mutex
+ *
+ * @param user_data The arbitrary data.
+ */
+typedef void (*embc_dl_lock)(void * user_data);
 
-/// The function used to unlock the mutex
-typedef void (*embc_dl_unlock)();
+/**
+ * @brief The function used to unlock the mutex
+ *
+ * @param user_data The arbitrary data.
+ */
+typedef void (*embc_dl_unlock)(void * user_data);
 
 /**
  * @brief Register functions to lock and unlock the send-side mutex.
@@ -449,8 +457,9 @@ typedef void (*embc_dl_unlock)();
  * @param self The data link instance.
  * @param lock The function called to lock the send-side mutex.
  * @param unlock The function called to unlock the send-side mutex.
+ * @param user_data The arbitrary data passed to lock and unlock.
  */
-void embc_dl_register_lock(struct embc_dl_s * self, embc_dl_lock lock, embc_dl_unlock unlock);
+void embc_dl_register_lock(struct embc_dl_s * self, embc_dl_lock lock, embc_dl_unlock unlock, void * user_data);
 
 
 #ifdef __cplusplus

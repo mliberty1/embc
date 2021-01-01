@@ -16,7 +16,7 @@
 
 #define EMBC_LOG_LEVEL EMBC_LOG_LEVEL_DEBUG1
 
-#include "uart.h"
+#include "embc/host/uart.h"
 #include "embc/cdef.h"
 #include "embc/ec.h"
 #include "embc/log.h"
@@ -362,23 +362,6 @@ void uart_handles(struct uart_s *self, uint32_t * handle_count, void ** handles)
 void uart_process(struct uart_s *self) {
     process_read(self);
     process_write(self);
-}
-
-uint32_t uart_time_get_ms(struct uart_s *self) {
-    (void) self;
-    //SYSTEMTIME time;
-    //GetSystemTime(&time);
-    //return (time.wSecond * 1000) + time.wMilliseconds;
-
-    // https://docs.microsoft.com/en-us/windows/win32/sysinfo/acquiring-high-resolution-time-stamps
-    LARGE_INTEGER counter;
-    LARGE_INTEGER frequency;
-
-    QueryPerformanceFrequency(&frequency);
-    QueryPerformanceCounter(&counter);
-    counter.QuadPart *= 1000;
-    counter.QuadPart /= frequency.QuadPart;
-    return (uint32_t) counter.QuadPart;
 }
 
 int32_t uart_status_get(struct uart_s *self, struct uart_status_s * stats) {

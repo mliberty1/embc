@@ -62,8 +62,6 @@ uint32_t uart_send_available(struct uart_s *self);
 
 void uart_process(struct uart_s *self);
 
-uint32_t uart_time_get_ms(struct uart_s *self);
-
 void uart_handles(struct uart_s *self, uint32_t * handle_count, void ** handles);
 
 int32_t uart_status_get(struct uart_s *self, struct uart_status_s * stats);

@@ -49,6 +49,15 @@ set(SOURCES
         ${PLATFORM_SRC}
 )
 
+set(SOURCES_HOST
+        host/win/platform.c
+        host/win/uart.c
+        host/win/uart_data_link.c)
+
+if (${EMBC_TOPLEVEL})
+    set(SOURCES ${SOURCES} ${SOURCES_HOST})
+endif()
+
 foreach(f IN LISTS SOURCES)
     SET_FILENAME("${f}")
 endforeach()

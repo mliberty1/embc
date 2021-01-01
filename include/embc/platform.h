@@ -176,6 +176,14 @@ static inline void * embc_alloc_clr(embc_size_t size_bytes) {
  */
 EMBC_API void embc_free(void * ptr);
 
+/**
+ * @brief Get the platform time in milliseconds.
+ *
+ * @return The monotonic platform time in milliseconds.  This
+ *      time value rolls over every 49.7 days.
+ */
+EMBC_API uint32_t embc_time_get_ms();
+
 #if defined(EMBC_PLATFORM_STDLIB)
 #include "embc/platform/stdlib.h"
 #elif defined(EMBC_PLATFORM_ARM)

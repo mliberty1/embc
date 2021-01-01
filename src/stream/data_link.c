@@ -87,6 +87,7 @@ struct embc_dl_s {
 
     embc_dl_lock lock;
     embc_dl_unlock unlock;
+    void * lock_user_data;
 
     struct embc_framer_s rx_framer;
     struct embc_dl_rx_status_s rx_status;
@@ -102,20 +103,20 @@ static void unlock_default() {
 int32_t embc_dl_send(struct embc_dl_s * self,
                      uint32_t metadata,
                      uint8_t const *msg, uint32_t msg_size) {
-    self->lock();
+    self->lock(self->lock_user_data);
     uint16_t frame_id = self->tx_frame_next_id;
     uint16_t idx = frame_id & (self->tx_frame_count - 1);
     struct tx_frame_s * f = &self->tx_frames[idx];
 
     if (embc_framer_frame_id_subtract(frame_id, self->tx_frame_last_id) >= self->tx_frame_count) {
         EMBC_LOGW("embc_dl_send(0x%02" PRIx32 ") too many frames outstanding", metadata);
-        self->unlock();
+        self->unlock(self->lock_user_data);
         return EMBC_ERROR_NOT_ENOUGH_MEMORY;
     }
 
     if (!embc_framer_validate_data(frame_id, metadata, msg_size)) {
         EMBC_LOGW("embc_framer_send invalid parameters");
-        self->unlock();
+        self->unlock(self->lock_user_data);
         return EMBC_ERROR_PARAMETER_INVALID;
     }
 
@@ -123,7 +124,7 @@ int32_t embc_dl_send(struct embc_dl_s * self,
     uint8_t * b = embc_mrb_alloc(&self->tx_buf, frame_sz);
     if (!b) {
         EMBC_LOGW("embc_dl_send(0x%06" PRIx32 ") out of buffer space", metadata);
-        self->unlock();
+        self->unlock(self->lock_user_data);
         return EMBC_ERROR_NOT_ENOUGH_MEMORY;
     }
     int32_t rv = embc_framer_construct_data(b, frame_id, metadata, msg, msg_size);
@@ -139,7 +140,7 @@ int32_t embc_dl_send(struct embc_dl_s * self,
     self->tx_status.bytes += frame_sz;
     self->tx_frame_next_id = (frame_id + 1) & EMBC_FRAMER_FRAME_ID_MAX;
     // frame queued for send_data()
-    self->unlock();
+    self->unlock(self->lock_user_data);
     return 0;
 }
 
@@ -496,11 +497,11 @@ static void tx_transmit(struct embc_dl_s * self) {
 }
 
 void embc_dl_process(struct embc_dl_s * self) {
-    self->lock();
+    self->lock(self->lock_user_data);
     send_link_pending(self);
     tx_timeout(self);
     tx_transmit(self);
-    self->unlock();
+    self->unlock(self->lock_user_data);
 }
 
 static uint32_t to_power_of_two(uint32_t v) {
@@ -601,14 +602,14 @@ struct embc_dl_s * embc_dl_initialize(
 }
 
 void embc_dl_register_upper_layer(struct embc_dl_s * self, struct embc_dl_api_s const * ul) {
-    self->lock();
+    self->lock(self->lock_user_data);
     self->ul_instance = *ul;
-    self->unlock();
+    self->unlock(self->lock_user_data);
 }
 
 void embc_dl_reset(struct embc_dl_s * self) {
     EMBC_LOGI("reset");
-    self->lock();
+    self->lock(self->lock_user_data);
     self->tx_frame_last_id = 0;
     self->tx_frame_next_id = 0;
     self->rx_next_frame_id = 0;
@@ -627,16 +628,16 @@ void embc_dl_reset(struct embc_dl_s * self) {
     embc_framer_reset(&self->rx_framer);
     embc_memset(&self->rx_status, 0, sizeof(self->rx_status));
     embc_memset(&self->tx_status, 0, sizeof(self->tx_status));
-    self->unlock();
+    self->unlock(self->lock_user_data);
 }
 
 int32_t embc_dl_finalize(struct embc_dl_s * self) {
     EMBC_LOGI("finalize");
     if (self) {
         embc_dl_unlock unlock = self->unlock;
-        self->lock();
+        self->lock(self->lock_user_data);
         embc_free(self);
-        unlock();
+        unlock(self->lock_user_data);
     }
     return 0;
 }
@@ -647,16 +648,17 @@ int32_t embc_dl_status_get(
     if (!status) {
         return EMBC_ERROR_PARAMETER_INVALID;
     }
-    self->lock();
+    self->lock(self->lock_user_data);
     status->version = 1;
     status->rx = self->rx_status;
     status->rx_framer = self->rx_framer.status;
     status->tx = self->tx_status;
-    self->unlock();
+    self->unlock(self->lock_user_data);
     return 0;
 }
 
-void embc_dl_register_lock(struct embc_dl_s * self, embc_dl_lock lock, embc_dl_unlock unlock) {
+void embc_dl_register_lock(struct embc_dl_s * self, embc_dl_lock lock, embc_dl_unlock unlock, void * user_data) {
     self->lock = lock ? lock : lock_default;
     self->unlock = unlock ? unlock : unlock_default;
+    self->lock_user_data = user_data;
 }
