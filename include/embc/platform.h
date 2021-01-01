@@ -111,7 +111,6 @@ static inline void embc_memset(void * ptr, int value, embc_size_t num);
  */
 static inline void embc_memcpy(void * destination, void const * source, embc_size_t num);
 
-
 /**
  * @brief The function type used by EMBC to allocate memory.
  *
@@ -180,7 +179,8 @@ EMBC_API void embc_free(void * ptr);
  * @brief Get the platform time in milliseconds.
  *
  * @return The monotonic platform time in milliseconds.  This
- *      time value rolls over every 49.7 days.
+ *      time value rolls over every 49.7 days.  The platform time has
+ *      no guaranteed relationship with calendar time.
  */
 EMBC_API uint32_t embc_time_get_ms();
 
