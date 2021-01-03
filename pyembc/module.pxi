@@ -40,21 +40,22 @@ cdef extern from "stdarg.h":
         pass
     ctypedef struct fake_type:
         pass
-    void va_start(va_list, void* arg)
-    void* va_arg(va_list, fake_type)
-    void va_end(va_list)
+    void va_start(va_list, void* arg) nogil
+    void* va_arg(va_list, fake_type) nogil
+    void va_end(va_list) nogil
     fake_type int_type "int"
 
 cdef extern from "stdio.h":
-    int vsnprintf (char * s, size_t n, const char * format, va_list arg )
+    int vsnprintf (char * s, size_t n, const char * format, va_list arg ) nogil
 
 cdef extern from "embc/platform.h":
-    void embc_fatal(const char * file, int line, const char * msg)
+    void embc_fatal(const char * file, int line, const char * msg) nogil
 
 cdef extern from "embc/log.h":
-    ctypedef void(*embc_log_printf)(const char * format, ...)
+    ctypedef void(*embc_log_printf)(const char * format, ...) nogil
     int embc_log_initialize(embc_log_printf handler)
 
+# https://cython.readthedocs.io/en/latest/src/userguide/external_C_code.html#acquiring-and-releasing-the-gil
 cdef void _log_print(const char * s) with gil:
     msg = s.decode('utf-8')
     lvl = LOG_LEVEL_MAP[msg[0]]
@@ -67,7 +68,7 @@ cdef void _log_print(const char * s) with gil:
         record = log.makeRecord(src_file, lvl, src_file, int(src_line), msg, [], None, None, None, None)
         log.handle(record)
 
-cdef void log_printf(const char *fmt, ...):
+cdef void log_printf(const char *fmt, ...) nogil:
     cdef va_list args
     cdef char[256] s
     va_start(args, <void*> fmt)
@@ -80,19 +81,19 @@ embc_log_initialize(log_printf)
 
 
 cdef extern from "embc/platform.h":
-    void embc_fatal(const char * file, int line, const char * msg)
+    void embc_fatal(const char * file, int line, const char * msg) nogil
     ctypedef intptr_t embc_size_t
-    void * embc_alloc(embc_size_t size_bytes)
-    void embc_free(void * ptr)
+    void * embc_alloc(embc_size_t size_bytes) nogil
+    void embc_free(void * ptr) nogil
 
 cdef void _embc_fatal(const char * file, int line, const char * msg) with gil:
     raise RuntimeError(f'embc_fatal({file}, {line}, {msg}')
 
-cdef void embc_fatal(const char * file, int line, const char * msg):
+cdef void embc_fatal(const char * file, int line, const char * msg) nogil:
     _embc_fatal(file, line, msg)
 
-cdef void * embc_alloc(embc_size_t size_bytes):
+cdef void * embc_alloc(embc_size_t size_bytes) nogil:
     return malloc(size_bytes)
 
-cdef void embc_free(void * ptr):
+cdef void embc_free(void * ptr) nogil:
     free(ptr)

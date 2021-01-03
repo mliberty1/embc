@@ -80,4 +80,5 @@ def on_cmd(args):
         print('Data streaming failed')
         return 1
     finally:
+        print('closing')
         h.udl.close()

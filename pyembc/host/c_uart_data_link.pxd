@@ -55,10 +55,10 @@ cdef extern from "embc/stream/data_link.h":
         EMBC_DL_EV_INTERNAL_ERROR
 
     struct embc_dl_api_s:
-        void *user_data;
-        void (*event_fn)(void *user_data, embc_dl_event_e event);
+        void *user_data
+        void (*event_fn)(void *user_data, embc_dl_event_e event) nogil
         void (*recv_fn)(void *user_data, uint32_t metadata,
-                        uint8_t *msg, uint32_t msg_size);
+                        uint8_t *msg, uint32_t msg_size) nogil
 
 
 cdef extern from "embc/host/uart_data_link.h":
@@ -66,20 +66,20 @@ cdef extern from "embc/host/uart_data_link.h":
     embc_udl_s * embc_udl_initialize(const embc_dl_config_s * config,
                                      const char * uart_device,
                                      uint32_t baudrate)
-    ctypedef void (*embc_udl_process_fn)(void * user_data)
+    ctypedef void (*embc_udl_process_fn)(void * user_data) nogil
     int32_t embc_udl_start(embc_udl_s * self,
                            const embc_dl_api_s * ul,
                            embc_udl_process_fn process_fn,
-                           void * process_user_data);
+                           void * process_user_data)
 
     int32_t embc_udl_send(embc_udl_s * self, uint32_t metadata,
-                         const uint8_t *msg, uint32_t msg_size);
-    void embc_udl_reset(embc_udl_s * self);
+                         const uint8_t *msg, uint32_t msg_size)
+    void embc_udl_reset(embc_udl_s * self)
 
-    int32_t embc_udl_finalize(embc_udl_s * self);
+    int32_t embc_udl_finalize(embc_udl_s * self)
 
     int32_t embc_udl_status_get(
             embc_udl_s * self,
-            embc_dl_status_s * status);
+            embc_dl_status_s * status)
 
-    uint32_t embc_udl_send_available(embc_udl_s * self);
+    uint32_t embc_udl_send_available(embc_udl_s * self)
