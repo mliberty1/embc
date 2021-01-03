@@ -94,10 +94,12 @@ struct embc_dl_s {
     struct embc_dl_tx_status_s tx_status;
 };
 
-static void lock_default() {
+static void lock_default(void * user_data) {
+    (void) user_data;
 }
 
-static void unlock_default() {
+static void unlock_default(void * user_data) {
+    (void) user_data;
 }
 
 int32_t embc_dl_send(struct embc_dl_s * self,

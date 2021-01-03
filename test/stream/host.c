@@ -55,7 +55,7 @@ struct host_s {
     // struct embc_transport_s transport;
     int host_type;
     uint32_t metadata;
-    struct embc_udl_s * dl;
+    struct embc_udl_s * udl;
     struct embc_list_s msg_free;
     struct embc_list_s msg_expect;
     struct embc_list_s msg_write;
@@ -121,7 +121,7 @@ static void on_recv(void *user_data, uint32_t metadata,
             break;
 
         case HOST_TYPE_REPEATER:
-            rv = embc_udl_send(host->dl, metadata, msg, msg_size);
+            rv = embc_udl_send(host->udl, metadata, msg, msg_size);
             EMBC_ASSERT(0 == rv);
             break;
 
@@ -155,7 +155,7 @@ static void generate_and_send(struct host_s * host) {
     for (uint16_t idx = 0; idx < msg->msg_size; ++idx) {
         msg->msg_buf[idx] = rand() & 0xff;
     }
-    int32_t rv = embc_udl_send(host->dl, msg->metadata, msg->msg_buf, msg->msg_size);
+    int32_t rv = embc_udl_send(host->udl, msg->metadata, msg->msg_buf, msg->msg_size);
     if (rv) {
         EMBC_LOGE("embc_dl_send error %d: %s", (int) rv, embc_error_code_description(rv));
         embc_list_add_tail(&host->msg_free, &msg->item);
@@ -172,7 +172,7 @@ static void on_process(void * user_data) {
 
     switch (h_.host_type) {
         case HOST_TYPE_CONTROLLER:
-            if ((embc_udl_send_available(h_.dl) >= EMBC_FRAMER_MAX_SIZE) &&
+            if ((embc_udl_send_available(h_.udl) >= EMBC_FRAMER_MAX_SIZE) &&
                 (embc_list_length(&h_.msg_expect) < (int32_t) self->tx_window_size) ) {
                 generate_and_send(&h_);
             }
@@ -185,12 +185,12 @@ static void on_process(void * user_data) {
 
     uint32_t time_ms = embc_time_get_ms();
     if ((time_ms - self->time_last_ms) >= 1000) {
-        embc_udl_status_get(h_.dl, &dl_status);
-                EMBC_LOGI("retry=%lu, resync=%lu, tx=%d, rx=%d",
-                          (unsigned long int) dl_status.tx.retransmissions,
-                          (unsigned long int) dl_status.rx_framer.resync,
-                          (int) (dl_status.tx.msg_bytes - self->dl_status.tx.msg_bytes),
-                          (int) (dl_status.rx.msg_bytes - self->dl_status.rx.msg_bytes));
+        embc_udl_status_get(h_.udl, &dl_status);
+        EMBC_LOGI("retry=%lu, resync=%lu, tx=%d, rx=%d",
+                  (unsigned long int) dl_status.tx.retransmissions,
+                  (unsigned long int) dl_status.rx_framer.resync,
+                  (int) (dl_status.tx.msg_bytes - self->dl_status.tx.msg_bytes),
+                  (int) (dl_status.rx.msg_bytes - self->dl_status.rx.msg_bytes));
         self->dl_status = dl_status;
         self->time_last_ms = time_ms;
     }
@@ -266,14 +266,14 @@ int main(int argc, char * argv[]) {
     embc_list_initialize(&h_.msg_read);
     h_.tx_window_size = config.tx_window_size;
 
-    h_.dl = embc_udl_initialize(&config, port_name, 3000000);
-    EMBC_ASSERT_ALLOC(h_.dl);
-    EMBC_ASSERT(0 == embc_udl_start(h_.dl, &ul, on_process, &h_));
+    h_.udl = embc_udl_initialize(&config, port_name, 3000000);
+    EMBC_ASSERT_ALLOC(h_.udl);
+    EMBC_ASSERT(0 == embc_udl_start(h_.udl, &ul, on_process, &h_));
 
     h_.time_last_ms = embc_time_get_ms();
-    embc_udl_status_get(h_.dl, &h_.dl_status);
+    embc_udl_status_get(h_.udl, &h_.dl_status);
 
     WaitForSingleObject(h_.ctrl_event, INFINITE);
-    embc_udl_finalize(h_.dl);
+    embc_udl_finalize(h_.udl);
     return 0;
 }

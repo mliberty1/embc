@@ -15,6 +15,7 @@ py/embc/libembc.dll
 
 pyembc/crc.c
 pyembc/stream.framer.c
+pyembc/host/uart_data_link.c
 
 # Compiled Object files
 *.slo

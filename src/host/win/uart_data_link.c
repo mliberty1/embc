@@ -79,6 +79,7 @@ struct embc_udl_s * embc_udl_initialize(struct embc_dl_config_s const * config,
         return NULL;
     }
 
+    EMBC_LOGI("embc_udl_initialize(%s, %d)", uart_device, (int) baudrate);
     snprintf(dev_str, sizeof(dev_str), "\\\\.\\%s", uart_device);
 
     struct embc_dl_ll_s ll = {

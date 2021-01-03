@@ -55,11 +55,15 @@ with open(VERSION_PATH, 'r', encoding='utf-8') as f:
 C_INCS = [C_INC_PATH, C_INC2_PATH, np.get_include()]
 ext = '.pyx' if USE_CYTHON else '.c'
 extensions = [
-    setuptools.Extension('pyembc.stream.framer',
+    setuptools.Extension('pyembc.host.uart_data_link',
         sources=[
-            'pyembc/stream/framer' + ext,
+            'pyembc/host/uart_data_link' + ext,
+            'src/host/win/platform.c',
+            'src/host/win/uart.c',
+            'src/host/win/uart_data_link.c',
             'src/stream/framer.c',
-            'src/stream/framer_rx.c',
+            'src/stream/data_link.c',
+            'src/stream/msg_ring_buffer.c',
             'src/crc.c',
             'src/log.c',
         ],

@@ -13,9 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from . import crc, framer_tester
+from . import crc, framer_tester, uart_data_link
 
-__all__ = [crc, framer_tester]
+__all__ = [crc, framer_tester, uart_data_link]
 """This list of available command modules.  Each module must contain a 
 parser_config(subparser) function.  The function must return the callable(args)
 that will be executed for the command."""

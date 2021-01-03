@@ -34,7 +34,7 @@ struct stream_tester_s;
 
 struct host_s {
     char name;
-    struct embc_dl_s * dl;
+    struct embc_dl_s * udl;
     struct embc_list_s recv_expect;
     struct embc_list_s send_queue;
     struct stream_tester_s * stream_tester;
@@ -76,8 +76,8 @@ static inline uint16_t rand_u15() {
 void embc_fatal(char const * file, int line, char const * msg) {
     struct embc_dl_status_s a_status;
     struct embc_dl_status_s b_status;
-    embc_dl_status_get(s_.a.dl, &a_status);
-    embc_dl_status_get(s_.b.dl, &b_status);
+    embc_dl_status_get(s_.a.udl, &a_status);
+    embc_dl_status_get(s_.b.udl, &b_status);
     printf("FATAL: %s:%d: %s\n", file, line, msg);
     fflush(stdout);
     exit(1);
@@ -163,8 +163,8 @@ static void host_initialize(struct host_s *host, struct stream_tester_s * parent
             .send_available = ll_send_available,
     };
 
-    host->dl = embc_dl_initialize(config, &ll);
-    EMBC_ASSERT_ALLOC(host->dl);
+    host->udl = embc_dl_initialize(config, &ll);
+    EMBC_ASSERT_ALLOC(host->udl);
     embc_list_initialize(&host->recv_expect);
     embc_list_initialize(&host->send_queue);
 
@@ -173,7 +173,7 @@ static void host_initialize(struct host_s *host, struct stream_tester_s * parent
             .event_fn = on_event,
             .recv_fn = on_recv,
     };
-    embc_dl_register_upper_layer(host->dl, &ul);
+    embc_dl_register_upper_layer(host->udl, &ul);
 }
 
 static void send(struct host_s *host) {
@@ -184,7 +184,7 @@ static void send(struct host_s *host) {
     for (uint16_t idx = 0; idx < msg->msg_size; ++idx) {
         msg->msg_buffer[idx] = rand() & 0xff;
     }
-    int32_t rv = embc_dl_send(host->dl, msg->metadata, msg->msg_buffer, msg->msg_size);
+    int32_t rv = embc_dl_send(host->udl, msg->metadata, msg->msg_buffer, msg->msg_size);
     if (rv) {
         EMBC_LOGE("embc_dl_send error %d: %s", (int) rv, embc_error_code_description(rv));
     } else {
@@ -276,7 +276,7 @@ static void process_host(struct host_s * host) {
         }
     }
 
-    embc_dl_ll_recv(host->target->dl, msg->msg_buffer, msg->msg_size);
+    embc_dl_ll_recv(host->target->udl, msg->msg_buffer, msg->msg_size);
     embc_list_add_tail(&host->stream_tester->msg_free, &msg->item);
 }
 
@@ -299,8 +299,8 @@ static void process(struct stream_tester_s * self) {
         } else {
             process_host(&self->b);
         }
-        embc_dl_process(self->a.dl);
-        embc_dl_process(self->b.dl);
+        embc_dl_process(self->a.udl);
+        embc_dl_process(self->b.udl);
     }
 }
 

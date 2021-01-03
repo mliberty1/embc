@@ -55,12 +55,7 @@ cdef extern from "embc/log.h":
     ctypedef void(*embc_log_printf)(const char * format, ...)
     int embc_log_initialize(embc_log_printf handler)
 
-cdef void log_printf(const char *fmt, ...):
-    cdef va_list args
-    cdef char[256] s
-    va_start(args, <void*> fmt)
-    vsnprintf(&s[0], 256, fmt, args)  # http://www.cplusplus.com/reference/cstdio/vsnprintf/
-    va_end(args)
+cdef void _log_print(const char * s) with gil:
     msg = s.decode('utf-8')
     lvl = LOG_LEVEL_MAP[msg[0]]
     msg = msg[2:]
@@ -72,6 +67,15 @@ cdef void log_printf(const char *fmt, ...):
         record = log.makeRecord(src_file, lvl, src_file, int(src_line), msg, [], None, None, None, None)
         log.handle(record)
 
+cdef void log_printf(const char *fmt, ...):
+    cdef va_list args
+    cdef char[256] s
+    va_start(args, <void*> fmt)
+    vsnprintf(&s[0], 256, fmt, args)  # http://www.cplusplus.com/reference/cstdio/vsnprintf/
+    va_end(args)
+    _log_print(s)
+
+
 embc_log_initialize(log_printf)
 
 
@@ -81,8 +85,11 @@ cdef extern from "embc/platform.h":
     void * embc_alloc(embc_size_t size_bytes)
     void embc_free(void * ptr)
 
-cdef void embc_fatal(const char * file, int line, const char * msg):
+cdef void _embc_fatal(const char * file, int line, const char * msg) with gil:
     raise RuntimeError(f'embc_fatal({file}, {line}, {msg}')
+
+cdef void embc_fatal(const char * file, int line, const char * msg):
+    _embc_fatal(file, line, msg)
 
 cdef void * embc_alloc(embc_size_t size_bytes):
     return malloc(size_bytes)
