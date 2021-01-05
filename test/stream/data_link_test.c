@@ -48,8 +48,6 @@ static uint8_t PAYLOAD_MAX[] = {
 struct test_s {
     struct embc_dl_s * dl;
     uint32_t send_available;
-    struct embc_rbu64_s link_buf;
-    uint64_t link_buffer_[64];
     uint32_t time_ms;
 };
 
@@ -60,11 +58,13 @@ static uint32_t ll_time_get_ms(void * user_data) {
 
 static void ll_send(void * user_data, uint8_t const * buffer, uint32_t buffer_size) {
     struct test_s * self = (struct test_s *) user_data;
+    (void) self;
     if (buffer[2] & 0xE0) {
         while (buffer_size) {
-            uint64_t u64 = 0;
-            assert_true(embc_rbu64_pop(&self->link_buf, &u64));
-            assert_memory_equal(buffer, (uint8_t *) &u64, EMBC_FRAMER_LINK_SIZE);
+            uint8_t event = (buffer[2] >> 5) & 0x7;
+            uint16_t frame_id = (((uint16_t) (buffer[2] & 0x7)) << 8) | buffer[3];
+            check_expected(event);
+            check_expected(frame_id);
             buffer += EMBC_FRAMER_LINK_SIZE;
             buffer_size -= EMBC_FRAMER_LINK_SIZE;
         }
@@ -84,6 +84,8 @@ static void on_event(void *user_data, enum embc_dl_event_e event) {
     (void) self;
     check_expected(event);
 }
+
+#define expect_event(expected_event)  expect_value(on_event, event, (expected_event))
 
 static void on_recv(void *user_data, uint32_t metadata, uint8_t *msg_buffer, uint32_t msg_size) {
     struct test_s * self = (struct test_s *) user_data;
@@ -128,8 +130,6 @@ static int setup(void ** state) {
     self->dl = embc_dl_initialize(&config, &ll);
     assert_non_null(self->dl);
     embc_dl_register_upper_layer(self->dl, &ul);
-
-    embc_rbu64_init(&self->link_buf, self->link_buffer_, sizeof(self->link_buffer_) / sizeof(uint64_t));
 
     *state = self;
     return 0;
@@ -177,9 +177,11 @@ static void send_and_expect(struct test_s *self,
 }
 
 static void expect_send_link(struct test_s *self, enum embc_framer_type_e frame_type, uint16_t frame_id) {
+    (void) self;
     uint64_t u64 = 0;
     assert_int_equal(0, embc_framer_construct_link((uint8_t *) &u64, frame_type, frame_id));
-    assert_true(embc_rbu64_push(&self->link_buf, u64));
+    expect_value(ll_send, event, frame_type);
+    expect_value(ll_send, frame_id, frame_id);
 }
 
 static void recv_link(struct test_s *self, enum embc_framer_type_e frame_type, uint16_t frame_id) {
@@ -196,10 +198,19 @@ static void recv_data(struct test_s *self, uint16_t frame_id, uint16_t metadata,
     embc_dl_ll_recv(self->dl, b, frame_sz);
 }
 
+static void connect(struct test_s *self) {
+    expect_send_link(self, EMBC_FRAMER_FT_RESET, 0);
+    embc_dl_process(self->dl);
+    expect_event(EMBC_DL_EV_CONNECTION_ESTABLISHED);
+    recv_link(self, EMBC_FRAMER_FT_RESET, 1);
+    embc_dl_status_clear(self->dl);
+}
+
 static void test_send_data_with_ack(void ** state) {
     struct test_s *self = (struct test_s *) *state;
     struct embc_dl_status_s status;
 
+    connect(self);
     send_and_expect(self, 0, 1, PAYLOAD1, sizeof(PAYLOAD1));
     embc_dl_process(self->dl);
 
@@ -217,6 +228,7 @@ static void test_send_nack_resend_ack(void ** state) {
     struct test_s *self = (struct test_s *) *state;
     struct embc_dl_status_s status;
 
+    connect(self);
     send_and_expect(self, 0, 1, PAYLOAD1, sizeof(PAYLOAD1));
     embc_dl_process(self->dl);
 
@@ -236,6 +248,7 @@ static void test_send_data_timeout_then_ack(void ** state) {
     struct test_s *self = (struct test_s *) *state;
     struct embc_dl_status_s status;
 
+    connect(self);
     self->time_ms = 5;
     send_and_expect(self, 0, 1, PAYLOAD1, sizeof(PAYLOAD1));
     embc_dl_process(self->dl);
@@ -256,6 +269,7 @@ static void test_send_multiple_with_buffer_wrap(void ** state) {
     struct embc_dl_status_s status;
     uint32_t count = (1 << 16) / sizeof(PAYLOAD_MAX);
 
+    connect(self);
     for (uint32_t i = 0; i < count; ++i) {
         send_and_expect(self, i, i + 1, PAYLOAD_MAX, sizeof(PAYLOAD_MAX));
         embc_dl_process(self->dl);
@@ -272,6 +286,7 @@ static void test_recv_and_ack(void ** state) {
     struct test_s *self = (struct test_s *) *state;
     struct embc_dl_status_s status;
 
+    connect(self);
     expect_recv(1, PAYLOAD1, sizeof(PAYLOAD1));
     recv_data(self, 0, 1, PAYLOAD1, sizeof(PAYLOAD1));
 
@@ -289,6 +304,7 @@ static void test_recv_multiple_all_acks(void ** state) {
     struct embc_dl_status_s status;
     uint32_t count = (1 << 16) / sizeof(PAYLOAD_MAX);
 
+    connect(self);
     for (uint32_t i = 0; i < count; ++i) {
         printf("iteration %d\n", i);
         expect_recv(1, PAYLOAD_MAX, sizeof(PAYLOAD_MAX));
@@ -306,6 +322,7 @@ static void test_recv_multiple_all_acks(void ** state) {
 static void test_recv_out_of_order(void ** state) {
     struct test_s *self = (struct test_s *) *state;
 
+    connect(self);
     expect_recv(0x11, PAYLOAD_MAX, sizeof(PAYLOAD_MAX));
     recv_data(self, 0, 0x11, PAYLOAD_MAX, sizeof(PAYLOAD_MAX));
     expect_send_link(self, EMBC_FRAMER_FT_ACK_ALL, 0);
@@ -324,6 +341,24 @@ static void test_recv_out_of_order(void ** state) {
     embc_dl_process(self->dl);
 }
 
+static void test_reset_retry(void ** state) {
+    struct test_s *self = (struct test_s *) *state;
+
+    expect_send_link(self, EMBC_FRAMER_FT_RESET, 0);
+    embc_dl_process(self->dl);
+    self->time_ms += 1;
+    embc_dl_process(self->dl);
+    self->time_ms += 999;
+    expect_send_link(self, EMBC_FRAMER_FT_RESET, 0);
+    embc_dl_process(self->dl);
+
+    self->time_ms += 1000;
+    expect_event(EMBC_DL_EV_CONNECTION_ESTABLISHED);
+    recv_link(self, EMBC_FRAMER_FT_RESET, 1);
+
+    embc_dl_process(self->dl);
+}
+
 int main(void) {
     hal_test_initialize();
     const struct CMUnitTest tests[] = {
@@ -335,7 +370,7 @@ int main(void) {
             cmocka_unit_test_setup_teardown(test_recv_and_ack, setup, teardown),
             cmocka_unit_test_setup_teardown(test_recv_multiple_all_acks, setup, teardown),
             cmocka_unit_test_setup_teardown(test_recv_out_of_order, setup, teardown),
-            //cmocka_unit_test_setup_teardown(, setup, teardown),
+            cmocka_unit_test_setup_teardown(test_reset_retry, setup, teardown),
             //cmocka_unit_test_setup_teardown(, setup, teardown),
     };
 

@@ -46,12 +46,11 @@ cdef extern from "embc/stream/data_link.h":
         embc_dl_rx_status_s rx
         embc_framer_status_s rx_framer
         embc_dl_tx_status_s tx
-        uint64_t send_buffers_free
 
     enum embc_dl_event_e:
         EMBC_DL_EV_UNKNOWN
-        EMBC_DL_EV_REMOTE_RESET
-        EMBC_DL_EV_REMOTE_UNRESPONSIVE
+        EMBC_DL_EV_RECEIVED_RESET
+        EMBC_DL_EV_CONNECTION_LOST
         EMBC_DL_EV_INTERNAL_ERROR
 
     struct embc_dl_api_s:

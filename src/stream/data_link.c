@@ -37,6 +37,13 @@
 #include "embc/platform.h"
 #include <inttypes.h>
 
+#define SEND_COUNT_MAX (25)
+
+
+enum tx_state_e {
+    TX_ST_DISCONNECTED,
+    TX_ST_CONNECTED,
+};
 
 enum tx_frame_state_e {
     TX_FRAME_ST_IDLE,
@@ -85,6 +92,9 @@ struct embc_dl_s {
     struct rx_frame_s * rx_frames;
     uint16_t rx_frame_count;
 
+    enum tx_state_e tx_state;
+    uint32_t tx_reset_last_ms;
+
     embc_dl_lock lock;
     embc_dl_unlock unlock;
     void * lock_user_data;
@@ -93,6 +103,8 @@ struct embc_dl_s {
     struct embc_dl_rx_status_s rx_status;
     struct embc_dl_tx_status_s tx_status;
 };
+
+static void tx_reset(struct embc_dl_s * self);
 
 static void lock_default(void * user_data) {
     (void) user_data;
@@ -105,6 +117,10 @@ static void unlock_default(void * user_data) {
 int32_t embc_dl_send(struct embc_dl_s * self,
                      uint32_t metadata,
                      uint8_t const *msg, uint32_t msg_size) {
+    if (self->tx_state != TX_ST_CONNECTED) {
+        return EMBC_ERROR_UNAVAILABLE;
+    }
+
     self->lock(self->lock_user_data);
     uint16_t frame_id = self->tx_frame_next_id;
     uint16_t idx = frame_id & (self->tx_frame_count - 1);
@@ -154,6 +170,12 @@ static uint16_t tx_buf_frame_id(struct tx_frame_s * f) {
     return (((uint16_t) f->buf[2] & 0x7) << 8) | f->buf[4];
 }
 
+static inline void event_emit(struct embc_dl_s * self, enum embc_dl_event_e event) {
+    if (self->ul_instance.event_fn) {
+        self->ul_instance.event_fn(self->ul_instance.user_data, event);
+    }
+}
+
 static void send_data(struct embc_dl_s * self, uint16_t frame_id) {
     uint16_t idx = frame_id & (self->tx_frame_count - 1);
     struct tx_frame_s * f = &self->tx_frames[idx];
@@ -177,11 +199,10 @@ static void send_data(struct embc_dl_s * self, uint16_t frame_id) {
         ++self->tx_status.retransmissions;
     }
     f->send_count += 1;
-    if (f->send_count > 25) {
+    if (f->send_count > SEND_COUNT_MAX) {
         EMBC_LOGE("send_data(%d), count=%d", (int) frame_id, (int) f->send_count);
-        if (self->ul_instance.event_fn) {
-            self->ul_instance.event_fn(self->ul_instance.user_data, EMBC_DL_EV_REMOTE_UNRESPONSIVE);
-        }
+        tx_reset(self);
+        event_emit(self, EMBC_DL_EV_CONNECTION_LOST);
     } else {
         EMBC_LOGD3("send_data(%d) buf->%d, count=%d, last=%d, next=%d",
                    (int) frame_id, (int) tx_buf_frame_id(f), (int) f->send_count,
@@ -233,6 +254,38 @@ static void send_link(struct embc_dl_s * self, enum embc_framer_type_e frame_typ
         return;
     } else if (!embc_rbu64_push(&self->tx_link_buf, b)) {
         EMBC_LOG_WARN("link buffer full");
+    }
+}
+
+static inline uint32_t reset_timeout_duration_ms(struct embc_dl_s * self) {
+    return self->tx_timeout_ms * 16;
+}
+
+static void send_reset_request(struct embc_dl_s * self) {
+    self->tx_state = TX_ST_DISCONNECTED;
+    uint32_t time_ms = self->ll_instance.time_get_ms(self->ll_instance.user_data);
+    self->tx_reset_last_ms = time_ms;
+    send_link(self, EMBC_FRAMER_FT_RESET, 0);
+}
+
+static void tx_reset(struct embc_dl_s * self) {
+    EMBC_LOGI("tx_reset");
+    self->tx_frame_last_id = 0;
+    self->tx_frame_next_id = 0;
+    embc_mrb_clear(&self->tx_buf);
+    embc_rbu64_clear(&self->tx_link_buf);
+    for (uint16_t f = 0; f < self->tx_frame_count; ++f) {
+        self->tx_frames[f].state = TX_FRAME_ST_IDLE;
+    }
+    send_reset_request(self);
+}
+
+static void rx_reset(struct embc_dl_s * self) {
+    EMBC_LOGI("rx_reset");
+    self->rx_next_frame_id = 0;
+    self->rx_max_frame_id = 0;
+    for (uint16_t f = 0; f < self->rx_frame_count; ++f) {
+        self->rx_frames[f].state = RX_FRAME_ST_IDLE;
     }
 }
 
@@ -417,11 +470,24 @@ static void handle_nack_framing_error(struct embc_dl_s * self, uint16_t frame_id
 }
 
 static void handle_reset(struct embc_dl_s * self, uint16_t frame_id) {
-    (void) self;
-    (void) frame_id;
-    EMBC_LOGI("received remote host reset");
-    if (self->ul_instance.event_fn) {
-        self->ul_instance.event_fn(self->ul_instance.user_data, EMBC_DL_EV_REMOTE_RESET);
+    EMBC_LOGI("received reset %d from remote host", (int) frame_id);
+    switch (frame_id) {
+        case 0:  // reset request
+            rx_reset(self);
+            send_link(self, EMBC_FRAMER_FT_RESET, 1);
+            event_emit(self, EMBC_DL_EV_RECEIVED_RESET);
+            break;
+        case 1:  // reset response
+            if (self->tx_state == TX_ST_DISCONNECTED) {
+                self->tx_state = TX_ST_CONNECTED;
+                event_emit(self, EMBC_DL_EV_CONNECTION_ESTABLISHED);
+            } else {
+                EMBC_LOGW("ignore reset rsp since already connected");
+            }
+            break;
+        default:
+            EMBC_LOGW("unsupported reset %d", (int) frame_id);
+            break;
     }
 }
 
@@ -451,22 +517,42 @@ uint32_t embc_dl_service_interval_ms(struct embc_dl_s * self) {
     uint32_t rv = 0xffffffffU;
     int32_t frame_count = embc_framer_frame_id_subtract(self->tx_frame_next_id, self->tx_frame_last_id);
     uint32_t now = self->ll_instance.time_get_ms(self->ll_instance.user_data);
-    for (int32_t offset = 0; offset < frame_count; ++offset) {
-        uint16_t frame_id = (self->tx_frame_last_id + offset) & EMBC_FRAMER_FRAME_ID_MAX;
-        uint16_t idx = (frame_id + offset) & (self->tx_frame_count - 1);
-        struct tx_frame_s * f = &self->tx_frames[idx];
-        if (f->state == TX_FRAME_ST_SENT) {
-            uint32_t delta = now - f->last_send_time_ms;
-            if (delta > self->tx_timeout_ms) {
-                return 0;
+
+    if (self->tx_state == TX_ST_CONNECTED) {
+        for (int32_t offset = 0; offset < frame_count; ++offset) {
+            uint16_t frame_id = (self->tx_frame_last_id + offset) & EMBC_FRAMER_FRAME_ID_MAX;
+            uint16_t idx = (frame_id + offset) & (self->tx_frame_count - 1);
+            struct tx_frame_s *f = &self->tx_frames[idx];
+            if (f->state == TX_FRAME_ST_SENT) {
+                uint32_t delta = now - f->last_send_time_ms;
+                if (delta >= self->tx_timeout_ms) {
+                    return 0;
+                }
+                delta = self->tx_timeout_ms - delta;
+                if (delta < rv) {
+                    rv = delta;
+                }
             }
-            delta -= self->tx_timeout_ms;
-            if (delta < rv) {
-                rv = delta;
-            }
+        }
+    } else {
+        uint32_t delta = now - self->tx_reset_last_ms;
+        uint32_t duration = reset_timeout_duration_ms(self);
+        if (delta >= duration) {
+            return 0;
+        } else {
+            rv = duration - delta;
         }
     }
     return rv;
+}
+
+static void tx_process_disconnected(struct embc_dl_s * self) {
+    uint32_t now = self->ll_instance.time_get_ms(self->ll_instance.user_data);
+    uint32_t delta = now - self->tx_reset_last_ms;
+    uint32_t duration = reset_timeout_duration_ms(self);
+    if (delta >= duration) {
+        send_reset_request(self);
+    }
 }
 
 static void tx_timeout(struct embc_dl_s * self) {
@@ -501,8 +587,12 @@ static void tx_transmit(struct embc_dl_s * self) {
 void embc_dl_process(struct embc_dl_s * self) {
     self->lock(self->lock_user_data);
     send_link_pending(self);
-    tx_timeout(self);
-    tx_transmit(self);
+    if (self->tx_state == TX_ST_DISCONNECTED) {
+        tx_process_disconnected(self);
+    } else {
+        tx_timeout(self);
+        tx_transmit(self);
+    }
     self->unlock(self->lock_user_data);
 }
 
@@ -598,7 +688,8 @@ struct embc_dl_s * embc_dl_initialize(
     self->rx_framer.api.framing_error_fn = on_framing_error;
     self->rx_framer.api.link_fn = on_recv_link;
     self->rx_framer.api.data_fn = on_recv_data;
-    embc_dl_reset(self);
+    rx_reset(self);
+    tx_reset(self);
 
     return self;
 }
@@ -612,24 +703,10 @@ void embc_dl_register_upper_layer(struct embc_dl_s * self, struct embc_dl_api_s 
 void embc_dl_reset(struct embc_dl_s * self) {
     EMBC_LOGI("reset");
     self->lock(self->lock_user_data);
-    self->tx_frame_last_id = 0;
-    self->tx_frame_next_id = 0;
-    self->rx_next_frame_id = 0;
-    self->rx_max_frame_id = 0;
-    embc_mrb_clear(&self->tx_buf);
-    embc_rbu64_clear(&self->tx_link_buf);
-
-    for (uint16_t f = 0; f < self->tx_frame_count; ++f) {
-        self->tx_frames[f].state = TX_FRAME_ST_IDLE;
-    }
-
-    for (uint16_t f = 0; f < self->rx_frame_count; ++f) {
-        self->rx_frames[f].state = RX_FRAME_ST_IDLE;
-    }
-
+    embc_dl_status_clear(self);
     embc_framer_reset(&self->rx_framer);
-    embc_memset(&self->rx_status, 0, sizeof(self->rx_status));
-    embc_memset(&self->tx_status, 0, sizeof(self->tx_status));
+    rx_reset(self);
+    tx_reset(self);
     self->unlock(self->lock_user_data);
 }
 
@@ -657,6 +734,14 @@ int32_t embc_dl_status_get(
     status->tx = self->tx_status;
     self->unlock(self->lock_user_data);
     return 0;
+}
+
+void embc_dl_status_clear(struct embc_dl_s * self) {
+    self->lock(self->lock_user_data);
+    embc_memset(&self->rx_status, 0, sizeof(self->rx_status));
+    embc_memset(&self->rx_framer.status, 0, sizeof(self->rx_framer.status));
+    embc_memset(&self->tx_status, 0, sizeof(self->tx_status));
+    self->unlock(self->lock_user_data);
 }
 
 void embc_dl_register_lock(struct embc_dl_s * self, embc_dl_lock lock, embc_dl_unlock unlock, void * user_data) {

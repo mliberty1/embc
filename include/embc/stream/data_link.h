@@ -246,7 +246,6 @@ struct embc_dl_status_s {
     struct embc_dl_rx_status_s rx;
     struct embc_framer_status_s rx_framer;
     struct embc_dl_tx_status_s tx;
-    uint64_t send_buffers_free;
 };
 
 /**
@@ -256,18 +255,14 @@ enum embc_dl_event_e {
     /// An unknown event occurred (should never happen).
     EMBC_DL_EV_UNKNOWN,
 
-    /// The remote host issued a reset command.
-    EMBC_DL_EV_REMOTE_RESET,
+    /// The remote issued a reset command for our receive path.
+    EMBC_DL_EV_RECEIVED_RESET,
 
-    /// The remote host is no longer responding.
-    EMBC_DL_EV_REMOTE_UNRESPONSIVE,
+    /// The remote device is no longer responding to transmissions.
+    EMBC_DL_EV_CONNECTION_LOST,
 
-    /**
-     * @brief This data link implementation encountered an unrecoverable internal error.
-     *
-     * After cleanup up the system, call embc_dl_reset() before resuming communication.
-     */
-    EMBC_DL_EV_INTERNAL_ERROR,
+    /// The remove device established a connection.
+    EMBC_DL_EV_CONNECTION_ESTABLISHED,
 };
 
 /**
@@ -436,6 +431,13 @@ int32_t embc_dl_finalize(struct embc_dl_s * self);
 int32_t embc_dl_status_get(
         struct embc_dl_s * self,
         struct embc_dl_status_s * status);
+
+/**
+ * @brief Clear the status.
+ *
+ * @param self The data link instance.
+ */
+void embc_dl_status_clear(struct embc_dl_s * self);
 
 /**
  * @brief The function used to lock the mutex

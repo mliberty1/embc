@@ -30,7 +30,7 @@ cdef void _process_cbk(void * user_data) nogil:
 cdef void _recv_fn_inner(void *user_data, uint32_t metadata, uint8_t *msg, uint32_t msg_size) with gil:
     cdef uint32_t i
     cdef UartDataLink self = <object> user_data
-    b = np.zeros(msg_size, dtype=np.uint8)
+    b = np.empty(msg_size, dtype=np.uint8)
     for i in range(msg_size):
         b[i] = msg[i]
     self._on_recv(metadata, b)
