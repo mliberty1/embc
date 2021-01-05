@@ -127,5 +127,4 @@ cdef class UartDataLink:
                 'data_frames': status.tx.data_frames,
                 'retransmissions': status.tx.retransmissions,
             },
-            'send_buffers_free': status.send_buffers_free,
         }

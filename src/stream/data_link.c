@@ -127,7 +127,7 @@ int32_t embc_dl_send(struct embc_dl_s * self,
     struct tx_frame_s * f = &self->tx_frames[idx];
 
     if (embc_framer_frame_id_subtract(frame_id, self->tx_frame_last_id) >= self->tx_frame_count) {
-        EMBC_LOGW("embc_dl_send(0x%02" PRIx32 ") too many frames outstanding", metadata);
+        EMBC_LOGD1("embc_dl_send(0x%02" PRIx32 ") too many frames outstanding", metadata);
         self->unlock(self->lock_user_data);
         return EMBC_ERROR_NOT_ENOUGH_MEMORY;
     }
@@ -141,7 +141,7 @@ int32_t embc_dl_send(struct embc_dl_s * self,
     uint16_t frame_sz = msg_size + EMBC_FRAMER_OVERHEAD_SIZE;
     uint8_t * b = embc_mrb_alloc(&self->tx_buf, frame_sz);
     if (!b) {
-        EMBC_LOGW("embc_dl_send(0x%06" PRIx32 ") out of buffer space", metadata);
+        EMBC_LOGD1("embc_dl_send(0x%06" PRIx32 ") out of buffer space", metadata);
         self->unlock(self->lock_user_data);
         return EMBC_ERROR_NOT_ENOUGH_MEMORY;
     }
@@ -565,7 +565,7 @@ static void tx_timeout(struct embc_dl_s * self) {
         if (f->state == TX_FRAME_ST_SENT) {
             uint32_t delta = now - f->last_send_time_ms;
             if (delta > self->tx_timeout_ms) {
-                EMBC_LOGI("tx timeout on %d", (int) frame_id);
+                EMBC_LOGD1("tx timeout on %d", (int) frame_id);
                 f->state = TX_FRAME_ST_SEND;
             }
         }
