@@ -133,11 +133,19 @@ int32_t embc_pubsub_subscribe(struct embc_pubsub_s * self, const char * topic,
  *
  * @param self The PubSub instance.
  * @param topic The topic to update.
- * @param value The new value for the topic
+ * @param value The new value for the topic.
  * @return 0 or error code.
  *
  * If the topic does not already exist, this function will
  * automatically create it.
+ *
+ * Any pointer types, such as cstr, must remain valid indefinitely.
+ * One "trick" to freeing pointers is to publish two messages:
+ * first one with the pointer and then one with NULL.
+ * If the publisher also subscribes, then they can free the pointer
+ * when they receive the NULL value.  However, this requires that
+ * all subscribers only operated on the pointer during the subscriber
+ * callback and do not hold on to it.
  */
 int32_t embc_pubsub_publish(struct embc_pubsub_s * self, const char * topic, const struct embc_pubsub_value_s * value);
 
