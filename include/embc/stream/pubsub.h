@@ -33,9 +33,9 @@ extern "C" {
 
 /**
  * @ingroup embc
- * @defgroup embc_pubsub Publish-Subscribe for small embedded systems
+ * @defgroup embc_pubsub Publish-Subscribe for small embedded systems.
  *
- * @brief Provide a simple, opinionated publish-subscribe architecture.
+ * @brief Provide a simple, opinionated Publish-Subscribe architecture.
  *
  * Alternatives include:
  * - [pubsub-c](https://github.com/jaracil/pubsub-c) but uses dynamic memory.
@@ -44,57 +44,129 @@ extern "C" {
  * @{
  */
 
+/// The allowed data types.
 enum embc_pubsub_type_e {
     EMBC_PUBSUB_TYPE_NULL = 0,
     EMBC_PUBSUB_TYPE_CSTR,
     EMBC_PUBSUB_TYPE_U32,
 };
 
-typedef const char * const embc_pubsub_alt_list_t[];
-
-struct embc_pubsub_option_s {
-    uint32_t value;
-    embc_pubsub_alt_list_t alt;
-};
-
-typedef const struct embc_pubsub_option_s * const embc_pubsub_options_list_t[];
-
-struct embc_pubsub_meta_s {
-    const char * topic;
-    const char * brief;
-    const char * detail;
-    enum embc_pubsub_type_e type;
-    embc_pubsub_options_list_t options;
-};
-
+/// The value holder for all types.
 struct embc_pubsub_value_s {
+    /// The value type indicator.
     enum embc_pubsub_type_e type;
+    /// The actual value.
     union {
-        const char * cstr;
-        uint32_t u32;
+        const char * cstr;  ///< EMBC_PUBSUB_TYPE_CSTR
+        uint32_t u32;       ///< EMBC_PUBSUB_TYPE_U32
     } value;
 };
 
+/// The opaque PubSub instance.
 struct embc_pubsub_s;
 
+/**
+ * @brief Function called on topic updates.
+ *
+ * @param user_data The arbitrary user data.
+ * @param topic The topic for this update.
+ * @param value The value for this update.
+ */
 typedef void (*embc_pubsub_subscribe_fn)(void * user_data, const char * topic, const struct embc_pubsub_value_s * value);
 
+/**
+ * @brief Function called whenever a new message is published.
+ *
+ * @param user_data Arbitrary user data.
+ */
+typedef void (*embc_pubsub_on_publish_fn)(void * user_data);
+
+/**
+ * @brief Create and initialize a new PubSub instance.
+ *
+ * @return The new PubSub instance.
+ */
 struct embc_pubsub_s * embc_pubsub_initialize();
 
+/**
+ * @brief Finalize the instance and free resources.
+ *
+ * @param self The PubSub instance.
+ */
 void embc_pubsub_finalize(struct embc_pubsub_s * self);
 
-int32_t embc_pubsub_register(struct embc_pubsub_s * self, const struct embc_pubsub_meta_s * meta, const struct embc_pubsub_value_s * value);
+/**
+ * @brief Register the function called for each call to embc_pubsub_publish().
+ *
+ * @param self The PubSub instance
+ * @param cbk_fn The callback function.
+ * @param cbk_user_data The arbitrary data for cbk_fn.
+ *
+ * Threaded implementations can use this callback to set an event,
+ * task notification, or file handle to tell the thread that
+ * embc_pubsub_process() should be invoked.
+ */
+void embc_pubsub_register_on_publish(struct embc_pubsub_s * self,
+        embc_pubsub_on_publish_fn cbk_fn, void * cbk_user_data);
 
-int32_t embc_pubsub_register_cstr(struct embc_pubsub_s * self, const struct embc_pubsub_meta_s * meta, const char * value);
+/**
+ * @brief Subscribe to a topic.
+ *
+ * @param self The PubSub instance.
+ * @param topic The topic to subscribe.
+ * @param cbk_fn The function to call on topic updates.
+ *      This function may be initially called from
+ *      within embc_pubsub_subscribe().  Future invocations
+ *      are from embc_pubsub_process().  The cbk_fn is responsible
+ *      for any thread resynchronization.
+ * @param cbk_user_data The arbitrary data for cbk_fn.
+ * @return 0 or error code.
+ *
+ * If the topic does not already exist, this function will
+ * automatically create it.
+ */
+int32_t embc_pubsub_subscribe(struct embc_pubsub_s * self, const char * topic,
+        embc_pubsub_subscribe_fn cbk_fn, void * cbk_user_data);
 
-int32_t embc_pubsub_register_u32(struct embc_pubsub_s * self, const struct embc_pubsub_meta_s * meta, uint32_t value);
-
-int32_t embc_pubsub_subscribe(struct embc_pubsub_s * self, const char * topic, embc_pubsub_subscribe_fn cbk_fn, void * cbk_user_data);
-
+/**
+ * @brief Publish to a topic.
+ *
+ * @param self The PubSub instance.
+ * @param topic The topic to update.
+ * @param value The new value for the topic
+ * @return 0 or error code.
+ *
+ * If the topic does not already exist, this function will
+ * automatically create it.
+ */
 int32_t embc_pubsub_publish(struct embc_pubsub_s * self, const char * topic, const struct embc_pubsub_value_s * value);
 
+/// Convenience wrapper for embc_pubsub_publish
+int32_t embc_pubsub_publish_cstr(struct embc_pubsub_s * self, const char * topic, const char * value);
+
+/// Convenience wrapper for embc_pubsub_publish
 int32_t embc_pubsub_publish_u32(struct embc_pubsub_s * self, const char * topic, uint32_t value);
 
+/**
+ * @brief Get the retained value for a topic.
+ *
+ * @param self The PubSub instance.
+ * @param topic The topic name.
+ * @param[out] value The current value for topic.  Since this request is
+ *      handled in the caller's thread, it does not account
+ *      for any updates queued for embc_pubsub_process().
+ * @return 0 or error code.
+ */
+int32_t embc_pubsub_query(struct embc_pubsub_s * self, const char * topic, struct embc_pubsub_value_s * value);
+
+/**
+ * @brief Process all outstanding topic updates.
+ *
+ * @param self The PubSub instance to process.
+ *
+ * Many implementation choose to run this from a unique thread.
+ *
+ */
 void embc_pubsub_process(struct embc_pubsub_s * self);
 
 /**
@@ -120,8 +192,6 @@ typedef void (*embc_pubsub_unlock)(void * user_data);
  * @param user_data The arbitrary data passed to lock and unlock.
  */
 void embc_pubsub_register_lock(struct embc_pubsub_s * self, embc_pubsub_lock lock, embc_pubsub_unlock unlock, void * user_data);
-
-void embc_pubsub_print(struct embc_pubsub_s * self);
 
 #ifdef __cplusplus
 }
