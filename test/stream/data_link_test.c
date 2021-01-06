@@ -252,7 +252,7 @@ static void test_send_data_timeout_then_ack(void ** state) {
     self->time_ms = 5;
     send_and_expect(self, 0, 1, PAYLOAD1, sizeof(PAYLOAD1));
     embc_dl_process(self->dl);
-    self->time_ms += 10;
+    self->time_ms += 9;
     embc_dl_process(self->dl);
     self->time_ms += 1;
     expect_send_data(self, 0, 1, PAYLOAD1, sizeof(PAYLOAD1));

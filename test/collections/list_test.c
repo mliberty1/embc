@@ -281,6 +281,24 @@ static void list_append(void **state) {
     assert_int_equal(3, embc_list_index_of(&a, &s->elements[3].item));
 }
 
+static void list_iterate_and_free(void **state) {
+    (void) state;
+    struct embc_list_s list;
+    struct embc_list_s * item;
+    struct element_s * el;
+    embc_list_initialize(&list);
+    for (int i = 0; i < 3; ++i) {
+        el = test_malloc(sizeof(struct element_s));
+        embc_list_initialize(&el->item);
+        embc_list_add_tail(&list, &el->item);
+    }
+    assert_int_equal(3, embc_list_length(&list));
+    embc_list_foreach(&list, item) {
+        el = EMBC_CONTAINER_OF(item, struct element_s, item);
+        test_free(el);
+    }
+}
+
 int main(void) {
     const struct CMUnitTest tests[] = {
             cmocka_unit_test_setup(list_empty, setup),
@@ -300,6 +318,7 @@ int main(void) {
             cmocka_unit_test_setup(list_index, setup),
             cmocka_unit_test_setup(list_autoremove, setup),
             cmocka_unit_test_setup(list_append, setup),
+            cmocka_unit_test_setup(list_iterate_and_free, setup),
     };
 
     return cmocka_run_group_tests(tests, NULL, NULL);

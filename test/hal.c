@@ -28,10 +28,13 @@
 
 
 static void * hal_alloc(embc_size_t size_bytes) {
-    return test_malloc((size_t) size_bytes);
+    void * ptr =  test_malloc((size_t) size_bytes);
+    // printf("hal_alloc %p\n", ptr);
+    return ptr;
 }
 
 static void hal_free(void * ptr) {
+    // printf("hal_free %p\n", ptr);
     test_free(ptr);
 }
 

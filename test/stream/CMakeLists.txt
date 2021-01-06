@@ -18,6 +18,7 @@ ADD_CMOCKA_TEST(async_source_test)
 ADD_CMOCKA_TEST(data_link_test)
 ADD_CMOCKA_TEST(framer_test)
 ADD_CMOCKA_TEST(msg_ring_buffer_test)
+ADD_CMOCKA_TEST(pubsub_test)
 ADD_CMOCKA_TEST(ring_buffer_u64_test)
 
 add_executable(stream_tester stream_tester.c $<TARGET_OBJECTS:embc_objlib>)

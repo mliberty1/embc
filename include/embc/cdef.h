@@ -202,7 +202,7 @@
  * @return The pointer to the container.
  */
 #define EMBC_CONTAINER_OF(ptr, type, member) \
-    ( (type *) ((char *) ptr - offsetof(type, member)) )
+    ( (type *) (((char *) (ptr)) - offsetof(type, member)) )
 
 
 #ifdef __cplusplus

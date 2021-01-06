@@ -46,13 +46,18 @@ set(SOURCES
         stream/data_link.c
         stream/framer.c
         stream/msg_ring_buffer.c
+        stream/pubsub.c
         ${PLATFORM_SRC}
 )
 
-set(SOURCES_HOST
-        host/win/platform.c
-        host/win/uart.c
-        host/win/uart_data_link.c)
+if (CMAKE_COMPILER_IS_GNUCC)
+    set(SOURCES_HOST "")
+else()
+    set(SOURCES_HOST
+            host/win/platform.c
+            host/win/uart.c
+            host/win/uart_data_link.c)
+endif()
 
 if (${EMBC_TOPLEVEL})
     set(SOURCES ${SOURCES} ${SOURCES_HOST})
