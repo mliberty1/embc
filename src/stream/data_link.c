@@ -200,7 +200,7 @@ static void send_data(struct embc_dl_s * self, uint16_t frame_id) {
     }
     f->send_count += 1;
     if (f->send_count > SEND_COUNT_MAX) {
-        EMBC_LOGE("send_data(%d), count=%d", (int) frame_id, (int) f->send_count);
+        EMBC_LOGW("send_data(%d), count=%d", (int) frame_id, (int) f->send_count);
         tx_reset(self);
         event_emit(self, EMBC_DL_EV_CONNECTION_LOST);
     } else {
@@ -250,10 +250,10 @@ static void send_link(struct embc_dl_s * self, enum embc_framer_type_e frame_typ
     uint64_t b;
     int32_t rv = embc_framer_construct_link((uint8_t *) &b, frame_type, frame_id);
     if (rv) {
-        EMBC_LOGE("send_link error: %d", (int) rv);
+        EMBC_LOGW("send_link error: %d", (int) rv);
         return;
     } else if (!embc_rbu64_push(&self->tx_link_buf, b)) {
-        EMBC_LOG_WARN("link buffer full");
+        EMBC_LOGW("link buffer full");
     }
 }
 
@@ -269,7 +269,7 @@ static void send_reset_request(struct embc_dl_s * self) {
 }
 
 static void tx_reset(struct embc_dl_s * self) {
-    EMBC_LOGI("tx_reset");
+    EMBC_LOGD1("tx_reset");
     self->tx_frame_last_id = 0;
     self->tx_frame_next_id = 0;
     embc_mrb_clear(&self->tx_buf);
@@ -281,7 +281,7 @@ static void tx_reset(struct embc_dl_s * self) {
 }
 
 static void rx_reset(struct embc_dl_s * self) {
-    EMBC_LOGI("rx_reset");
+    EMBC_LOGD1("rx_reset");
     self->rx_next_frame_id = 0;
     self->rx_max_frame_id = 0;
     for (uint16_t f = 0; f < self->rx_frame_count; ++f) {
@@ -340,7 +340,7 @@ static void on_recv_data(void * user_data, uint16_t frame_id, uint32_t metadata,
         EMBC_LOGD3("on_recv_data(%d) old frame next=%d", (int) frame_id, (int) self->rx_next_frame_id);
         send_link(self, EMBC_FRAMER_FT_ACK_ALL, (self->rx_next_frame_id - 1) & EMBC_FRAMER_FRAME_ID_MAX);
     } else if (embc_framer_frame_id_subtract(window_end, frame_id) <= 0) {
-        EMBC_LOGW("on_recv_data(%d) frame too far into the future: next=%d, end=%d",
+        EMBC_LOGI("on_recv_data(%d) frame too far into the future: next=%d, end=%d",
                   (int) frame_id, (int) self->rx_next_frame_id, (int) window_end);
         send_link(self, EMBC_FRAMER_FT_NACK_FRAME_ID, frame_id);
     } else {
@@ -380,13 +380,13 @@ static bool is_in_tx_window(struct embc_dl_s * self, uint16_t frame_id) {
     if (frame_delta < 0) {
         return false;  // frame_id is from the past, ignore
     } else if (frame_delta > self->tx_frame_count) {
-        EMBC_LOGE("ack_all too far into the future: %d", (int) frame_delta);
+        EMBC_LOGI("ack_all too far into the future: %d", (int) frame_delta);
         return false;
     }
     uint16_t frame_id_end = (self->tx_frame_next_id - 1) & EMBC_FRAMER_FRAME_ID_MAX;
     frame_delta = embc_framer_frame_id_subtract(frame_id, frame_id_end);
     if (frame_delta > 0) {
-        EMBC_LOGE("ack_all out of window range: %d : recv=%d, last=%d, next=%d",
+        EMBC_LOGI("ack_all out of window range: %d : recv=%d, last=%d, next=%d",
                   (int) frame_delta, (int) frame_id,
                   (int) self->tx_frame_last_id, (int) self->tx_frame_next_id);
         return false;
@@ -431,13 +431,13 @@ static void handle_ack_all(struct embc_dl_s * self, uint16_t frame_id) {
     if (frame_delta < 0) {
         return;  // frame_id is from the past, ignore
     } else if (frame_delta > self->tx_frame_count) {
-        EMBC_LOGE("ack_all too far into the future: %d", (int) frame_delta);
+        EMBC_LOGI("ack_all too far into the future: %d", (int) frame_delta);
         return;
     }
     uint16_t frame_id_end = (self->tx_frame_next_id - 1) & EMBC_FRAMER_FRAME_ID_MAX;
     frame_delta = embc_framer_frame_id_subtract(frame_id, frame_id_end);
     if (frame_delta > 0) {
-        EMBC_LOGE("ack_all out of window range: %d", (int) frame_delta);
+        EMBC_LOGI("ack_all out of window range: %d", (int) frame_delta);
         frame_id = frame_id_end; // only process what we have
     }
 
@@ -456,7 +456,7 @@ static void handle_ack_one(struct embc_dl_s * self, uint16_t frame_id) {
 static void handle_nack_frame_id(struct embc_dl_s * self, uint16_t frame_id) {
     struct tx_frame_s * f = tx_frame_get(self, frame_id);
     if (f && (f->state != TX_FRAME_ST_IDLE)) {
-        EMBC_LOGI("handle_nack_frame_id(%d)", (int) frame_id);
+        EMBC_LOGD1("handle_nack_frame_id(%d)", (int) frame_id);
         f->state = TX_FRAME_ST_SEND;
     }
 }
@@ -464,13 +464,13 @@ static void handle_nack_frame_id(struct embc_dl_s * self, uint16_t frame_id) {
 static void handle_nack_framing_error(struct embc_dl_s * self, uint16_t frame_id) {
     struct tx_frame_s * f = tx_frame_get(self, frame_id);
     if (f && (f->state != TX_FRAME_ST_IDLE)) {
-        EMBC_LOGI("handle_nack_framing_error(%d)", (int) frame_id);
+        EMBC_LOGD1("handle_nack_framing_error(%d)", (int) frame_id);
         f->state = TX_FRAME_ST_SEND;
     }
 }
 
 static void handle_reset(struct embc_dl_s * self, uint16_t frame_id) {
-    EMBC_LOGI("received reset %d from remote host", (int) frame_id);
+    EMBC_LOGD1("received reset %d from remote host", (int) frame_id);
     switch (frame_id) {
         case 0:  // reset request
             rx_reset(self);
@@ -564,7 +564,7 @@ static void tx_timeout(struct embc_dl_s * self) {
         struct tx_frame_s * f = &self->tx_frames[idx];
         if (f->state == TX_FRAME_ST_SENT) {
             uint32_t delta = now - f->last_send_time_ms;
-            if (delta > self->tx_timeout_ms) {
+            if (delta >= self->tx_timeout_ms) {
                 EMBC_LOGD1("tx timeout on %d", (int) frame_id);
                 f->state = TX_FRAME_ST_SEND;
             }
@@ -714,9 +714,10 @@ int32_t embc_dl_finalize(struct embc_dl_s * self) {
     EMBC_LOGI("finalize");
     if (self) {
         embc_dl_unlock unlock = self->unlock;
+        void * lock_user_data = self->lock_user_data;
         self->lock(self->lock_user_data);
         embc_free(self);
-        unlock(self->lock_user_data);
+        unlock(lock_user_data);
     }
     return 0;
 }
