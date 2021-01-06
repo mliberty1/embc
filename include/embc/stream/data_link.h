@@ -273,7 +273,7 @@ struct embc_dl_api_s {
     void *user_data;
 
     /**
-     * @brief The function called when the remote host issues a reset.
+     * @brief The function called on events.
      *
      * @param user_data The arbitrary user data.
      * @param event The signaled event.

@@ -21,6 +21,14 @@ ADD_CMOCKA_TEST(msg_ring_buffer_test)
 ADD_CMOCKA_TEST(pubsub_test)
 ADD_CMOCKA_TEST(ring_buffer_u64_test)
 
+# transport_test special build to break data_link dependency
+SET_FILENAME("transport_test.c")
+add_executable(transport_test transport_test.c ../../src/stream/transport.c ../../src/platform.c ../../src/log.c $<TARGET_OBJECTS:test_objlib>)
+add_dependencies(${TARGET} test_objlib cmocka)
+target_link_libraries(transport_test cmocka)
+add_test(transport_test ${CMAKE_CURRENT_BINARY_DIR}/transport_test)
+
+
 add_executable(stream_tester stream_tester.c $<TARGET_OBJECTS:embc_objlib>)
 add_dependencies(stream_tester embc_objlib test_objlib)
 

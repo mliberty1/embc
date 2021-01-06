@@ -266,7 +266,10 @@ int main(int argc, char * argv[]) {
     h_.tx_window_size = config.tx_window_size;
 
     h_.udl = embc_udl_initialize(&config, port_name, 3000000);
-    EMBC_ASSERT_ALLOC(h_.udl);
+    if (!h_.udl) {
+        EMBC_LOGE("Could not open udl instance");
+        return 1;
+    }
     EMBC_ASSERT(0 == embc_udl_start(h_.udl, &ul, on_process, &h_));
 
     h_.time_last_ms = embc_time_get_ms();
