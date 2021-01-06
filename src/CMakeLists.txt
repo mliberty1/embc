@@ -50,13 +50,13 @@ set(SOURCES
         ${PLATFORM_SRC}
 )
 
-if (CMAKE_COMPILER_IS_GNUCC)
-    set(SOURCES_HOST "")
-else()
+if (WIN32)
     set(SOURCES_HOST
             host/win/platform.c
             host/win/uart.c
             host/win/uart_data_link.c)
+else()
+    set(SOURCES_HOST "")
 endif()
 
 if (${EMBC_TOPLEVEL})

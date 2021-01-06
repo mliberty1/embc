@@ -96,8 +96,7 @@ static void app_log_printf_(const char *format, ...) {
 static void on_event(void *user_data, enum embc_dl_event_e event) {
     struct host_s * host = (struct host_s *) user_data;
     (void) host;
-    EMBC_LOGE("on_event(%d)\n", (int) event);
-    EMBC_FATAL("on_event_fn\n");
+    EMBC_LOGI("on_event(%d)", (int) event);
 }
 
 static void on_recv(void *user_data, uint32_t metadata,

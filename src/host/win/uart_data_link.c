@@ -35,7 +35,7 @@ struct embc_udl_s {
 
 static void lock(void * user_data) {
     struct embc_udl_s * self = (struct embc_udl_s *) user_data;
-    DWORD rc = WaitForSingleObject(self->mutex, 1000);
+    DWORD rc = WaitForSingleObject(self->mutex, 100);
     if (WAIT_OBJECT_0 != rc) {
         EMBC_LOGE("mutex lock failed");
     }
@@ -43,7 +43,7 @@ static void lock(void * user_data) {
 
 static void unlock(void * user_data) {
     struct embc_udl_s * self = (struct embc_udl_s *) user_data;
-    if (! ReleaseMutex(self->mutex)) {
+    if (!ReleaseMutex(self->mutex)) {
         EMBC_LOGE("mutex unlock failed");
     }
 }
@@ -100,20 +100,27 @@ struct embc_udl_s * embc_udl_initialize(struct embc_dl_config_s const * config,
 
     self->uart = uart_alloc();
     if (!self->uart) {
-        embc_free(self);
+        embc_udl_finalize(self);
         return NULL;
     }
     int32_t rv = uart_open(self->uart, dev_str, &uart_config);
     if (rv) {
-        embc_free(self->uart);
-        embc_free(self);
+        embc_udl_finalize(self);
+        return NULL;
+    }
+
+    self->mutex = CreateMutex(
+            NULL,                   // default security attributes
+            FALSE,                  // initially not owned
+            NULL);                  // unnamed mutex
+    if (!self->mutex) {
+        embc_udl_finalize(self);
         return NULL;
     }
 
     self->dl = embc_dl_initialize(config, &ll);
     if (!self->dl) {
-        embc_free(self->uart);
-        embc_free(self);
+        embc_udl_finalize(self);
         return NULL;
     }
 
@@ -156,14 +163,6 @@ int32_t embc_udl_start(struct embc_udl_s * self,
     }
     embc_dl_register_upper_layer(self->dl, ul);
 
-    self->mutex = CreateMutex(
-            NULL,                   // default security attributes
-            FALSE,                  // initially not owned
-            NULL);                  // unnamed mutex
-    if (!self->mutex) {
-        return EMBC_ERROR_NOT_ENOUGH_MEMORY;
-    }
-
     self->thread = CreateThread(
             NULL,                   // default security attributes
             0,                      // use default stack size
@@ -172,7 +171,6 @@ int32_t embc_udl_start(struct embc_udl_s * self,
             0,                      // use default creation flags
             NULL);                  // returns the thread identifier
     if (!self->thread) {
-        CloseHandle(self->mutex);
         return EMBC_ERROR_NOT_ENOUGH_MEMORY;
     }
 
@@ -192,10 +190,23 @@ void embc_udl_reset(struct embc_udl_s * self) {
 }
 
 int32_t embc_udl_finalize(struct embc_udl_s * self) {
-    self->quit = 1;
-    WaitForSingleObject(self->thread, 1000);
-    CloseHandle(self->thread);
-    self->thread = NULL;
+    if (self) {
+        self->quit = 1;
+        if (self->thread) {
+            WaitForSingleObject(self->thread, 1000);
+            CloseHandle(self->thread);
+            self->thread = NULL;
+        }
+        if (self->mutex) {
+            CloseHandle(self->mutex);
+            self->mutex = NULL;
+        }
+        if (self->uart) {
+            embc_free(self->uart);
+            self->uart = NULL;
+        }
+        embc_free(self);
+    }
     return 0;
 }
 
