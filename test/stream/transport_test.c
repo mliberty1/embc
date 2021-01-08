@@ -72,11 +72,11 @@ static int teardown(void ** state) {
 
 static void test_send(void ** state) {
     struct embc_dl_s * self = (struct embc_dl_s *) *state;
-    expect_send(0x123400, DATA1, sizeof(DATA1));
-    assert_int_equal(0, embc_transport_send(self->t, 0, 0x1234, DATA1, sizeof(DATA1)));
-    expect_send(0x12341f, DATA1, sizeof(DATA1));
-    assert_int_equal(0, embc_transport_send(self->t, 0x1f, 0x1234, DATA1, sizeof(DATA1)));
-    assert_int_not_equal(0, embc_transport_send(self->t, EMBC_TRANSPORT_PORT_MAX + 1, 0, DATA1, sizeof(DATA1)));
+    expect_send(0x1234C0, DATA1, sizeof(DATA1));
+    assert_int_equal(0, embc_transport_send(self->t, 0, EMBC_TRANSPORT_SEQ_SINGLE, 0x1234, DATA1, sizeof(DATA1)));
+    expect_send(0x1234Df, DATA1, sizeof(DATA1));
+    assert_int_equal(0, embc_transport_send(self->t, 0x1f, EMBC_TRANSPORT_SEQ_SINGLE, 0x1234, DATA1, sizeof(DATA1)));
+    assert_int_not_equal(0, embc_transport_send(self->t, EMBC_TRANSPORT_PORT_MAX + 1, EMBC_TRANSPORT_SEQ_SINGLE, 0, DATA1, sizeof(DATA1)));
 }
 
 void on_event(void *user_data, enum embc_dl_event_e event) {

@@ -96,11 +96,14 @@ int32_t embc_transport_port_register(struct embc_transport_s * self, uint8_t por
 
 int32_t embc_transport_send(struct embc_transport_s * self,
                             uint8_t port_id,
+                            enum embc_transport_seq_e seq,
                             uint16_t port_data,
                             uint8_t const *msg, uint32_t msg_size) {
     if (port_id > EMBC_TRANSPORT_PORT_MAX) {
         return EMBC_ERROR_PARAMETER_INVALID;
     }
-    uint32_t metadata = (port_id & EMBC_TRANSPORT_PORT_MAX) | (((uint32_t) port_data) << 8);
+    uint32_t metadata = ((seq & 0x3) << 6)
+        | (port_id & EMBC_TRANSPORT_PORT_MAX)
+        | (((uint32_t) port_data) << 8);
     return embc_dl_send(self->dl, metadata, msg, msg_size);
 }

@@ -116,6 +116,7 @@ int32_t embc_transport_port_register(struct embc_transport_s * self, uint8_t por
  *
  * @param self The instance.
  * @param port_id The port id for this port.
+ * @param seq The frame reassembly information.
  * @param port_data The arbitrary 16-bit port data.  Each port is
  *      free to assign meaning to this value.
  * @param msg The msg_buffer containing the message.  The data link layer
@@ -128,6 +129,7 @@ int32_t embc_transport_port_register(struct embc_transport_s * self, uint8_t por
  */
 int32_t embc_transport_send(struct embc_transport_s * self,
                             uint8_t port_id,
+                            enum embc_transport_seq_e seq,
                             uint16_t port_data,
                             uint8_t const *msg, uint32_t msg_size);
 
