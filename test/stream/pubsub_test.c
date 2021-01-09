@@ -74,7 +74,7 @@ static void test_cstr(void ** state) {
 
     struct embc_pubsub_s * ps = embc_pubsub_initialize();
     assert_non_null(ps);
-    assert_int_equal(0, embc_pubsub_publish_cstr(ps, "s/hello/world", "hello world"));
+    assert_int_equal(0, embc_pubsub_publish_cstr(ps, "s/hello/world", "hello world", NULL, NULL));
     embc_pubsub_process(ps);
     embc_pubsub_process(ps);
 
@@ -87,7 +87,7 @@ static void test_cstr(void ** state) {
     assert_int_equal(0, embc_pubsub_subscribe(ps, "s/hello", on_pub, NULL));
 
     // publish
-    assert_int_equal(0, embc_pubsub_publish_cstr(ps, "s/hello/world", "there"));
+    assert_int_equal(0, embc_pubsub_publish_cstr(ps, "s/hello/world", "there", NULL, NULL));
     expect_pub_cstr("s/hello/world", "there"); // first subscription
     expect_pub_cstr("s/hello/world", "there"); // second subscription
     embc_pubsub_process(ps);
@@ -98,7 +98,7 @@ static void test_cstr(void ** state) {
 static void test_u32(void ** state) {
     (void) state;
     struct embc_pubsub_s * ps = embc_pubsub_initialize();
-    assert_int_equal(0, embc_pubsub_publish_u32(ps, "s/hello/u32", 42));
+    assert_int_equal(0, embc_pubsub_publish_u32(ps, "s/hello/u32", 42, NULL, NULL));
     embc_pubsub_process(ps);
 
     // subscribe to parent, get retained value
@@ -106,7 +106,7 @@ static void test_u32(void ** state) {
     assert_int_equal(0, embc_pubsub_subscribe(ps, "s/hello", on_pub, NULL));
 
     // publish
-    assert_int_equal(0, embc_pubsub_publish_u32(ps, "s/hello/u32", 7));
+    assert_int_equal(0, embc_pubsub_publish_u32(ps, "s/hello/u32", 7, NULL, NULL));
     expect_pub_u32("s/hello/u32", 7);
     embc_pubsub_process(ps);
 
@@ -121,7 +121,7 @@ static void test_subscribe_first(void ** state) {
     assert_int_equal(0, embc_pubsub_subscribe(ps, "s/hello", on_pub, NULL));
 
     // publish
-    assert_int_equal(0, embc_pubsub_publish_u32(ps, "s/hello/u32", 42));
+    assert_int_equal(0, embc_pubsub_publish_u32(ps, "s/hello/u32", 42, NULL, NULL));
     expect_pub_u32("s/hello/u32", 42);
     embc_pubsub_process(ps);
 
@@ -140,7 +140,7 @@ static void test_on_publish_cbk(void ** state) {
     // publish
     embc_pubsub_register_on_publish(ps, on_publish, NULL);
     expect_function_call(on_publish);
-    assert_int_equal(0, embc_pubsub_publish_u32(ps, "s/hello/u32", 42));
+    assert_int_equal(0, embc_pubsub_publish_u32(ps, "s/hello/u32", 42, NULL, NULL));
 
     embc_pubsub_finalize(ps);
 }
@@ -150,12 +150,22 @@ static void test_retained_value_query(void ** state) {
     struct embc_pubsub_value_s value;
     struct embc_pubsub_s * ps = embc_pubsub_initialize();
     assert_int_not_equal(0, embc_pubsub_query(ps, "s/hello/u32", &value));
-    assert_int_equal(0, embc_pubsub_publish_u32(ps, "s/hello/u32", 42));
+    assert_int_equal(0, embc_pubsub_publish_u32(ps, "s/hello/u32", 42, NULL, NULL));
     embc_pubsub_process(ps);
     assert_int_equal(0, embc_pubsub_query(ps, "s/hello/u32", &value));
     assert_int_equal(42, value.value.u32);
     embc_pubsub_finalize(ps);
 }
+
+static void test_do_not_update_same(void ** state) {
+    (void) state;
+    struct embc_pubsub_s * ps = embc_pubsub_initialize();
+    assert_int_equal(0, embc_pubsub_subscribe(ps, "s/hello", on_pub, NULL));
+    assert_int_equal(0, embc_pubsub_publish_u32(ps, "s/hello/u32", 42, on_pub, NULL));
+    embc_pubsub_process(ps);
+    embc_pubsub_finalize(ps);
+}
+
 
 int main(void) {
     hal_test_initialize();
@@ -165,6 +175,7 @@ int main(void) {
             cmocka_unit_test_setup_teardown(test_subscribe_first, setup, teardown),
             cmocka_unit_test_setup_teardown(test_on_publish_cbk, setup, teardown),
             cmocka_unit_test_setup_teardown(test_retained_value_query, setup, teardown),
+            cmocka_unit_test_setup_teardown(test_do_not_update_same, setup, teardown),
     };
 
     return cmocka_run_group_tests(tests, NULL, NULL);

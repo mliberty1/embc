@@ -134,10 +134,22 @@ int32_t embc_pubsub_subscribe(struct embc_pubsub_s * self, const char * topic,
  * @param self The PubSub instance.
  * @param topic The topic to update.
  * @param value The new value for the topic.
+ * @param src_fn The callback function for the source subscriber
+ *      that is publishing the update.  Can be NULL.
+ * @param src_user_data The arbitrary user data for the source subscriber
+ *      callback function.
  * @return 0 or error code.
  *
  * If the topic does not already exist, this function will
  * automatically create it.
+ *
+ * The src_fn and src_user_data provide trivial, built-in support
+ * to ensure that a publisher/subscriber does not receive their
+ * own updates.  One deduplication technique is to compare values.
+ * However, some pub/sub instances, such as communication bridges
+ * between PubSub instances, would need to maintain a lot of state.
+ * This simple approach great simplifies implementing a
+ * subscriber that also publishes to the same topics.
  *
  * Any pointer types, such as cstr, must remain valid indefinitely.
  * One "trick" to freeing pointers is to publish two messages:
@@ -147,13 +159,31 @@ int32_t embc_pubsub_subscribe(struct embc_pubsub_s * self, const char * topic,
  * all subscribers only operated on the pointer during the subscriber
  * callback and do not hold on to it.
  */
-int32_t embc_pubsub_publish(struct embc_pubsub_s * self, const char * topic, const struct embc_pubsub_value_s * value);
+int32_t embc_pubsub_publish(struct embc_pubsub_s * self,
+        const char * topic, const struct embc_pubsub_value_s * value,
+        embc_pubsub_subscribe_fn src_fn, void * src_user_data);
 
 /// Convenience wrapper for embc_pubsub_publish
-int32_t embc_pubsub_publish_cstr(struct embc_pubsub_s * self, const char * topic, const char * value);
+static inline int32_t embc_pubsub_publish_cstr(
+        struct embc_pubsub_s * self,
+        const char * topic, const char * value,
+        embc_pubsub_subscribe_fn src_fn, void * src_user_data) {
+    struct embc_pubsub_value_s s;
+    s.type = EMBC_PUBSUB_TYPE_CSTR;
+    s.value.cstr = value;
+    return embc_pubsub_publish(self, topic, &s, src_fn, src_user_data);
+}
 
 /// Convenience wrapper for embc_pubsub_publish
-int32_t embc_pubsub_publish_u32(struct embc_pubsub_s * self, const char * topic, uint32_t value);
+static inline int32_t embc_pubsub_publish_u32(
+        struct embc_pubsub_s * self,
+        const char * topic, uint32_t value,
+        embc_pubsub_subscribe_fn src_fn, void * src_user_data) {
+    struct embc_pubsub_value_s s;
+    s.type = EMBC_PUBSUB_TYPE_U32;
+    s.value.u32 = value;
+    return embc_pubsub_publish(self, topic, &s, src_fn, src_user_data);
+}
 
 /**
  * @brief Get the retained value for a topic.
