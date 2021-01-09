@@ -22,10 +22,6 @@
 #include "embc/collections/list.h"
 #include "embc/cstr.h"
 
-#define TOPIC_LENGTH_MAX (32)
-#define TOPIC_LENGTH_PER_LEVEL (8)
-
-
 struct subscriber_s {
     embc_pubsub_subscribe_fn cbk_fn;
     void * cbk_user_data;
@@ -38,11 +34,11 @@ struct topic_s {
     struct embc_list_s item;  // used by parent->children
     struct embc_list_s children;
     struct embc_list_s subscribers;
-    char name[TOPIC_LENGTH_PER_LEVEL];
+    char name[EMBC_PUBSUB_TOPIC_LENGTH_PER_LEVEL];
 };
 
 struct message_s {
-    char name[TOPIC_LENGTH_MAX];
+    char name[EMBC_PUBSUB_TOPIC_LENGTH_MAX];
     struct embc_pubsub_value_s value;
     embc_pubsub_subscribe_fn src_fn;
     void * src_user_data;
@@ -56,6 +52,7 @@ struct embc_pubsub_s {
     embc_pubsub_unlock unlock;
     void * lock_user_data;
     struct topic_s * topic;
+    struct embc_list_s subscriber_free;
     struct embc_list_s msg_pend;
     struct embc_list_s msg_free;
 };
@@ -92,18 +89,28 @@ static struct message_s * msg_alloc(struct embc_pubsub_s * self) {
 }
 
 static struct subscriber_s * subscriber_alloc(struct embc_pubsub_s * self) {
-    (void) self;
-    struct subscriber_s * sub = embc_alloc_clr(sizeof(struct subscriber_s));
-    EMBC_ASSERT_ALLOC(sub);
-    EMBC_LOGD3("subscriber alloc: %p", (void *)sub);
+    struct subscriber_s * sub;
+    if (!embc_list_is_empty(&self->subscriber_free)) {
+        struct embc_list_s * item;
+        item = embc_list_remove_head(&self->subscriber_free);
+        sub = EMBC_CONTAINER_OF(item, struct subscriber_s, item);
+    } else {
+        sub = embc_alloc_clr(sizeof(struct subscriber_s));
+        EMBC_ASSERT_ALLOC(sub);
+        EMBC_LOGD3("subscriber alloc: %p", (void *) sub);
+    }
     embc_list_initialize(&sub->item);
     sub->cbk_fn = NULL;
     sub->cbk_user_data = NULL;
     return sub;
 }
 
+static void subscriber_free(struct embc_pubsub_s * self, struct subscriber_s * sub) {
+    embc_list_add_tail(&self->subscriber_free, &sub->item);
+}
+
 static bool topic_name_set(struct topic_s * topic, const char * name) {
-    for (int i = 0; i < (TOPIC_LENGTH_PER_LEVEL - 1); ++i) {
+    for (int i = 0; i < (EMBC_PUBSUB_TOPIC_LENGTH_PER_LEVEL - 1); ++i) {
         if (*name) {
             topic->name[i] = *name++;
         } else {
@@ -112,16 +119,16 @@ static bool topic_name_set(struct topic_s * topic, const char * name) {
         }
     }
     EMBC_LOGW("topic name truncated: %s", name);
-    topic->name[TOPIC_LENGTH_PER_LEVEL - 1] = 0;
+    topic->name[EMBC_PUBSUB_TOPIC_LENGTH_PER_LEVEL - 1] = 0;
     return false;
 }
 
 static bool topic_str_copy(char * topic_str, const char * src) {
     size_t sz = 0;
-    while (src[sz] && (sz < TOPIC_LENGTH_MAX)) {
+    while (src[sz] && (sz < EMBC_PUBSUB_TOPIC_LENGTH_MAX)) {
         topic_str[sz] = src[sz];
         ++sz;
-        if (sz >= TOPIC_LENGTH_MAX) {
+        if (sz >= EMBC_PUBSUB_TOPIC_LENGTH_MAX) {
             return false;
         }
     }
@@ -140,7 +147,7 @@ static void topic_str_append(char * topic_str, const char * topic_sub_str) {
         ++topic_len;
         ++t;
     }
-    if (topic_len >= (TOPIC_LENGTH_MAX - 1)) {
+    if (topic_len >= (EMBC_PUBSUB_TOPIC_LENGTH_MAX - 1)) {
         return;
     }
 
@@ -151,7 +158,7 @@ static void topic_str_append(char * topic_str, const char * topic_sub_str) {
     }
 
     // Copy substring
-    while (*topic_sub_str && (topic_len < (TOPIC_LENGTH_MAX - 1))) {
+    while (*topic_sub_str && (topic_len < (EMBC_PUBSUB_TOPIC_LENGTH_MAX - 1))) {
         *t++ = *topic_sub_str++;
         ++topic_len;
     }
@@ -190,7 +197,7 @@ static void topic_free(struct embc_pubsub_s * self, struct topic_s * topic) {
 
 static bool subtopic_get_str(const char ** topic, char * subtopic) {
     const char * t = *topic;
-    for (int i = 0; i < TOPIC_LENGTH_PER_LEVEL; ++i) {
+    for (int i = 0; i < EMBC_PUBSUB_TOPIC_LENGTH_PER_LEVEL; ++i) {
         if (*t == 0) {
             *subtopic = 0;
             *topic = t;
@@ -220,7 +227,7 @@ struct topic_s * subtopic_find(struct topic_s * parent, const char * subtopic_st
 }
 
 static struct topic_s * topic_find(struct embc_pubsub_s * self, const char * topic, bool create) {
-    char subtopic_str[TOPIC_LENGTH_PER_LEVEL];
+    char subtopic_str[EMBC_PUBSUB_TOPIC_LENGTH_PER_LEVEL];
     const char * c = topic;
 
     struct topic_s * t = self->topic;
@@ -251,9 +258,20 @@ struct embc_pubsub_s * embc_pubsub_initialize() {
     self->lock = lock_default;
     self->unlock = unlock_default;
     self->topic = topic_alloc(self, "");
+    embc_list_initialize(&self->subscriber_free);
     embc_list_initialize(&self->msg_pend);
     embc_list_initialize(&self->msg_free);
     return self;
+}
+
+void subscriber_list_free(struct embc_list_s * list) {
+    struct embc_list_s * item;
+    struct subscriber_s * sub;
+    embc_list_foreach(list, item) {
+        sub = EMBC_CONTAINER_OF(item, struct subscriber_s, item);
+        embc_free(sub);
+    }
+    embc_list_initialize(list);
 }
 
 void msg_list_free(struct embc_list_s * list) {
@@ -274,6 +292,7 @@ void embc_pubsub_finalize(struct embc_pubsub_s * self) {
         void * lock_user_data = self->lock_user_data;
         self->lock(self->lock_user_data);
         topic_free(self, self->topic);
+        subscriber_list_free(&self->subscriber_free);
         msg_list_free(&self->msg_pend);
         msg_list_free(&self->msg_free);
         embc_free(self);
@@ -304,7 +323,7 @@ void subscribe_traverse(struct topic_s * topic, char * topic_str, embc_pubsub_su
 }
 
 int32_t embc_pubsub_subscribe(struct embc_pubsub_s * self, const char * topic, embc_pubsub_subscribe_fn cbk_fn, void * cbk_user_data) {
-    char topic_str[TOPIC_LENGTH_MAX] = {0};
+    char topic_str[EMBC_PUBSUB_TOPIC_LENGTH_MAX] = {0};
     if (!self || !cbk_fn) {
         return EMBC_ERROR_PARAMETER_INVALID;
     }
@@ -319,6 +338,29 @@ int32_t embc_pubsub_subscribe(struct embc_pubsub_s * self, const char * topic, e
     topic_str_append(topic_str, topic);
     subscribe_traverse(t, topic_str, cbk_fn, cbk_user_data);
     unlock(self);
+    return 0;
+}
+
+int32_t embc_pubsub_unsubscribe(struct embc_pubsub_s * self, const char * topic,
+                                embc_pubsub_subscribe_fn cbk_fn, void * cbk_user_data) {
+    struct topic_s * t = topic_find(self, topic, false);
+    struct embc_list_s * item;
+    struct subscriber_s * subscriber;
+    int count = 0;
+    if (!t) {
+        return EMBC_ERROR_NOT_FOUND;
+    }
+    embc_list_foreach(&t->subscribers, item) {
+        subscriber = EMBC_CONTAINER_OF(item, struct subscriber_s, item);
+        if ((subscriber->cbk_fn == cbk_fn) && (subscriber->cbk_user_data == cbk_user_data)) {
+            embc_list_remove(item);
+            subscriber_free(self, subscriber);
+            ++count;
+        }
+    }
+    if (!count) {
+        return EMBC_ERROR_NOT_FOUND;
+    }
     return 0;
 }
 

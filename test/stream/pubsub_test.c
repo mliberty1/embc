@@ -166,6 +166,16 @@ static void test_do_not_update_same(void ** state) {
     embc_pubsub_finalize(ps);
 }
 
+static void test_unsubscribe(void ** state) {
+    (void) state;
+    struct embc_pubsub_s * ps = embc_pubsub_initialize();
+    assert_int_equal(0, embc_pubsub_subscribe(ps, "s/hello", on_pub, NULL));
+    assert_int_equal(0, embc_pubsub_unsubscribe(ps, "s/hello", on_pub, NULL));
+    assert_int_equal(0, embc_pubsub_publish_u32(ps, "s/hello/u32", 42, NULL, NULL));
+    embc_pubsub_process(ps);
+    embc_pubsub_finalize(ps);
+}
+
 
 int main(void) {
     hal_test_initialize();
@@ -176,6 +186,7 @@ int main(void) {
             cmocka_unit_test_setup_teardown(test_on_publish_cbk, setup, teardown),
             cmocka_unit_test_setup_teardown(test_retained_value_query, setup, teardown),
             cmocka_unit_test_setup_teardown(test_do_not_update_same, setup, teardown),
+            cmocka_unit_test_setup_teardown(test_unsubscribe, setup, teardown),
     };
 
     return cmocka_run_group_tests(tests, NULL, NULL);

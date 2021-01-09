@@ -44,6 +44,10 @@ extern "C" {
  * @{
  */
 
+#define EMBC_PUBSUB_TOPIC_LENGTH_MAX (32)
+#define EMBC_PUBSUB_TOPIC_LENGTH_PER_LEVEL (8)
+
+
 /// The allowed data types.
 enum embc_pubsub_type_e {
     EMBC_PUBSUB_TYPE_NULL = 0,
@@ -127,6 +131,18 @@ void embc_pubsub_register_on_publish(struct embc_pubsub_s * self,
  */
 int32_t embc_pubsub_subscribe(struct embc_pubsub_s * self, const char * topic,
         embc_pubsub_subscribe_fn cbk_fn, void * cbk_user_data);
+
+/**
+ * @brief Unsubscribe from a topic.
+ *
+ * @param self The PubSub instance.
+ * @param topic The topic to unsubscribe.
+ * @param cbk_fn The function provided to embc_pubsub_subscribe().
+ * @param cbk_user_data The arbitrary data provided to embc_pubsub_subscribe().
+ * @return 0 or error code.
+ */
+int32_t embc_pubsub_unsubscribe(struct embc_pubsub_s * self, const char * topic,
+                                embc_pubsub_subscribe_fn cbk_fn, void * cbk_user_data);
 
 /**
  * @brief Publish to a topic.
