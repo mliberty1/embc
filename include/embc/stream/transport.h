@@ -76,18 +76,31 @@ typedef void (*embc_transport_recv_fn)(void *user_data,
                                        uint16_t port_data,
                                        uint8_t *msg, uint32_t msg_size);
 
-/// The opaque transport instance.
-struct embc_transport_s;
+/**
+ * @brief The function called to send a message to the data link layer.
+ *
+ * @param user_data The arbitrary user data (data link layer instance).
+ * @param metadata The arbitrary 24-bit metadata associated with the message.
+ * @param msgr The msg_buffer containing the message.  The driver
+ *      copies this buffer, so it only needs to be valid for the duration
+ *      of the function call.
+ * @param msg_size The size of msg_buffer in total_bytes.
+ * @return 0 or error code.
+ *
+ * The port send_done_cbk callback will be called when the send completes.
+ */
+typedef int32_t (*embc_transport_ll_send)(void * user_data, uint32_t metadata,
+                     uint8_t const *msg, uint32_t msg_size);
 
 /**
  * @brief Allocate and initialize the instance.
  *
- * @param data_link The data link layer.  The only functions used are:
- *  - embc_dl_register_upper_layer
- *  - embc_dl_send
+ * @param send_fn The function called to send data.  Normally, provide
+ *      (embc_transport_ll_send) embc_dl_send.
+ * @param send_user_data The arbitrary data for send_fn.
  * @return 0 or error code.
  */
-struct embc_transport_s * embc_transport_initialize(struct embc_dl_s * data_link);
+struct embc_transport_s * embc_transport_initialize(embc_transport_ll_send send_fn, void * send_user_data);
 
 /**
  * @brief Finalize and deallocate the instance.
@@ -133,6 +146,32 @@ int32_t embc_transport_send(struct embc_transport_s * self,
                             uint16_t port_data,
                             uint8_t const *msg, uint32_t msg_size);
 
+/**
+ * @brief The function to call when the lower layer receives an event.
+ *
+ * @param self The instance.
+ * @param event The event.
+ *
+ * This function can be safely cast to embc_dl_event_fn and provided
+ * to embc_dl_register_upper_layer().
+ *
+ */
+void embc_transport_on_event_cbk(struct embc_transport_s * self, enum embc_dl_event_e event);
+
+/**
+ * @brief The function to call when the lower-layer receives a message.
+ *
+ * @param self The instance.
+ * @param metadata The arbitrary 24-bit metadata associated with the message.
+ * @param msg The buffer containing the message.
+ *      This buffer is only valid for the duration of the callback.
+ * @param msg_size The size of msg_buffer in bytes.
+ *
+ * This function can be safely cast to embc_dl_recv_fn and provided
+ * to embc_dl_register_upper_layer().
+ */
+void embc_transport_on_recv_cbk(struct embc_transport_s * self, uint32_t metadata,
+                                uint8_t *msg, uint32_t msg_size);
 
 /** @} */
 

@@ -73,7 +73,6 @@ cdef extern from "embc/host/uart_data_link.h":
 
     int32_t embc_udl_send(embc_udl_s * self, uint32_t metadata,
                          const uint8_t *msg, uint32_t msg_size)
-    void embc_udl_reset(embc_udl_s * self)
 
     int32_t embc_udl_finalize(embc_udl_s * self)
 

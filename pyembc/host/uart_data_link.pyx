@@ -107,9 +107,6 @@ cdef class UartDataLink:
         msg_c = msg
         return embc_udl_send(self._udl, int(metadata), &msg_c[0], len(msg))
 
-    def reset(self):
-        embc_udl_reset(self._udl)
-
     def close(self):
         embc_udl_finalize(self._udl)
 

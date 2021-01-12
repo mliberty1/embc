@@ -270,10 +270,10 @@ static void send_reset_request(struct embc_dl_s * self) {
 
 static void tx_reset(struct embc_dl_s * self) {
     EMBC_LOGD1("tx_reset");
+    self->tx_state = TX_ST_DISCONNECTED;
     self->tx_frame_last_id = 0;
     self->tx_frame_next_id = 0;
     embc_mrb_clear(&self->tx_buf);
-    embc_rbu64_clear(&self->tx_link_buf);
     for (uint16_t f = 0; f < self->tx_frame_count; ++f) {
         self->tx_frames[f].state = TX_FRAME_ST_IDLE;
     }
@@ -284,6 +284,7 @@ static void rx_reset(struct embc_dl_s * self) {
     EMBC_LOGD1("rx_reset");
     self->rx_next_frame_id = 0;
     self->rx_max_frame_id = 0;
+    embc_rbu64_clear(&self->tx_link_buf);
     for (uint16_t f = 0; f < self->rx_frame_count; ++f) {
         self->rx_frames[f].state = RX_FRAME_ST_IDLE;
     }
@@ -556,12 +557,13 @@ static void tx_process_disconnected(struct embc_dl_s * self) {
 }
 
 static void tx_timeout(struct embc_dl_s * self) {
+    struct tx_frame_s * f;
     int32_t frame_count = embc_framer_frame_id_subtract(self->tx_frame_next_id, self->tx_frame_last_id);
     uint32_t now = self->ll_instance.time_get_ms(self->ll_instance.user_data);
     for (int32_t offset = 0; offset < frame_count; ++offset) {
         uint16_t frame_id = (self->tx_frame_last_id + offset) & EMBC_FRAMER_FRAME_ID_MAX;
         uint16_t idx = frame_id & (self->tx_frame_count - 1);
-        struct tx_frame_s * f = &self->tx_frames[idx];
+        f = &self->tx_frames[idx];
         if (f->state == TX_FRAME_ST_SENT) {
             uint32_t delta = now - f->last_send_time_ms;
             if (delta >= self->tx_timeout_ms) {
@@ -700,14 +702,8 @@ void embc_dl_register_upper_layer(struct embc_dl_s * self, struct embc_dl_api_s 
     self->unlock(self->lock_user_data);
 }
 
-void embc_dl_reset(struct embc_dl_s * self) {
-    EMBC_LOGI("reset");
-    self->lock(self->lock_user_data);
-    embc_dl_status_clear(self);
-    embc_framer_reset(&self->rx_framer);
-    rx_reset(self);
+void embc_dl_resetembc_dl_reset_tx_from_event(struct embc_dl_s * self) {
     tx_reset(self);
-    self->unlock(self->lock_user_data);
 }
 
 int32_t embc_dl_finalize(struct embc_dl_s * self) {

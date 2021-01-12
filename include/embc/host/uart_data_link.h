@@ -87,13 +87,6 @@ int32_t embc_udl_send(struct embc_udl_s * self, uint32_t metadata,
                      uint8_t const *msg, uint32_t msg_size);
 
 /**
- * @brief Reset the data link state.
- *
- * @param self The data link instance.
- */
-void embc_udl_reset(struct embc_udl_s * self);
-
-/**
  * @brief Stop, finalize, and deallocate the data link instance.
  *
  * @param self The data link instance.

@@ -266,31 +266,31 @@ enum embc_dl_event_e {
 };
 
 /**
+ * @brief The function called on events.
+ *
+ * @param user_data The arbitrary user data.
+ * @param event The signaled event.
+ */
+typedef void (*embc_dl_event_fn)(void *user_data, enum embc_dl_event_e event);
+
+/**
+ * @brief The function called upon message receipt.
+ *
+ * @param user_data The arbitrary user data.
+ * @param metadata The arbitrary 24-bit metadata associated with the message.
+ * @param msg The buffer containing the message.
+ *      This buffer is only valid for the duration of the callback.
+ * @param msg_size The size of msg_buffer in bytes.
+ */
+typedef void (*embc_dl_recv_fn)(void *user_data, uint32_t metadata, uint8_t *msg, uint32_t msg_size);
+
+/**
  * @brief The API event callbacks to the upper layer.
  */
 struct embc_dl_api_s {
-    /// The arbitrary user data.
-    void *user_data;
-
-    /**
-     * @brief The function called on events.
-     *
-     * @param user_data The arbitrary user data.
-     * @param event The signaled event.
-     */
-    void (*event_fn)(void *user_data, enum embc_dl_event_e event);
-
-    /**
-     * @brief The function called upon message receipt.
-     *
-     * @param user_data The arbitrary user data.
-     * @param metadata The arbitrary 24-bit metadata associated with the message.
-     * @param msg The buffer containing the message.
-     *      This buffer is only valid for the duration of the callback.
-     * @param msg_size The size of msg_buffer in bytes.
-     */
-    void (*recv_fn)(void *user_data, uint32_t metadata,
-                    uint8_t *msg, uint32_t msg_size);
+    void *user_data;            ///< The arbitrary user data.
+    embc_dl_event_fn event_fn;  ///< Function called on events.
+    embc_dl_recv_fn recv_fn;    ///< Function call on received messages.
 };
 
 /**
@@ -407,8 +407,13 @@ void embc_dl_register_upper_layer(struct embc_dl_s * self, struct embc_dl_api_s 
  * @brief Reset the data link state.
  *
  * @param self The data link instance.
+ *
+ * WARNING: "client" devices call this function on EMBC_DL_EV_RECEIVED_RESET
+ * to reset their transmission path.  Normally, the transmitter will
+ * automatically signal a link-layer reset to the receiver upon connection
+ * lost.  Call this function with caution.
  */
-void embc_dl_reset(struct embc_dl_s * self);
+void embc_dl_reset_tx_from_event(struct embc_dl_s * self);
 
 /**
  * @brief Stop, finalize, and deallocate the data link instance.

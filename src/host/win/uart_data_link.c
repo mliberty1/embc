@@ -185,10 +185,6 @@ int32_t embc_udl_send(struct embc_udl_s * self, uint32_t metadata,
     return embc_dl_send(self->dl, metadata, msg, msg_size);
 }
 
-void embc_udl_reset(struct embc_udl_s * self) {
-    embc_dl_reset(self->dl);
-}
-
 int32_t embc_udl_finalize(struct embc_udl_s * self) {
     if (self) {
         self->quit = 1;
