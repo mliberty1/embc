@@ -49,6 +49,12 @@ cdef void _event_cbk(void * user_data, embc_dl_event_e event) nogil:
     _event_cbk_inner(user_data, event)
 
 
+class Events:
+    RECEIVED_RESET = 1
+    CONNECTION_LOST = 2
+    CONNECTION_ESTABLISHED = 3
+
+
 cdef class UartDataLink:
     cdef embc_udl_s * _udl
     cdef object _recv_cbk
@@ -56,8 +62,8 @@ cdef class UartDataLink:
 
     def __init__(self,
             uart_device,
-            recv_callback,
-            event_callback,
+            event_callback,         # event_callback(event)
+            recv_callback,          # recv_callback(metadata, msg)
             baudrate=None,
             tx_link_size=None,
             tx_window_size=None,

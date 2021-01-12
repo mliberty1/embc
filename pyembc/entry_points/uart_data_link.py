@@ -36,9 +36,20 @@ class Host:
 
     def __init__(self, dev, baudrate):
         from pyembc.host.uart_data_link import UartDataLink
-        self.udl = UartDataLink(dev, self._on_recv, self._on_event, baudrate=baudrate)
+        self.udl = UartDataLink(dev, self._on_event, self._on_recv, baudrate=baudrate)
 
     def _on_recv(self, metadata, msg):
+        port = metadata & 0x1f
+        seq = (metadata >> 6) & 0x03;
+        port_data = (metadata >> 8) & 0xffff
+        if 1 == port:
+            if len(msg) < 3:
+                return
+            payload_type = (msg[0] >> 6) & 0x03
+            topic_len = (msg[0] & 0x1f) + 1
+            topic = bytes(msg[1:topic_len]).decode('utf-8')
+            print(f'topic={topic} payload_type={payload_type}')
+
         pass
 
     def _on_event(self, event):
