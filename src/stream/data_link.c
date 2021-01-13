@@ -702,7 +702,7 @@ void embc_dl_register_upper_layer(struct embc_dl_s * self, struct embc_dl_api_s 
     self->unlock(self->lock_user_data);
 }
 
-void embc_dl_resetembc_dl_reset_tx_from_event(struct embc_dl_s * self) {
+void embc_dl_reset_tx_from_event(struct embc_dl_s * self) {
     tx_reset(self);
 }
 
