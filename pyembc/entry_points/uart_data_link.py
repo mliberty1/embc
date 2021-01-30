@@ -12,9 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import logging
-import numpy as np
-import json
 import signal
 import logging
 import time
@@ -40,7 +37,7 @@ class Host:
 
     def _on_recv(self, metadata, msg):
         port = metadata & 0x1f
-        seq = (metadata >> 6) & 0x03;
+        seq = (metadata >> 6) & 0x03
         port_data = (metadata >> 8) & 0xffff
         if 1 == port:
             if len(msg) < 3:

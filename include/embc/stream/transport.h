@@ -110,6 +110,34 @@ struct embc_transport_s * embc_transport_initialize(embc_transport_ll_send send_
 void embc_transport_finalize(struct embc_transport_s * self);
 
 /**
+ * @brief Set the port metadata.
+ *
+ * @param self The transport instance.
+ * @param port_id The port_id for the metadata.
+ * @param meta The JSON-formatted port metadata.  This pointer must remain
+ *      valid until embc_transport_finalize().  You can remove the metadata
+ *      by passing NULL.
+ *
+ * The metadata is a map with the following keys:
+ *  - type: The port type.  Known types include:
+ *    - pubsub
+ *    - linetext
+ *
+ *
+ *
+ */
+int32_t embc_transport_meta_set(struct embc_transport_s * self, uint8_t port_id, const char * meta);
+
+/**
+ * @brief Get the port metadata.
+ *
+ * @param self The transport instance.
+ * @param port_id The port_id for the metadata.
+ * @return The metadata.
+ */
+const char * embc_transport_meta_get(struct embc_transport_s * self, uint8_t port_id);
+
+/**
  * @brief Register (or deregister) port callbacks.
  *
  * @param self The transport instance.

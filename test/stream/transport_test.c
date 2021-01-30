@@ -124,12 +124,20 @@ static void test_recv(void ** state) {
     embc_transport_on_recv_cbk(self->t, 0x7, DATA1, sizeof(DATA1));
 }
 
+static void test_meta(void ** state) {
+    static const char * meta = "{\"type\":\"pubsub\"}";
+    struct embc_dl_s * self = (struct embc_dl_s *) *state;
+    assert_int_equal(0, embc_transport_meta_set(self->t, 1, meta));
+    assert_ptr_equal(meta, embc_transport_meta_get(self->t, 1));
+}
+
 int main(void) {
     hal_test_initialize();
     const struct CMUnitTest tests[] = {
             cmocka_unit_test_setup_teardown(test_send, setup, teardown),
             cmocka_unit_test_setup_teardown(test_event, setup, teardown),
             cmocka_unit_test_setup_teardown(test_recv, setup, teardown),
+            cmocka_unit_test_setup_teardown(test_meta, setup, teardown),
     };
 
     return cmocka_run_group_tests(tests, NULL, NULL);

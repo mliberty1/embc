@@ -1,5 +1,4 @@
-#!/usr/bin/env python3
-# Copyright 2018-2020 Jetperch LLC
+# Copyright 2020 Jetperch LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,9 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from . import crc, data_link_ui, framer_tester, uart_data_link
+from pyembc.host.ui import run
+import logging
 
-__all__ = [crc, data_link_ui, framer_tester, uart_data_link]
-"""This list of available command modules.  Each module must contain a 
-parser_config(subparser) function.  The function must return the callable(args)
-that will be executed for the command."""
+log = logging.getLogger(__name__)
+
+
+def parser_config(p):
+    """Run the data link user interface."""
+    return on_cmd
+
+
+def on_cmd(args):
+    return run()

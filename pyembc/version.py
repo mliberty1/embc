@@ -6,4 +6,5 @@ __url__ = 'https://github.com/mliberty1/embc'
 __author__ = 'Jetperch LLC'
 __author_email__ = 'dev@jetperch.com'
 __license__ = 'Apache 2.0'
-__copyright__ = 'Copyright 2017-2020 Jetperch LLC'
+__copyright__ = 'Copyright 2017-2021 Jetperch LLC'
+

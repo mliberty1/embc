@@ -12,6 +12,7 @@ This file contains the list of changes made to the embc library.
 *   Added embc_list_replace.
 *   Added stream data link and new framer.
 *   Improved unit tests and documentation.
+*   Removed "py" cython bindings.  Cython bindings are under pyembc.
 
 
 ## 0.1.1
