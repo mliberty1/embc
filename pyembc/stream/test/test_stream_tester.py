@@ -17,7 +17,7 @@ from pyembc.stream.stream_tester import StreamTester
 import numpy as np
 
 
-class StreamFramer(unittest.TestCase):
+class StreamFramerTest(unittest.TestCase):
 
     def setUp(self):
         self.s = StreamTester()

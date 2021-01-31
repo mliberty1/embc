@@ -16,15 +16,21 @@ import weakref
 from collections.abc import Mapping
 
 
-class Topic:
+class _Topic:
 
     def __init__(self, parent, topic, value=None):
+        """Hold a single Topic entry for :class:`PubSub`.
+
+        :param parent: The parent :class:`Topic` instance.
+        :param topic: The topic string.
+        :param value: The optional initial value for the topic.
+        """
         self._topic = topic
         self._value = value
         if parent is not None:
             parent = weakref.ref(parent)
         self.parent = parent
-        self.children: Mapping[str, Topic] = {}
+        self.children: Mapping[str, _Topic] = {}
         self._subscribers = []
 
     def __str__(self):
@@ -76,7 +82,7 @@ class PubSub:
         Subscribing to a topic will automatically publish the
         retained values to the new subscriber.
         """
-        self._root = Topic(None, '')
+        self._root = _Topic(None, '')
 
     def _topic_find(self, topic, create=False):
         t = self._root
@@ -89,7 +95,7 @@ class PubSub:
                 if child is None:
                     if create:
                         subtopic = '/'.join(parts_so_far)
-                        child = Topic(t, subtopic)
+                        child = _Topic(t, subtopic)
                         t.children[part] = child
                     else:
                         return None
@@ -101,8 +107,7 @@ class PubSub:
 
         :param topic: The topic name.
         :param value: The value for the topic.
-        :param src_cbk: The subscriber that will not be
-            updated.
+        :param src_cbk: The subscriber that will not be updated.
         """
         t = self._topic_find(topic, create=True)
         return t.publish(value, src_cbk)
@@ -120,10 +125,19 @@ class PubSub:
         return t.value
 
     def subscribe(self, topic, cbk):
+        """Subscribe to a topic and its children.
+
+        :param topic: The topic name.
+        :param cbk: The callable(topic, value) called on value changes.
+        """
         t = self._topic_find(topic, create=True)
         t.subscribe(cbk)
 
     def unsubscribe(self, topic, cbk):
+        """Unsubscribe from a topic.
+
+        :param topic: The topic name.
+        :param cbk: The callable provided to subscribe.
+        """
         t = self._topic_find(topic, create=True)
         t.unsubscribe(cbk)
-

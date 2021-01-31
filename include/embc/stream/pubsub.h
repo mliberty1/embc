@@ -82,18 +82,6 @@ typedef uint8_t (*embc_pubsub_subscribe_fn)(void * user_data,
         const char * topic, const struct embc_pubsub_value_s * value);
 
 /**
- * @brief Function called when publish completes.
- *
- * @param user_data The arbitrary user data.
- * @param topic The topic for this update.
- * @param value The value for this update.
- * @param status 0 or error code.
- */
-typedef void (*embc_pubsub_completion_fn)(void * user_data,
-        const char * topic, const struct embc_pubsub_value_s * value,
-        uint8_t status);
-
-/**
  * @brief Function called whenever a new message is published.
  *
  * @param user_data Arbitrary user data.

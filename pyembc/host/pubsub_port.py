@@ -111,4 +111,4 @@ class PubSubPort:
         x = payload_fn(payload)
         log.info("recv(status=%s, topic='%s', value=%s, port_data=%s)", status, topic, x, port_data)
         if callable(self.listener):
-            self.listener(status, topic, x, port_data)
+            self.listener(topic, x)
