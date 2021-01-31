@@ -20,6 +20,7 @@ from pyembc import __version__, __url__
 import ctypes
 import json
 import logging
+import numpy as np
 import sys
 
 
@@ -76,6 +77,179 @@ def menu_setup(d, parent=None):
     return k
 
 
+class StatusWidget(QtWidgets.QWidget):
+
+    def __init__(self, parent):
+        super(StatusWidget, self).__init__(parent)
+
+        self.setObjectName('status')
+        self.setGeometry(QtCore.QRect(0, 0, 294, 401))
+
+        self._layout = QtWidgets.QGridLayout(self)
+        self._layout.setSpacing(6)
+        self._layout.setContentsMargins(11, 11, 11, 11)
+        self._layout.setObjectName('status_layout')
+
+        self._prev = None
+        self._items = {}
+
+    def clear(self):
+        while not self._layout.isEmpty():
+            item = self._layout.takeAt(0)
+            widget = item.widget()
+            if widget is not None:
+                widget.setParent(None)
+        self._items.clear()
+        self._prev = None
+
+    def _statistic_get(self, name):
+        try:
+            return self._items[name]
+        except KeyError:
+            row = self._layout.rowCount()
+            n = QtWidgets.QLabel(self)
+            n.setText(name)
+            v = QtWidgets.QLabel(self)
+            self._layout.addWidget(n, row, 0)
+            self._layout.addWidget(v, row, 1)
+            value = (n, v)
+            self._items[name] = value
+            return value
+
+    def _statistic_update(self, name, value):
+        _, v = self._statistic_get(name)
+        v.setText(str(value))
+
+    def update(self, status):
+        for top_key, top_obj in status.items():
+            if isinstance(top_obj, dict):
+                for key, obj in top_obj.items():
+                    self._statistic_update(f'{top_key}.{key}', obj)
+            else:
+                self._statistic_update(top_key, top_obj)
+        status_json = json.dumps(status, separators=(',', ':'))
+        # print(f'{len(status_json)} : {status_json}')
+        if self._prev is not None:
+            rx_bytes = status['rx']['msg_bytes'] - self._prev['rx']['msg_bytes']
+            tx_bytes = status['tx']['msg_bytes'] - self._prev['tx']['msg_bytes']
+            self._statistic_update('Δrx.msg_bytes', rx_bytes)
+            self._statistic_update('Δtx.msg_bytes', tx_bytes)
+        self._prev = status
+
+
+class TransportSeq:
+    MIDDLE = 0
+    STOP = 1
+    START = 2
+    SINGLE = 3
+
+
+def transport_pack(port_id, seq, port_data):
+    return (port_id & 0x1f) | ((seq & 0x03) << 6) | ((port_data & 0xffff) << 8)
+
+
+class Port0:
+    STATUS = 1
+    ECHO = 2
+    TIMESYNC = 3
+    META = 4
+    RAW = 5
+
+    @staticmethod
+    def pack_req(op, cmd_meta):
+        return (op & 0x07) | 0x00 | ((cmd_meta & 0xff) << 8)
+
+    @staticmethod
+    def pack_rsp(op, cmd_meta):
+        return (op & 0x07) | 0x08 | ((cmd_meta & 0xff) << 8)
+
+    @staticmethod
+    def parse(port_data):
+        op = port_data & 0x07
+        rsp = (port_data & 0x08) != 0
+        cmd_data = (port_data >> 8) & 0xff
+        return op, rsp, cmd_data
+
+
+class EchoWidget(QtWidgets.QWidget):
+
+    def __init__(self, parent):
+        self.send_fn = None
+        self._length = 256  # must be multiple of 8
+        self._tx_frame_id = 0
+        self._rx_frame_id = 0
+        super(EchoWidget, self).__init__(parent)
+
+        self.setObjectName('echo')
+        self.setGeometry(QtCore.QRect(0, 0, 294, 401))
+
+        self._layout = QtWidgets.QGridLayout(self)
+        self._layout.setSpacing(6)
+        self._layout.setContentsMargins(11, 11, 11, 11)
+        self._layout.setObjectName('echo_layout')
+
+        self._outstanding_label = QtWidgets.QLabel(self)
+        self._outstanding_label.setObjectName('echo_outstanding_label')
+        self._outstanding_label.setText('Outstanding frames')
+        self._layout.addWidget(self._outstanding_label, 0, 0, 1, 1)
+
+        self._outstanding_combo_box = QtWidgets.QComboBox(self)
+        self._outstanding_combo_box.setObjectName('echo_outstanding_combobox')
+        for frame in [1, 2, 4, 8, 16, 32]:
+            self._outstanding_combo_box.addItem(str(frame))
+        self._outstanding_combo_box.setEditable(True)
+        self._outstanding_combo_box.setCurrentIndex(3)
+        self._outstanding_validator = QtGui.QIntValidator(0, 256, self)
+        self._outstanding_combo_box.setValidator(self._outstanding_validator)
+        self._layout.addWidget(self._outstanding_combo_box, 0, 1, 1, 1)
+
+        self._button = QtWidgets.QPushButton(self)
+        self._button.setCheckable(True)
+        self._button.setText('Press to start')
+        self._button.toggled.connect(self._on_button_toggled)
+        self._layout.addWidget(self._button, 1, 0, 2, 0)
+
+    def _on_button_toggled(self, checked):
+        log.info('echo button  %s', checked)
+        txt = 'Press to stop' if checked else 'Press to start'
+        self._button.setText(txt)
+        self.clear()
+        if checked:
+            self._send()
+
+    def clear(self):
+        self._tx_frame_id = 0
+        self._rx_frame_id = 0
+
+    def _send(self):
+        if not callable(self.send_fn) or not self._button.isChecked():
+            return
+        count = int(self._outstanding_combo_box.currentText())
+        while (self._tx_frame_id - self._rx_frame_id) < count:
+            tx_u8 = np.zeros(self._length, dtype=np.uint8)
+            tx_u64 = tx_u8[:8].view(dtype=np.uint64)
+            tx_u64[0] = self._tx_frame_id
+            self._tx_frame_id += 1
+            metadata = transport_pack(0, TransportSeq.SINGLE, Port0.pack_req(Port0.ECHO, 0))
+            rv = self.send_fn(metadata, tx_u8)
+            if rv:
+                log.warning('echo send returned %d', rv)
+
+    def recv(self, msg):
+        msg_len = len(msg)
+        if msg_len != self._length or msg_len < 8:
+            log.warning('unexpected message length %s', len(msg))
+            return
+        frame_id = msg[:8].view(dtype=np.uint64)[0]
+        if frame_id != self._rx_frame_id:
+            log.warning('echo frame_id mismatch: %d != %d', frame_id, self._rx_frame_id)
+        self._rx_frame_id = frame_id + 1
+        self._send()
+
+    def process(self):
+        self._send()
+
+
 class MainWindow(QtWidgets.QMainWindow):
 
     def __init__(self, app):
@@ -93,15 +267,11 @@ class MainWindow(QtWidgets.QMainWindow):
         self._central_layout.setContentsMargins(11, 11, 11, 11)
         self._central_layout.setObjectName('central_layout')
 
-        self._status_widget = QtWidgets.QWidget(self)
-        self._status_widget.setObjectName('status')
-        self._status_widget.setGeometry(QtCore.QRect(0, 0, 294, 401))
+        self._status_widget = StatusWidget(self)
         self._central_layout.addWidget(self._status_widget)
 
-        self._status_layout = QtWidgets.QGridLayout(self._status_widget)
-        self._status_layout.setSpacing(6)
-        self._status_layout.setContentsMargins(11, 11, 11, 11)
-        self._status_layout.setObjectName('status_layout')
+        self._echo_widget = EchoWidget(self)
+        self._central_layout.addWidget(self._echo_widget)
 
         # Status bar
         self._status_bar = QtWidgets.QStatusBar(self)
@@ -114,8 +284,6 @@ class MainWindow(QtWidgets.QMainWindow):
         self._status_update_timer = QtCore.QTimer(self)
         self._status_update_timer.setInterval(1000)  # milliseconds
         self._status_update_timer.timeout.connect(self._on_status_update_timer)
-        self._status_prev = None
-        self._status_items = {}
 
         self._menu_bar = QtWidgets.QMenuBar(self)
         self._menu_items = menu_setup(
@@ -139,11 +307,24 @@ class MainWindow(QtWidgets.QMainWindow):
     def _on_device_event(self, event):
         log.info('_on_device_event(%s)', event)
 
+    def _on_port0(self, seq, port_data, msg):
+        if seq != TransportSeq.SINGLE:
+            log.warning('Port0 only supports seq single')
+            return
+        op, rsp, cmd_data = Port0.parse(port_data)
+        if rsp:  # response
+            if op == Port0.ECHO:
+                self._echo_widget.recv(msg)
+        else:    # request
+            pass
+
     def _on_device_recv(self, metadata, msg):
         port = metadata & 0x1f
         seq = (metadata >> 6) & 0x03
         port_data = (metadata >> 8) & 0xffff
-        if 1 == port:
+        if 0 == port:
+            self._on_port0(seq, port_data, msg)
+        elif 1 == port:
             if len(msg) < 3:
                 return
             payload_type = (msg[0] >> 6) & 0x03
@@ -155,24 +336,25 @@ class MainWindow(QtWidgets.QMainWindow):
         self._device_close()
         log.info('_device_open')
         try:
-            self._device = UartDataLink(dev, self._on_device_event, self._on_device_recv, baud)
+            self._device = UartDataLink(dev, self._on_device_event, self._on_device_recv, baudrate=baud)
             name = dev.split('/')[-1]
             self._status_indicator.setText(name)
             self._status_update_timer.start()
+            self._echo_widget.send_fn = self._device.send
         except:
             log.warning('Could not open device')
 
     def _device_close(self):
         log.info('_device_close')
         self._status_update_timer.stop()
+        self._echo_widget.send_fn = None
         if self._device is not None:
             device, self._device = self._device, None
             try:
                 device.close()
             except:
                 log.exception('Could not close device')
-        self._status_clear()
-        self._status_prev = None
+        self._status_widget.clear()
         self._status_indicator.setText('Not connected')
 
     def _on_file_open(self):
@@ -205,50 +387,11 @@ class MainWindow(QtWidgets.QMainWindow):
                            url=__url__)
         QtWidgets.QMessageBox.about(self, 'Delta Link UI', txt)
 
-    def _status_clear(self):
-        while not self._status_layout.isEmpty():
-            item = self._status_layout.takeAt(0)
-            widget = item.widget()
-            if widget is not None:
-                widget.setParent(None)
-        self._status_items.clear()
-
-    def _statistic_get(self, name):
-        try:
-            return self._status_items[name]
-        except KeyError:
-            row = self._status_layout.rowCount()
-            n = QtWidgets.QLabel(self)
-            n.setText(name)
-            v = QtWidgets.QLabel(self)
-            self._status_layout.addWidget(n, row, 0)
-            self._status_layout.addWidget(v, row, 1)
-            value = (n, v)
-            self._status_items[name] = value
-            return value
-
-    def _statistic_update(self, name, value):
-        _, v = self._statistic_get(name)
-        v.setText(str(value))
-
     def _on_status_update_timer(self):
         if self._device is None:
             return
         status = self._device.status()
-        for top_key, top_obj in status.items():
-            if isinstance(top_obj, dict):
-                for key, obj in top_obj.items():
-                    self._statistic_update(f'{top_key}.{key}', obj)
-            else:
-                self._statistic_update(top_key, top_obj)
-        status_json = json.dumps(status, separators=(',', ':'))
-        print(f'{len(status_json)} : {status_json}')
-        if self._status_prev is not None:
-            rx_bytes = status['rx']['msg_bytes'] - self._status_prev['rx']['msg_bytes']
-            tx_bytes = status['tx']['msg_bytes'] - self._status_prev['tx']['msg_bytes']
-            self._statistic_update('Δrx.msg_bytes', rx_bytes)
-            self._statistic_update('Δtx.msg_bytes', tx_bytes)
-        self._status_prev = status
+        self._status_widget.update(status)
 
     @QtCore.Slot(str)
     def status_msg(self, msg, timeout=None, level=None):
