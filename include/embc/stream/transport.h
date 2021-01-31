@@ -50,6 +50,9 @@ enum embc_transport_seq_e {
     EMBC_TRANSPORT_SEQ_SINGLE = 3,
 };
 
+/// Opaque transport instance.
+struct embc_transport_s;
+
 /**
  * @brief The function called on events.
  *
@@ -93,6 +96,29 @@ typedef int32_t (*embc_transport_ll_send)(void * user_data, uint32_t metadata,
                      uint8_t const *msg, uint32_t msg_size);
 
 /**
+ * @brief The function type used by upper layers to send a message.
+ *
+ * @param self The instance.
+ * @param port_id The port id for this port.
+ * @param seq The frame reassembly information.
+ * @param port_data The arbitrary 16-bit port data.  Each port is
+ *      free to assign meaning to this value.
+ * @param msg The msg_buffer containing the message.  The data link layer
+ *      copies this buffer, so it only needs to be valid for the duration
+ *      of the function call.
+ * @param msg_size The size of msg_buffer in total_bytes.
+ * @return 0 or error code.
+ *
+ * The port send_done_cbk callback will be called when the send completes.
+ * Implemented by embc_transport_send().
+ */
+typedef int32_t (*embc_transport_send_fn)(struct embc_transport_s * self,
+                                          uint8_t port_id,
+                                          enum embc_transport_seq_e seq,
+                                          uint16_t port_data,
+                                          uint8_t const *msg, uint32_t msg_size);
+
+/**
  * @brief Allocate and initialize the instance.
  *
  * @param send_fn The function called to send data.  Normally, provide
@@ -108,34 +134,6 @@ struct embc_transport_s * embc_transport_initialize(embc_transport_ll_send send_
  * @param self The transport instance.
  */
 void embc_transport_finalize(struct embc_transport_s * self);
-
-/**
- * @brief Set the port metadata.
- *
- * @param self The transport instance.
- * @param port_id The port_id for the metadata.
- * @param meta The JSON-formatted port metadata.  This pointer must remain
- *      valid until embc_transport_finalize().  You can remove the metadata
- *      by passing NULL.
- *
- * The metadata is a map with the following keys:
- *  - type: The port type.  Known types include:
- *    - pubsub
- *    - linetext
- *
- *
- *
- */
-int32_t embc_transport_meta_set(struct embc_transport_s * self, uint8_t port_id, const char * meta);
-
-/**
- * @brief Get the port metadata.
- *
- * @param self The transport instance.
- * @param port_id The port_id for the metadata.
- * @return The metadata.
- */
-const char * embc_transport_meta_get(struct embc_transport_s * self, uint8_t port_id);
 
 /**
  * @brief Register (or deregister) port callbacks.
