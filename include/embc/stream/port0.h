@@ -174,8 +174,7 @@ void embc_port0_on_recv_cbk(struct embc_port0_s * self,
  * @return 0 or error code.
  *
  * This function sets the port metadata.  When port 0 receives a META
- * request, then this transport layer will respond with the
- *
+ * request, then this transport layer will respond with the metadata message.
  */
 int32_t embc_port0_meta_set(struct embc_port0_s * self, uint8_t port_id, const char * meta);
 

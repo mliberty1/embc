@@ -26,6 +26,7 @@ import sys
 
 log = logging.getLogger(__name__)
 STATUS_BAR_TIMEOUT_DEFAULT = 2500
+PORT_COUNT = 32
 
 
 ABOUT = """\
@@ -173,7 +174,7 @@ class Port0:
 
 class EchoWidget(QtWidgets.QWidget):
 
-    def __init__(self, parent):
+    def __init__(self, parent=None):
         self.send_fn = None
         self._length = 256  # must be multiple of 8
         self._tx_frame_id = 0
@@ -250,6 +251,76 @@ class EchoWidget(QtWidgets.QWidget):
         self._send()
 
 
+class PortWidget(QtWidgets.QWidget):
+
+    def __init__(self, parent=None):
+        self._outstanding = 8
+        self._tx_port_id = 0
+        self._rx_port_id = 0
+        self._send_fn = None
+        super(PortWidget, self).__init__(parent)
+        self.setObjectName('port_widget')
+        self.setGeometry(QtCore.QRect(0, 0, 294, 401))
+
+        self._layout = QtWidgets.QGridLayout(self)
+        self._layout.setSpacing(5)
+        self._layout.setContentsMargins(11, 11, 11, 11)
+        self._layout.setObjectName('port_widget_layout')
+
+        self._items = []
+        for idx in range(PORT_COUNT):
+            name_label = QtWidgets.QLabel(self)
+            name_label.setObjectName(f'port_name_label_{idx}')
+            name_label.setText(f'{idx}')
+            self._layout.addWidget(name_label, idx, 1, 1, 1)
+            type_label = QtWidgets.QLabel(self)
+            type_label.setObjectName(f'port_type_label_{idx}')
+            type_label.setText(' ')
+            self._layout.addWidget(type_label, idx, 2, 1, 1)
+            self._items.append([name_label, type_label])
+
+    def recv(self, port_id, msg):
+        if port_id != self._rx_port_id:
+            log.warning('unexpected port_id %d != %d', port_id, self._rx_port_id)
+        try:
+            if len(msg) <= 1:
+                s = '-'
+            else:
+                msg_str = msg[:-1].tobytes().decode('utf-8')
+                meta = json.loads(msg_str)
+                s = meta.get('type', 'unknown')
+        except:
+            s = 'invalid'
+        self._items[port_id][1].setText(s)
+        self._rx_port_id += 1
+        self._send()
+
+    def _send(self):
+        if not callable(self._send_fn):
+            return
+        payload = np.zeros(1, dtype=np.uint8)
+        while (self._tx_port_id < PORT_COUNT) and (self._tx_port_id - self._rx_port_id) < self._outstanding:
+            metadata = transport_pack(0, TransportSeq.SINGLE, Port0.pack_req(Port0.META, self._tx_port_id))
+            rv = self._send_fn(metadata, payload)
+            if rv:
+                log.warning('meta send returned %d for port_id=%d', rv, self._tx_port_id)
+            self._tx_port_id += 1
+        if self._tx_port_id == PORT_COUNT:
+            self._send_fn = None
+
+    def scan(self, send_fn):
+        self._tx_port_id = 0
+        self._rx_port_id = 0
+        for idx in range(PORT_COUNT):
+            self._items[idx][1].setText('-')
+        if not callable(send_fn):
+            log.warning('cannot scan, send_fn not callable')
+            self._send_fn = None
+            return
+        self._send_fn = send_fn
+        self._send()
+
+
 class MainWindow(QtWidgets.QMainWindow):
 
     def __init__(self, app):
@@ -266,6 +337,9 @@ class MainWindow(QtWidgets.QMainWindow):
         self._central_layout.setSpacing(6)
         self._central_layout.setContentsMargins(11, 11, 11, 11)
         self._central_layout.setObjectName('central_layout')
+
+        self._port_widget = PortWidget(self)
+        self._central_layout.addWidget(self._port_widget)
 
         self._status_widget = StatusWidget(self)
         self._central_layout.addWidget(self._status_widget)
@@ -306,6 +380,8 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def _on_device_event(self, event):
         log.info('_on_device_event(%s)', event)
+        if self._device is not None and event == 3:
+            self._port_widget.scan(self._device.send)
 
     def _on_port0(self, seq, port_data, msg):
         if seq != TransportSeq.SINGLE:
@@ -315,6 +391,8 @@ class MainWindow(QtWidgets.QMainWindow):
         if rsp:  # response
             if op == Port0.ECHO:
                 self._echo_widget.recv(msg)
+            elif op == Port0.META:
+                self._port_widget.recv(cmd_data, msg)
         else:    # request
             pass
 

@@ -261,7 +261,7 @@ enum embc_dl_event_e {
     /// The remote device is no longer responding to transmissions.
     EMBC_DL_EV_CONNECTION_LOST,
 
-    /// The remove device established a connection.
+    /// The remote device established a connection.
     EMBC_DL_EV_CONNECTION_ESTABLISHED,
 };
 
