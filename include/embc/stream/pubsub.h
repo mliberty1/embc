@@ -169,9 +169,6 @@ int32_t embc_pubsub_unsubscribe(struct embc_pubsub_s * self, const char * topic,
  *      that is publishing the update.  Can be NULL.
  * @param src_user_data The arbitrary user data for the source subscriber
  *      callback function.
- * @param complete_fn The function to call with the status when
- *      publish completes.  Can be NULL.
- * @param complete_user_data The arbitrary user data for complete_fn.
  * @return 0 or error code.
  *
  * If the topic does not already exist, this function will
@@ -195,31 +192,28 @@ int32_t embc_pubsub_unsubscribe(struct embc_pubsub_s * self, const char * topic,
  */
 int32_t embc_pubsub_publish(struct embc_pubsub_s * self,
         const char * topic, const struct embc_pubsub_value_s * value,
-        embc_pubsub_subscribe_fn src_fn, void * src_user_data,
-        embc_pubsub_completion_fn complete_fn, void * complete_user_data);
+        embc_pubsub_subscribe_fn src_fn, void * src_user_data);
 
 /// Convenience wrapper for embc_pubsub_publish
 static inline int32_t embc_pubsub_publish_cstr(
         struct embc_pubsub_s * self,
         const char * topic, const char * value,
-        embc_pubsub_subscribe_fn src_fn, void * src_user_data,
-        embc_pubsub_completion_fn complete_fn, void * complete_user_data) {
+        embc_pubsub_subscribe_fn src_fn, void * src_user_data) {
     struct embc_pubsub_value_s s;
     s.type = EMBC_PUBSUB_TYPE_CSTR;
     s.value.cstr = value;
-    return embc_pubsub_publish(self, topic, &s, src_fn, src_user_data, complete_fn, complete_user_data);
+    return embc_pubsub_publish(self, topic, &s, src_fn, src_user_data);
 }
 
 /// Convenience wrapper for embc_pubsub_publish
 static inline int32_t embc_pubsub_publish_u32(
         struct embc_pubsub_s * self,
         const char * topic, uint32_t value,
-        embc_pubsub_subscribe_fn src_fn, void * src_user_data,
-        embc_pubsub_completion_fn complete_fn, void * complete_user_data) {
+        embc_pubsub_subscribe_fn src_fn, void * src_user_data) {
     struct embc_pubsub_value_s s;
     s.type = EMBC_PUBSUB_TYPE_U32;
     s.value.u32 = value;
-    return embc_pubsub_publish(self, topic, &s, src_fn, src_user_data, complete_fn, complete_user_data);
+    return embc_pubsub_publish(self, topic, &s, src_fn, src_user_data);
 }
 
 /**

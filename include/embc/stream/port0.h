@@ -61,18 +61,20 @@ enum embc_port0_op_e {
      *
      * On request, the payload is ignored.
      * On response, the payload contains a NULL-terminated JSON formatted string.
-     * The JSON response structure consists of a "type" key.
+     * The JSON response structure consists of a "type" key and a
+     * user-meaningful "name" key.
      * All other keys are defined by the type.
      *
      * - oam: Operations, administration and management.  This port 0 only.
      * - pubsub: The publish-subscribe port.  Not other keys defined.
-     * - text: Provides text communication, often for a command console,
+     * - text: Provides UTF-8 text communication, often for a command console,
      *   such as SCPI.  The "protocol" key describes the actual protocol.
-     * - stream: Streaming binary data.  Each message on this
+     * - stream: An data stream with custom format.
+     * - msg: Raw messages with custom payload format.
+     * - sample: Binary data samples.  Each message on this
      *   port contains a 32-bit sample identifier corresponding to the first
      *   sample in the message followed by packed sample data.
      *   The additional metadata keys are:
-     *   - name: The name for this sample stream.
      *   - prefix: The topic prefix for controlling this stream.
      *     If available, subtopics must include [ctrl, div, format, compression].
      *   - dir: source (device transmits data), sink (device receives data).
@@ -86,7 +88,6 @@ enum embc_port0_op_e {
      *     - Signed fixed-point integers are iMqN where M+N is a multiple of 4.
      *     - Unsigned fixed-point integers are uMqN where M+N is a multiple of 4.
      *   - compression: The list of available compression algorithms.
-     *
      *   The single bit format is packed with the bit N in byte 0, bit 0.
      *   Bit N+1 goes to byte 0, bit 1.  Bit N+8 goes to byte 1, bit 0.
      *

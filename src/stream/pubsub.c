@@ -42,8 +42,6 @@ struct message_s {
     struct embc_pubsub_value_s value;
     embc_pubsub_subscribe_fn src_fn;
     void * src_user_data;
-    embc_pubsub_completion_fn complete_fn;
-    void * complete_user_data;
     struct embc_list_s item;
 };
 
@@ -382,28 +380,19 @@ static void publish(struct topic_s * topic, struct message_s * msg) {
         }
         topic = topic->parent;
     }
-    if (msg->complete_fn) {
-        msg->complete_fn(msg->complete_user_data, msg->name, &msg->value, status);
-    }
 }
 
 int32_t embc_pubsub_publish(struct embc_pubsub_s * self,
         const char * topic, const struct embc_pubsub_value_s * value,
-        embc_pubsub_subscribe_fn src_fn, void * src_user_data,
-        embc_pubsub_completion_fn complete_fn, void * complete_user_data) {
+        embc_pubsub_subscribe_fn src_fn, void * src_user_data) {
     lock(self);
     struct message_s * msg = msg_alloc(self);
     if (!topic_str_copy(msg->name, topic)) {
         unlock(self);
-        if (complete_fn) {
-            complete_fn(complete_user_data, topic, value, EMBC_ERROR_PARAMETER_INVALID);
-        }
         return EMBC_ERROR_PARAMETER_INVALID;
     }
     msg->src_fn = src_fn;
     msg->src_user_data = src_user_data;
-    msg->complete_fn = complete_fn;
-    msg->complete_user_data = complete_user_data;
     msg->value = *value;
     embc_list_add_tail(&self->msg_pend, &msg->item);
     if (self->cbk_fn) { ;

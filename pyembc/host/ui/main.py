@@ -128,8 +128,6 @@ class StatusWidget(QtWidgets.QWidget):
                     self._statistic_update(f'{top_key}.{key}', obj)
             else:
                 self._statistic_update(top_key, top_obj)
-        status_json = json.dumps(status, separators=(',', ':'))
-        # print(f'{len(status_json)} : {status_json}')
         if self._prev is not None:
             rx_bytes = status['rx']['msg_bytes'] - self._prev['rx']['msg_bytes']
             tx_bytes = status['tx']['msg_bytes'] - self._prev['tx']['msg_bytes']
@@ -319,6 +317,29 @@ class PortWidget(QtWidgets.QWidget):
             return
         self._send_fn = send_fn
         self._send()
+
+
+class PubSubWidget(QtWidgets.QWidget):
+
+    def __init__(self, parent=None):
+        super(PubSubWidget, self).__init__(parent)
+        self.setObjectName('pubsub_widget')
+        self.setGeometry(QtCore.QRect(0, 0, 294, 401))
+
+        self._layout = QtWidgets.QGridLayout(self)
+        self._layout.setSpacing(5)
+        self._layout.setContentsMargins(11, 11, 11, 11)
+        self._layout.setObjectName('pubsub_widget_layout')
+
+        self._items = {}
+
+    def clear(self):
+        while not self._layout.isEmpty():
+            item = self._layout.takeAt(0)
+            widget = item.widget()
+            if widget is not None:
+                widget.setParent(None)
+        self._items.clear()
 
 
 class MainWindow(QtWidgets.QMainWindow):
