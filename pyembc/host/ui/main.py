@@ -322,6 +322,7 @@ class PortWidget(QtWidgets.QWidget):
 class PubSubWidget(QtWidgets.QWidget):
 
     def __init__(self, parent=None):
+        self._device = None
         super(PubSubWidget, self).__init__(parent)
         self.setObjectName('pubsub_widget')
         self.setGeometry(QtCore.QRect(0, 0, 294, 401))
@@ -340,6 +341,13 @@ class PubSubWidget(QtWidgets.QWidget):
             if widget is not None:
                 widget.setParent(None)
         self._items.clear()
+
+    def open(self, device):
+        # send to device.
+        pass
+
+    def close(self):
+        self._device = None
 
 
 class MainWindow(QtWidgets.QMainWindow):
