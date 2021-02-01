@@ -19,6 +19,7 @@ ADD_CMOCKA_TEST(data_link_test)
 ADD_CMOCKA_TEST(framer_test)
 ADD_CMOCKA_TEST(msg_ring_buffer_test)
 ADD_CMOCKA_TEST(port0_test)
+ADD_CMOCKA_TEST(pubsub_port_test)
 ADD_CMOCKA_TEST(pubsub_test)
 ADD_CMOCKA_TEST(ring_buffer_u64_test)
 

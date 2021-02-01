@@ -89,6 +89,23 @@ typedef uint8_t (*embc_pubsub_subscribe_fn)(void * user_data,
 typedef void (*embc_pubsub_on_publish_fn)(void * user_data);
 
 /**
+ * @brief Publish to a topic.
+ *
+ * @param self The PubSub instance.
+ * @param topic The topic to update.
+ * @param value The new value for the topic.
+ * @param src_fn The callback function for the source subscriber
+ *      that is publishing the update.  Can be NULL.
+ * @param src_user_data The arbitrary user data for the source subscriber
+ *      callback function.
+ * @return 0 or error code.
+ */
+typedef int32_t (*embc_pubsub_publish_fn)(
+        struct embc_pubsub_s * self,
+        const char * topic, const struct embc_pubsub_value_s * value,
+        embc_pubsub_subscribe_fn src_fn, void * src_user_data);
+
+/**
  * @brief Create and initialize a new PubSub instance.
  *
  * @return The new PubSub instance.

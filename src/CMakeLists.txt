@@ -48,6 +48,7 @@ set(SOURCES
         stream/msg_ring_buffer.c
         stream/port0.c
         stream/pubsub.c
+        stream/pubsub_port.c
         stream/transport.c
         ${PLATFORM_SRC}
 )
