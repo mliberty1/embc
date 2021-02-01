@@ -55,7 +55,7 @@ struct embc_mrb_s {
  * @param buffer The underlying memory to use for this buffer.
  * @param buffer_size The size of buffer in bytes.
  */
-void embc_mrb_init(struct embc_mrb_s * self, uint8_t * buffer, uint16_t buffer_size);
+void embc_mrb_init(struct embc_mrb_s * self, uint8_t * buffer, uint32_t buffer_size);
 
 /**
  * @brief Clear all data from the memory buffer.

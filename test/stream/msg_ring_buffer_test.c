@@ -126,6 +126,17 @@ static void test_clear(void ** state) {
     assert_int_equal(0, sz);
 }
 
+static void test_alloc_halves(void ** state) {
+    struct test_s *self = (struct test_s *) *state;
+    uint32_t sz = 1;
+    assert_non_null(embc_mrb_alloc(&self->mrb, SZ/2));
+    assert_non_null(embc_mrb_pop(&self->mrb, &sz));
+    assert_non_null(embc_mrb_alloc(&self->mrb, SZ/2));
+    assert_non_null(embc_mrb_pop(&self->mrb, &sz));
+    assert_non_null(embc_mrb_alloc(&self->mrb, SZ/2));
+    assert_non_null(embc_mrb_pop(&self->mrb, &sz));
+}
+
 int main(void) {
     hal_test_initialize();
     const struct CMUnitTest tests[] = {
@@ -134,6 +145,7 @@ int main(void) {
             cmocka_unit_test_setup_teardown(test_alloc_sizes, setup, teardown),
             cmocka_unit_test_setup_teardown(test_alloc_sizes_keep_not_empty, setup, teardown),
             cmocka_unit_test_setup_teardown(test_clear, setup, teardown),
+            cmocka_unit_test_setup_teardown(test_alloc_halves, setup, teardown),
     };
 
     return cmocka_run_group_tests(tests, NULL, NULL);

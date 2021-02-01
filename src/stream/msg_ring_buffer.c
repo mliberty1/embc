@@ -26,7 +26,7 @@
  * which indicates wrap_around.
  */
 
-void embc_mrb_init(struct embc_mrb_s * self, uint8_t * buffer, uint16_t buffer_size) {
+void embc_mrb_init(struct embc_mrb_s * self, uint8_t * buffer, uint32_t buffer_size) {
     self->buf = buffer;
     self->buf_size = buffer_size;
     embc_mrb_clear(self);
@@ -64,6 +64,11 @@ uint8_t * embc_mrb_alloc(struct embc_mrb_s * self, uint32_t size) {
         } else if ((size + 5) < tail) {
             // fits after wrap
             add_sz(p, 0xffffffffU);
+            p = self->buf;
+        } else if (head == tail) {
+            // Big item, but buffer is empty.  Reset pointers to make room.
+            self->head = 0;
+            self->tail = 0;
             p = self->buf;
         } else {
             return NULL; // does not fit
