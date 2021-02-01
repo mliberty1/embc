@@ -115,18 +115,18 @@ void embc_pubsubp_on_recv(struct embc_pubsubp_s *self,
     struct embc_pubsub_value_s value;
     value.type = payload_type;
     switch (payload_type) {
-        case EMBC_PUBSUB_TYPE_NULL:
+        case EMBC_PUBSUB_DTYPE_NULL:
             break;
-        case EMBC_PUBSUB_TYPE_CSTR:
+        case EMBC_PUBSUB_DTYPE_STR:
             if (payload[payload_len - 1]) {
                 EMBC_LOGW("invalid payload string");
             } else {
                 EMBC_LOGW("CSTR not fully supported yet");
                 // WARNING todo support this correctly
-                value.value.cstr = (char *) payload;  // not const and persistent!!!
+                value.value.str = (char *) payload;  // not const and persistent!!!
             }
             break;
-        case EMBC_PUBSUB_TYPE_U32:
+        case EMBC_PUBSUB_DTYPE_U32:
             if (payload_len != 4) {
                 EMBC_LOGW("invalid payload u32");
             } else {
@@ -138,7 +138,8 @@ void embc_pubsubp_on_recv(struct embc_pubsubp_s *self,
             EMBC_LOGW("unsupported type: %d", (int) payload_type);
             return;
     }
-    self->pubsub_publish_fn(self->pubsub, topic, &value, embc_pubsubp_on_update, self);
+    self->pubsub_publish_fn(self->pubsub, topic, &value,
+                            (embc_pubsub_subscribe_fn) embc_pubsubp_on_update, self);
 }
 
 uint8_t embc_pubsubp_on_update(struct embc_pubsubp_s *self,
@@ -165,10 +166,11 @@ uint8_t embc_pubsubp_on_update(struct embc_pubsubp_s *self,
     uint8_t * hdr = (uint8_t *) p++;
 
     switch (value->type) {
-        case EMBC_PUBSUB_TYPE_NULL:
+        case EMBC_PUBSUB_DTYPE_NULL:
             break;
-        case EMBC_PUBSUB_TYPE_CSTR: {
-            const char * s = value->value.cstr;
+        case EMBC_PUBSUB_DTYPE_STR:  // intentional fall-through
+        case EMBC_PUBSUB_DTYPE_JSON: {
+            const char * s = value->value.str;
             while (*s) {
                 if (payload_sz >= (payload_sz_max - 1)) {
                     EMBC_LOGW("payload full");
@@ -178,10 +180,22 @@ uint8_t embc_pubsubp_on_update(struct embc_pubsubp_s *self,
                 ++payload_sz;
             }
             *p++ = 0;       // add string terminator
-            ++topic_len;
+            ++payload_sz;
             break;
         }
-        case EMBC_PUBSUB_TYPE_U32:
+        case EMBC_PUBSUB_DTYPE_BIN: {
+            if (payload_sz_max < value->size) {
+                EMBC_LOGW("payload full");
+                return EMBC_ERROR_PARAMETER_INVALID;
+            }
+            const uint8_t * s = value->value.bin;
+            for (uint8_t sz = 0; sz < value->size; ++sz) {
+                *p++ = *s++;
+                ++payload_sz;
+            }
+            break;
+        }
+        case EMBC_PUBSUB_DTYPE_U32:
             if (payload_sz_max < 4) {
                 EMBC_LOGW("payload full");
                 return EMBC_ERROR_PARAMETER_INVALID;

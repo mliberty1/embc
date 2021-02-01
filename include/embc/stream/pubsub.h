@@ -35,7 +35,53 @@ extern "C" {
  * @ingroup embc
  * @defgroup embc_pubsub Publish-Subscribe for small embedded systems.
  *
- * @brief Provide a simple, opinionated Publish-Subscribe architecture.
+ * @brief A simple, opinionated Publish-Subscribe architecture.
+ *
+ * This modules provides a publish-subscribe implementation suitable
+ * for small embedded microcontrollers.  Features include:
+ * - Multiple data types including u32, str, json, binary
+ * - Constant pointers for more efficient memory usage
+ * - Retained messages
+ * - Topic metadata for validation and automatically populating user interfaces
+ * - Designed to easily support distributed instances in star topology
+ *
+ *
+ * ## Topics
+ *
+ * Topic names are any valid UTF-8.  However, we highly recommend sticking
+ * to standard letters and numbers.  The following symbols are reserved
+ * and may have special meaning: /?#$'"`&
+ *
+ * Topics are hierarchical, and each level of the hierarchy is separated by
+ * '/'.  The topic should NOT start with '/'.  We recommend using short
+ * names or abbreviations, including single letters, to keep the topic
+ * string to 31 characters plus the null terminator.
+ *
+ * Topics that end in '$' are the JSON metadata for the associated topic
+ * without the $.  Most microcontrollers should use both CONST and RETAIN
+ * flags for metadata.  The metadata format is JSON with the following
+ * keys:
+ * - dtype: one of ['u32', 'str', 'json', 'bin']
+ * - brief: A brief string description (recommended).
+ * - detail: A more detailed string description (optional).
+ * - default: The recommended default value (optional).
+ * - options: A list of options, which is each a list of:
+ *      [value, [alt1 [, ...]]]
+ *      The alternates should be given in order.  The first value
+ *      must be the value as dtype.  The second value alt1
+ *      (when provided) is used to automatically populate user
+ *      interfaces, and it can be the same as value.  Additional
+ *      values will be interpreted as equivalents.
+ *  - flags: A list of flags for this topic.  Options include:
+ *    - read_only: This topic cannot be updated.
+ *    - hidden: This topic should not appear in the user interface.
+ *    - dev: Developer option that should not be used in production.
+ *
+ * To re-enumerate all metadata, publish NULL to $ or topic/hierarchy/$.
+ * This implementation recognizes this request, and will publish
+ * all metadata instances.  Note that only the primary instance needs
+ * to retain the metadata topics, and all other instances can safely
+ * discard the metadata.
  *
  * Alternatives include:
  * - [pubsub-c](https://github.com/jaracil/pubsub-c) but uses dynamic memory.
@@ -49,23 +95,57 @@ extern "C" {
 
 
 /// The allowed data types.
-enum embc_pubsub_type_e {
-    EMBC_PUBSUB_TYPE_NULL = 0,
-    EMBC_PUBSUB_TYPE_CSTR = 1,
-    EMBC_PUBSUB_TYPE_U32 = 2,
+enum embc_pubsub_dtype_e {
+    EMBC_PUBSUB_DTYPE_NULL = 0, ///< NULL value.  Also used to clear existing value.
+    EMBC_PUBSUB_DTYPE_U32 = 1,  ///< Unsigned 32-bit integer value.
+    EMBC_PUBSUB_DTYPE_STR = 4,  ///< UTF-8 string value, null terminated.
+    EMBC_PUBSUB_DTYPE_JSON = 5, ///< UTF-8 JSON string value, null terminated.
+    EMBC_PUBSUB_DTYPE_BIN = 6,  ///< Raw binary value
 };
+
+enum embc_pubsub_dflag_e {
+    EMBC_PUBSUB_DFLAG_NONE = 0,
+    EMBC_PUBSUB_DFLAG_RETAIN = (1 << 4),
+    EMBC_PUBSUB_DFLAG_CONST = (1 << 5),
+};
+
+#define EMBC_PUBSUB_DTYPE_MASK (0x0f)
 
 /// The value holder for all types.
 struct embc_pubsub_value_s {
-    /// The value type indicator.
-    enum embc_pubsub_type_e type;
+    /**
+     * @brief The data format indicator
+     *
+     * type[3:0] = DTYPE
+     * type[7:4] = DFLAGS
+     */
+    uint8_t type;
+
     /// The actual value.
     union {
-        uint8_t status;     ///< EMBC_PUBSUB_TYPE_STATUS
-        const char * cstr;  ///< EMBC_PUBSUB_TYPE_CSTR
-        uint32_t u32;       ///< EMBC_PUBSUB_TYPE_U32
+        const char * str;      ///< EMBC_PUBSUB_TYPE_STR, EMBC_PUBSUB_DTYPE_JSON
+        const uint8_t * bin;   ///< EMBC_PUBSUB_TYPE_BIN
+        uint32_t u32;          ///< EMBC_PUBSUB_TYPE_U32
     } value;
+    uint32_t size;             ///< payload size for pointer types.
 };
+
+#define embc_pubsub_null() &((struct embc_pubsub_value_s){.type=EMBC_PUBSUB_DTYPE_NULL, .value={.u32=0}, .size=0})
+#define embc_pubsub_null_r() &((struct embc_pubsub_value_s){.type=EMBC_PUBSUB_DTYPE_NULL | EMBC_PUBSUB_DFLAG_RETAIN, .value={.u32=0}, .size=0})
+#define embc_pubsub_u32(_value) &((struct embc_pubsub_value_s){.type=EMBC_PUBSUB_DTYPE_U32, .value={.u32=_value}, .size=0})
+#define embc_pubsub_u32_r(_value) &((struct embc_pubsub_value_s){.type=EMBC_PUBSUB_DTYPE_U32 | EMBC_PUBSUB_DFLAG_RETAIN, .value={.u32=_value}, .size=0})
+
+#define embc_pubsub_str(_value) &((struct embc_pubsub_value_s){.type=EMBC_PUBSUB_DTYPE_STR, .value={.str=_value}, .size=0})
+#define embc_pubsub_cstr(_value) &((struct embc_pubsub_value_s){.type=EMBC_PUBSUB_DTYPE_STR | EMBC_PUBSUB_DFLAG_CONST, .value={.str=_value}, .size=0})
+#define embc_pubsub_cstr_r(_value) &((struct embc_pubsub_value_s){.type=EMBC_PUBSUB_DTYPE_STR | EMBC_PUBSUB_DFLAG_CONST | EMBC_PUBSUB_DFLAG_RETAIN, .value={.str=_value}, .size=0})
+
+#define embc_pubsub_json(_value) &((struct embc_pubsub_value_s){.type=EMBC_PUBSUB_DTYPE_JSON, .value={.str=_value}, .size=0})
+#define embc_pubsub_cjson(_value) &((struct embc_pubsub_value_s){.type=EMBC_PUBSUB_DTYPE_JSON | EMBC_PUBSUB_DFLAG_CONST, .value={.str=_value}, .size=0})
+#define embc_pubsub_cjson_r(_value) &((struct embc_pubsub_value_s){.type=EMBC_PUBSUB_DTYPE_JSON | EMBC_PUBSUB_DFLAG_CONST | EMBC_PUBSUB_DFLAG_RETAIN, .value={.str=_value}, .size=0})
+
+#define embc_pubsub_bin(_value, _size) &((struct embc_pubsub_value_s){.type=EMBC_PUBSUB_DTYPE_BIN, .value={.str=_value}, .size=_size})
+#define embc_pubsub_cbin(_value, _size) &((struct embc_pubsub_value_s){.type=EMBC_PUBSUB_DTYPE_BIN | EMBC_PUBSUB_DFLAG_CONST, .value={.str=_value}, .size=_size})
+#define embc_pubsub_cbin_r(_value, _size) &((struct embc_pubsub_value_s){.type=EMBC_PUBSUB_DTYPE_BIN | EMBC_PUBSUB_DFLAG_CONST | EMBC_PUBSUB_DFLAG_RETAIN, .value={.str=_value}, .size=_size})
 
 /// The opaque PubSub instance.
 struct embc_pubsub_s;
@@ -108,9 +188,11 @@ typedef int32_t (*embc_pubsub_publish_fn)(
 /**
  * @brief Create and initialize a new PubSub instance.
  *
+ * @param buffer_size The buffer size for dynamic pointer messages.
+ *      0 prohibits non-CONST pointer types.
  * @return The new PubSub instance.
  */
-struct embc_pubsub_s * embc_pubsub_initialize();
+struct embc_pubsub_s * embc_pubsub_initialize(uint32_t buffer_size);
 
 /**
  * @brief Finalize the instance and free resources.
@@ -187,39 +269,50 @@ int32_t embc_pubsub_unsubscribe(struct embc_pubsub_s * self, const char * topic,
  * This simple approach great simplifies implementing a
  * subscriber that also publishes to the same topics.
  *
- * Any pointer types, such as cstr, must remain valid indefinitely.
+ * When posting requests, including metadata requests,
+ * providing src_fn will limit the response to only that callback.
+ *
+ * This modules supports two types of pointer types.  Values marked with
+ * the EMBC_PUBSUB_DFLAG_CONST remain owned by the caller.  The values
+ * must remain valid until the pubsub instance completes publishing.
+ * If also marked with EMBC_PUBSUB_DFLAG_RETAIN, the value must remain
+ * valid until a new value publishes.  We only recommend using this
+ * method with "static const" values.  Note that properly freeing a
+ * pointer type is not trivial, since publishing is asynchronous and
+ * subscriber calling order is not guaranteed.
+ *
  * One "trick" to freeing pointers is to publish two messages:
  * first one with the pointer and then one with NULL.
  * If the publisher also subscribes, then they can free the pointer
  * when they receive the NULL value.  However, this requires that
  * all subscribers only operated on the pointer during the subscriber
  * callback and do not hold on to it.
+ *
+ * The second pointer type is dynamically managed by the pubsub instance.
+ * EMBC_PUBSUB_DFLAG_RETAIN is NOT allowed for these pointer types as
+ * they are only temporarily allocated in a circular buffer.
+ * If the item is too big to ever fit, this function returns
+ * EMBC_ERROR_PARAMETER_INVALID.
+ * If the circular buffer is full, this function returns
+ * EMBC_ERROR_NOT_ENOUGH_MEMORY.  The caller can optionally wait and retry.
  */
 int32_t embc_pubsub_publish(struct embc_pubsub_s * self,
         const char * topic, const struct embc_pubsub_value_s * value,
         embc_pubsub_subscribe_fn src_fn, void * src_user_data);
 
-/// Convenience wrapper for embc_pubsub_publish
-static inline int32_t embc_pubsub_publish_cstr(
-        struct embc_pubsub_s * self,
-        const char * topic, const char * value,
-        embc_pubsub_subscribe_fn src_fn, void * src_user_data) {
-    struct embc_pubsub_value_s s;
-    s.type = EMBC_PUBSUB_TYPE_CSTR;
-    s.value.cstr = value;
-    return embc_pubsub_publish(self, topic, &s, src_fn, src_user_data);
-}
-
-/// Convenience wrapper for embc_pubsub_publish
-static inline int32_t embc_pubsub_publish_u32(
-        struct embc_pubsub_s * self,
-        const char * topic, uint32_t value,
-        embc_pubsub_subscribe_fn src_fn, void * src_user_data) {
-    struct embc_pubsub_value_s s;
-    s.type = EMBC_PUBSUB_TYPE_U32;
-    s.value.u32 = value;
-    return embc_pubsub_publish(self, topic, &s, src_fn, src_user_data);
-}
+/**
+ * @brief Convenience function to set the topic metadata.
+ *
+ * @param self The PubSub instance.
+ * @param topic The topic name.
+ * @param meta_json The JSON-formatted UTF-8 metadata string for the topic.
+ * @return 0 or error code.
+ *
+ * Although you can use embc_pubsub_publish() with topic + '$' and
+ * a const, retained JSON string, this function simplifies the
+ * metadata call.
+ */
+int32_t embc_pubsub_meta(struct embc_pubsub_s * self, const char * topic, const char * meta_json);
 
 /**
  * @brief Get the retained value for a topic.

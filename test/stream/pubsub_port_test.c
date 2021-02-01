@@ -47,11 +47,11 @@ int32_t on_publish(
     int type = value->type;
     check_expected_ptr(topic);
     check_expected(type);
-    const char * cstr = value->value.cstr;
+    const char * cstr = value->value.str;
     uint32_t u32 = value->value.u32;
     switch (value->type) {
-        case EMBC_PUBSUB_TYPE_CSTR: check_expected_ptr(cstr); break;
-        case EMBC_PUBSUB_TYPE_U32: check_expected(u32); break;
+        case EMBC_PUBSUB_DTYPE_STR: check_expected_ptr(cstr); break;
+        case EMBC_PUBSUB_DTYPE_U32: check_expected(u32); break;
         default: break;
     }
     return 0;
@@ -59,12 +59,12 @@ int32_t on_publish(
 
 #define expect_publish_cstr(_topic, _cstr)                  \
     expect_string(on_publish, topic, _topic);               \
-    expect_value(on_publish, type, EMBC_PUBSUB_TYPE_CSTR);  \
+    expect_value(on_publish, type, EMBC_PUBSUB_DTYPE_STR);  \
     expect_string(on_publish, cstr, _cstr);
 
 #define expect_publish_u32(_topic, _u32)                    \
     expect_string(on_publish, topic, _topic);               \
-    expect_value(on_publish, type, EMBC_PUBSUB_TYPE_U32);   \
+    expect_value(on_publish, type, EMBC_PUBSUB_DTYPE_U32);  \
     expect_value(on_publish, u32, _u32);
 
 int32_t on_send(struct embc_transport_s * self,
@@ -109,7 +109,7 @@ static void test_pubsub_to_transport(void ** state) {
     struct test_s * self = (struct test_s *) *state;
     embc_pubsubp_on_event(self->s, EMBC_DL_EV_CONNECTION_ESTABLISHED);
     struct embc_pubsub_value_s value;
-    value.type = EMBC_PUBSUB_TYPE_U32;
+    value.type = EMBC_PUBSUB_DTYPE_U32;
     value.value.u32 = 42;
     uint8_t msg[] = {3 | value.type << 5, 'h', '/', 'w', 0, 4, 42, 0, 0, 0};
     expect_send(2, 0, msg, sizeof(msg));
@@ -120,7 +120,7 @@ static void test_transport_to_pubsub(void ** state) {
     struct test_s * self = (struct test_s *) *state;
     embc_pubsubp_on_event(self->s, EMBC_DL_EV_CONNECTION_ESTABLISHED);
     struct embc_pubsub_value_s value;
-    value.type = EMBC_PUBSUB_TYPE_U32;
+    value.type = EMBC_PUBSUB_DTYPE_U32;
     value.value.u32 = 42;
     uint8_t msg[] = {3 | value.type << 5, 'h', '/', 'w', 0, 4, 42, 0, 0, 0};
     expect_publish_u32("h/w", 42);
