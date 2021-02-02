@@ -273,6 +273,17 @@ enum embc_dl_event_e {
 };
 
 /**
+ * @brief Function called whenever a new message is sent.
+ *
+ * @param user_data Arbitrary user data.
+ *
+ * When used in a threaded environment, this function can signal the
+ * thread that it should call embc_dl_process().  This automatic
+ * hook often eliminates the need for more complicated wrappers.
+ */
+typedef void (*embc_dl_on_send_fn)(void * user_data);
+
+/**
  * @brief The function called on events.
  *
  * @param user_data The arbitrary user data.
@@ -450,6 +461,20 @@ int32_t embc_dl_status_get(
  * @param self The data link instance.
  */
 void embc_dl_status_clear(struct embc_dl_s * self);
+
+/**
+ * @brief Register the function called for each call to embc_dl_send().
+ *
+ * @param self The data link instance.
+ * @param cbk_fn The callback function.
+ * @param cbk_user_data The arbitrary data for cbk_fn.
+ *
+ * Threaded implementations can use this callback to set an event,
+ * task notification, or file handle to tell the thread that
+ * embc_dl_process() should be invoked.
+ */
+void embc_dl_register_on_send(struct embc_dl_s * self,
+                              embc_dl_on_send_fn cbk_fn, void * cbk_user_data);
 
 /**
  * @brief The function used to lock the mutex

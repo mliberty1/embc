@@ -166,8 +166,8 @@ static void test_pubsub_to_transport(void ** state) {
     struct embc_pubsub_value_s value;
     value.type = EMBC_PUBSUB_DTYPE_U32;
     value.value.u32 = 42;
-    uint8_t msg[] = {3 | value.type << 5, 'h', '/', 'w', 0, 4, 42, 0, 0, 0};
-    expect_send(2, 0, msg, sizeof(msg));
+    uint8_t msg[] = {3, 'h', '/', 'w', 0, 4, 42, 0, 0, 0};
+    expect_send(2, ((uint16_t) value.type) << 8, msg, sizeof(msg));
     assert_int_equal(0, embc_pubsubp_on_update(self->s, "h/w", &value));
 }
 
@@ -176,9 +176,9 @@ static void test_transport_to_pubsub(void ** state) {
     struct embc_pubsub_value_s value;
     value.type = EMBC_PUBSUB_DTYPE_U32;
     value.value.u32 = 42;
-    uint8_t msg[] = {3 | value.type << 5, 'h', '/', 'w', 0, 4, 42, 0, 0, 0};
+    uint8_t msg[] = {3 , 'h', '/', 'w', 0, 4, 42, 0, 0, 0};
     expect_publish_u32("h/w", 42);
-    embc_pubsubp_on_recv(self->s, 2, EMBC_TRANSPORT_SEQ_SINGLE, 0, msg, sizeof(msg));
+    embc_pubsubp_on_recv(self->s, 2, EMBC_TRANSPORT_SEQ_SINGLE,  ((uint16_t) value.type) << 8, msg, sizeof(msg));
 }
 
 int main(void) {

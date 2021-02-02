@@ -78,8 +78,7 @@ class PubSubPort:
     def on_event(self, event):
         pass
 
-    def send(self, topic, value, port_data=None):
-        port_data = 0 if port_data is None else int(port_data)
+    def send(self, topic, value):
         topic_bytes = topic.encode('utf-8') + b'\x00'
         topic_len = len(topic_bytes)
         if topic_len > 32:
@@ -88,27 +87,26 @@ class PubSubPort:
         sz = 1 + 1 + topic_len + 1 + len(payload)
         if sz > 256:
             raise ValueError(f'message too long: {sz}')
+        port_data = (payload_type & 0x0f) << 8
         msg = np.empty(sz, dtype=np.uint8)
-        msg[0] = 0
-        msg[1] = (topic_len - 1) | (payload_type << 5)
-        msg[2:topic_len + 2] = memoryview(topic_bytes)
-        msg[2 + topic_len] = len(payload)
+        msg[0] = (topic_len - 1)
+        msg[1:topic_len + 1] = memoryview(topic_bytes)
+        msg[1 + topic_len] = len(payload)
         if len(payload):
-            msg[3 + topic_len:] = memoryview(payload)
+            msg[2 + topic_len:] = memoryview(payload)
         self._send(port_data, msg)
 
     def on_recv(self, port_data, msg):
-        status = msg[0]
-        topic_len = (msg[1] & 0x1f) + 1
-        payload_type = (msg[1] >> 5) & 0x07
-        topic = msg[2:topic_len+1].tobytes().decode('utf-8')
-        payload_len = msg[2 + topic_len]
-        payload = msg[3 + topic_len:]
+        topic_len = (msg[0] & 0x1f) + 1
+        payload_type = (port_data >> 8) & 0x0f
+        topic = msg[1:topic_len].tobytes().decode('utf-8')
+        payload_len = msg[1 + topic_len]
+        payload = msg[2 + topic_len:]
         if len(payload) != payload_len:
             log.warning('Invalid payload')
             return
         payload_fn = _PAYLOAD_TYPE_FN[payload_type]
         x = payload_fn(payload)
-        log.info("recv(status=%s, topic='%s', value=%s, port_data=%s)", status, topic, x, port_data)
+        log.info("recv(topic='%s', value=%s, port_data=%s)", topic, x, port_data)
         if callable(self.listener):
             self.listener(topic, x)

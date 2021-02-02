@@ -95,6 +95,9 @@ struct embc_dl_s {
     enum tx_state_e tx_state;
     uint32_t tx_reset_last_ms;
 
+    embc_dl_on_send_fn on_send_cbk;
+    void * on_send_user_data;
+
     embc_dl_lock lock;
     embc_dl_unlock unlock;
     void * lock_user_data;
@@ -159,6 +162,10 @@ int32_t embc_dl_send(struct embc_dl_s * self,
     self->tx_frame_next_id = (frame_id + 1) & EMBC_FRAMER_FRAME_ID_MAX;
     // frame queued for send_data()
     self->unlock(self->lock_user_data);
+
+    if (self->on_send_cbk) {
+        self->on_send_cbk(self->on_send_user_data);
+    }
     return 0;
 }
 
@@ -739,6 +746,12 @@ void embc_dl_status_clear(struct embc_dl_s * self) {
     embc_memset(&self->rx_framer.status, 0, sizeof(self->rx_framer.status));
     embc_memset(&self->tx_status, 0, sizeof(self->tx_status));
     self->unlock(self->lock_user_data);
+}
+
+void embc_dl_register_on_send(struct embc_dl_s * self,
+                              embc_dl_on_send_fn cbk_fn, void * cbk_user_data) {
+    self->on_send_cbk = cbk_fn;
+    self->on_send_user_data = cbk_user_data;
 }
 
 void embc_dl_register_lock(struct embc_dl_s * self, embc_dl_lock lock, embc_dl_unlock unlock, void * user_data) {

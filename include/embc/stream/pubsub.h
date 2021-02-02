@@ -165,6 +165,10 @@ typedef uint8_t (*embc_pubsub_subscribe_fn)(void * user_data,
  * @brief Function called whenever a new message is published.
  *
  * @param user_data Arbitrary user data.
+ *
+ * When used in a threaded environment, this function can signal the
+ * thread that it should call embc_pubsub_process().  This automatic
+ * hook often eliminates the need for more complicated wrappers.
  */
 typedef void (*embc_pubsub_on_publish_fn)(void * user_data);
 
@@ -205,7 +209,7 @@ void embc_pubsub_finalize(struct embc_pubsub_s * self);
 /**
  * @brief Register the function called for each call to embc_pubsub_publish().
  *
- * @param self The PubSub instance
+ * @param self The PubSub instance.
  * @param cbk_fn The callback function.
  * @param cbk_user_data The arbitrary data for cbk_fn.
  *

@@ -183,15 +183,16 @@ void embc_pubsubp_on_recv(struct embc_pubsubp_s *self,
         EMBC_LOGW("invalid seq: %d", (int) seq);
         return;
     }
-    if (port_data != 0) {
-        EMBC_LOGW("invalide port_data: %d", (int) port_data);
+    uint8_t type = (port_data >> 8) & 0xff;
+    uint8_t dtype = type & EMBC_PUBSUB_DTYPE_MASK;
+    if ((port_data & 0x00ff) != 0) {
+        EMBC_LOGW("invalid port_data: %d", (int) port_data);
         return;
     }
     if (msg_size < 3) {
         EMBC_LOGW("msg too small");
         return;
     }
-    uint8_t payload_type = (msg[0] >> 5) & 0x07;
     uint8_t topic_len = (msg[0] & 0x1f) + 1;  // 32 max
     char * topic = (char *) (msg + 1);
 
@@ -215,8 +216,8 @@ void embc_pubsubp_on_recv(struct embc_pubsubp_s *self,
 
     // parse message
     struct embc_pubsub_value_s value;
-    value.type = payload_type;
-    switch (payload_type) {
+    value.type = type;
+    switch (dtype) {
         case EMBC_PUBSUB_DTYPE_NULL:
             break;
         case EMBC_PUBSUB_DTYPE_STR:
@@ -237,7 +238,7 @@ void embc_pubsubp_on_recv(struct embc_pubsubp_s *self,
             break;
 
         default:
-            EMBC_LOGW("unsupported type: %d", (int) payload_type);
+            EMBC_LOGW("unsupported type: %d", (int) dtype);
             return;
     }
     embc_pubsub_publish(self->pubsub, topic, &value,
@@ -262,12 +263,15 @@ uint8_t embc_pubsubp_on_update(struct embc_pubsubp_s *self,
     *p++ = 0;       // add string terminator
     ++topic_len;
 
-    self->msg[0] = ((topic_len - 1) & 0x1f) | ((value->type & 0x07) << 5);
+    uint8_t dtype = value->type & EMBC_PUBSUB_DTYPE_MASK;
+    uint16_t port_data = 0 | (((uint16_t) value->type & 0xff) << 8);
+
+    self->msg[0] = ((topic_len - 1) & 0x1f);
     uint8_t payload_sz_max = sizeof(self->msg) - ((uint8_t *) (p + 1) - self->msg);
     uint8_t payload_sz = 0;
     uint8_t * hdr = (uint8_t *) p++;
 
-    switch (value->type) {
+    switch (dtype) {
         case EMBC_PUBSUB_DTYPE_NULL:
             break;
         case EMBC_PUBSUB_DTYPE_STR:  // intentional fall-through
@@ -312,6 +316,6 @@ uint8_t embc_pubsubp_on_update(struct embc_pubsubp_s *self,
     }
     *hdr = (uint8_t) payload_sz;
     embc_transport_send(self->transport, self->port_id, EMBC_TRANSPORT_SEQ_SINGLE,
-                        0, self->msg, 2 + topic_len + payload_sz);
+                        port_data, self->msg, 2 + topic_len + payload_sz);
     return 0;
 }

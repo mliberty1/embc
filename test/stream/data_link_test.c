@@ -206,6 +206,20 @@ static void connect(struct test_s *self) {
     embc_dl_status_clear(self->dl);
 }
 
+void on_send_fn(void * user_data) {
+    (void) user_data;
+    int value = 0;
+    check_expected(value);
+}
+
+static void test_on_send_cbk(void ** state) {
+    struct test_s *self = (struct test_s *) *state;
+    connect(self);
+    embc_dl_register_on_send(self->dl, on_send_fn, self);
+    expect_value(on_send_fn, value, 0);
+    assert_int_equal(0, embc_dl_send(self->dl, 1, PAYLOAD1, sizeof(PAYLOAD1)));
+}
+
 static void test_send_data_with_ack(void ** state) {
     struct test_s *self = (struct test_s *) *state;
     struct embc_dl_status_s status;
@@ -363,6 +377,7 @@ int main(void) {
     hal_test_initialize();
     const struct CMUnitTest tests[] = {
             cmocka_unit_test_setup_teardown(test_initial_state, setup, teardown),
+            cmocka_unit_test_setup_teardown(test_on_send_cbk, setup, teardown),
             cmocka_unit_test_setup_teardown(test_send_data_with_ack, setup, teardown),
             cmocka_unit_test_setup_teardown(test_send_nack_resend_ack, setup, teardown),
             cmocka_unit_test_setup_teardown(test_send_data_timeout_then_ack, setup, teardown),
