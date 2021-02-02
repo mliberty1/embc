@@ -146,9 +146,9 @@ static int setup(void ** state) {
     expect_subscribe("s");
     embc_pubsubp_transport_register(self->s, 2, &self->t);
 
-    expect_publish_u32("s/c/ev", EMBC_DL_EV_CONNECTION_ESTABLISHED);
+    expect_publish_u32("s/c/ev", EMBC_DL_EV_TX_CONNECTED);
     expect_publish_u32("s/c/tx", 1);
-    embc_pubsubp_on_event(self->s, EMBC_DL_EV_CONNECTION_ESTABLISHED);
+    embc_pubsubp_on_event(self->s, EMBC_DL_EV_TX_CONNECTED);
 
     *state = self;
     return 0;

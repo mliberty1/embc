@@ -256,10 +256,10 @@ enum embc_dl_event_e {
     EMBC_DL_EV_UNKNOWN,
 
     /// The remote issued a reset command for our receive path.
-    EMBC_DL_EV_RECEIVED_RESET,
+    EMBC_DL_EV_RX_RESET_REQUEST,
 
     /// The remote device is no longer responding to transmissions.
-    EMBC_DL_EV_CONNECTION_LOST,
+    EMBC_DL_EV_TX_DISCONNECTED,
 
     /**
      * @brief The remote device established a transmit connection.
@@ -269,7 +269,7 @@ enum embc_dl_event_e {
      * path is working, but we will not receive data until the
      * remote successfully completes the same process.
      */
-    EMBC_DL_EV_CONNECTION_ESTABLISHED,
+    EMBC_DL_EV_TX_CONNECTED,
 };
 
 /**

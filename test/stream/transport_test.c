@@ -50,7 +50,7 @@ static int setup(void ** state) {
     struct embc_dl_s * self = embc_alloc_clr(sizeof(struct embc_dl_s));
     self->t = embc_transport_initialize(ll_send, self);
     assert_non_null(self->t);
-    embc_transport_on_event_cbk(self->t, EMBC_DL_EV_CONNECTION_ESTABLISHED);
+    embc_transport_on_event_cbk(self->t, EMBC_DL_EV_TX_CONNECTED);
 
     *state = self;
     return 0;
@@ -100,22 +100,22 @@ void on_recv(void *user_data, uint8_t port_id,
 
 static void test_event(void ** state) {
     struct embc_dl_s * self = (struct embc_dl_s *) *state;
-    expect_event(EMBC_DL_EV_CONNECTION_ESTABLISHED);
+    expect_event(EMBC_DL_EV_TX_CONNECTED);
     assert_int_equal(0, embc_transport_port_register(self->t, 1, on_event, on_recv, self));
-    expect_event(EMBC_DL_EV_RECEIVED_RESET);
-    embc_transport_on_event_cbk(self->t, EMBC_DL_EV_RECEIVED_RESET);
+    expect_event(EMBC_DL_EV_RX_RESET_REQUEST);
+    embc_transport_on_event_cbk(self->t, EMBC_DL_EV_RX_RESET_REQUEST);
 }
 
 static void test_event_when_not_connected(void ** state) {
     struct embc_dl_s * self = (struct embc_dl_s *) *state;
-    embc_transport_on_event_cbk(self->t, EMBC_DL_EV_CONNECTION_LOST);
-    expect_event(EMBC_DL_EV_CONNECTION_LOST);
+    embc_transport_on_event_cbk(self->t, EMBC_DL_EV_TX_DISCONNECTED);
+    expect_event(EMBC_DL_EV_TX_DISCONNECTED);
     assert_int_equal(0, embc_transport_port_register(self->t, 1, on_event, on_recv, self));
 }
 
 static void test_recv(void ** state) {
     struct embc_dl_s * self = (struct embc_dl_s *) *state;
-    expect_event(EMBC_DL_EV_CONNECTION_ESTABLISHED);
+    expect_event(EMBC_DL_EV_TX_CONNECTED);
     assert_int_equal(0, embc_transport_port_register(self->t, 1, on_event, on_recv, self));
 
     expect_recv(1, EMBC_TRANSPORT_SEQ_SINGLE, 0x1234, DATA1, sizeof(DATA1));

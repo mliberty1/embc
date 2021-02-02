@@ -36,8 +36,8 @@ struct embc_transport_s {
 
 void embc_transport_on_event_cbk(struct embc_transport_s * self, enum embc_dl_event_e event) {
     switch (event) {
-        case EMBC_DL_EV_CONNECTION_ESTABLISHED:  // intentional fall-through
-        case EMBC_DL_EV_CONNECTION_LOST:
+        case EMBC_DL_EV_TX_CONNECTED:  // intentional fall-through
+        case EMBC_DL_EV_TX_DISCONNECTED:
             self->last_tx_event = event;
             break;
         default:
@@ -63,7 +63,7 @@ void embc_transport_on_recv_cbk(struct embc_transport_s * self, uint32_t metadat
 struct embc_transport_s * embc_transport_initialize(embc_transport_ll_send send_fn, void * send_user_data) {
     struct embc_transport_s * t = embc_alloc_clr(sizeof(struct embc_transport_s));
     EMBC_ASSERT_ALLOC(t);
-    t->last_tx_event = EMBC_DL_EV_CONNECTION_LOST;
+    t->last_tx_event = EMBC_DL_EV_TX_DISCONNECTED;
     t->send_fn = send_fn;
     t->send_user_data = send_user_data;
     return t;

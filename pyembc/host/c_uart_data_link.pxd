@@ -49,8 +49,8 @@ cdef extern from "embc/stream/data_link.h":
 
     enum embc_dl_event_e:
         EMBC_DL_EV_UNKNOWN
-        EMBC_DL_EV_RECEIVED_RESET
-        EMBC_DL_EV_CONNECTION_LOST
+        EMBC_DL_EV_RX_RESET_REQUEST
+        EMBC_DL_EV_TX_DISCONNECTED
         EMBC_DL_EV_INTERNAL_ERROR
 
     struct embc_dl_api_s:

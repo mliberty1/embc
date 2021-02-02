@@ -156,10 +156,10 @@ static void publish_tx(struct embc_pubsubp_s *self, uint32_t value) {
 void embc_pubsubp_on_event(struct embc_pubsubp_s *self, enum embc_dl_event_e event)  {
     publish_ev(self, event);
     switch (event) {
-        case EMBC_DL_EV_CONNECTION_ESTABLISHED:
+        case EMBC_DL_EV_TX_CONNECTED:
             publish_tx(self, 1);
             break;
-        case EMBC_DL_EV_CONNECTION_LOST:
+        case EMBC_DL_EV_TX_DISCONNECTED:
             publish_tx(self, 0);
             break;
         default:

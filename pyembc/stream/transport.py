@@ -1,4 +1,4 @@
-# Copyright 2020 Jetperch LLC
+# Copyright 2021 Jetperch LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,25 +12,32 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from .data_link import PORTS_MAX, PAYLOAD_MAX, Event
 import logging
 import numpy as np
 
 
 log = logging.getLogger(__name__)
-PORTS_MAX = 0x1f
-PAYLOAD_MAX = 256
+
+
+class PortApi:
+
+    def on_event(self, event):
+        raise NotImplementedError()
+
+    def on_recv(self, port_data, msg):
+        raise NotImplementedError()
 
 
 class _Port:
 
-    def __init__(self):
-        self._on_event = None
-        self._on_recv = None
+    def __init__(self, port=None):
+        self.port = port
         self._msg = []
 
     def on_event(self, event):
-        if callable(self._on_event):
-            self._on_event(event)
+        if self.port is not None and callable(self.port.on_event):
+            self.port.on_event(event)
 
     def on_recv(self, metadata, msg):
         seq = (metadata >> 6) & 0x03
@@ -44,21 +51,20 @@ class _Port:
         if 0 != (seq & 1):
             msg = np.concatenate(self._msg)
             self._msg.clear()
-            if callable(self._on_recv):
-                self._on_recv(port_data, msg)
-
-    def register(self, on_event, on_recv):
-        self._on_event = on_event
-        self._on_recv = on_recv
+            if self.port is not None and callable(self.port.on_recv):
+                self.port.on_recv(port_data, msg)
 
 
 class Transport:
 
     def __init__(self, send_fn=None):
         self.send_fn = send_fn
+        self._last_tx_event = Event.TX_DISCONNECTED
         self._ports = [_Port() for idx in range(PORTS_MAX + 1)]
 
     def on_event(self, event):
+        if event == Event.TX_CONNECTED or event == Event.TX_DISCONNECTED:
+            self._last_tx_event = event
         for port in self._ports:
             port.on_event(event)
 
@@ -86,15 +92,14 @@ class Transport:
             self.send_fn(metadata, payload)
             seq = 0
 
-    def register_port(self, port_id, on_event, on_recv):
+    def register_port(self, port_id, port):
         """Register port handlers.
 
         :param port_id: The port identifier.
-        :param on_event: The function(event) to call on new events.
-        :param on_recv: The function(port_data, msg) to call on messages.
+        :param port: The object that implements the :class:`PortApi`.
         """
         port_id = int(port_id)
         if not 0 <= port_id <= PORTS_MAX:
             raise ValueError('invalid port: %d', port_id)
-        self._ports[port_id].register(on_event, on_recv)
-
+        self._ports[port_id].port = port
+        self._ports[port_id].on_event(self._last_tx_event)

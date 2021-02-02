@@ -16,6 +16,16 @@ import weakref
 from collections.abc import Mapping
 
 
+def _as_bool(x):
+    if isinstance(x, str):
+        x = x.lower()
+    if x in [0, 'no', 'off', 'disable', 'disabled', 'false', 'inactive']:
+        return False
+    if x in [1, 'yes', 'on', 'enable', 'enabled', 'true', 'active']:
+        return True
+    raise ValueError(f'Invalid boolean value: {x}')
+
+
 class _Topic:
 
     def __init__(self, parent, topic, value=None):
@@ -27,6 +37,7 @@ class _Topic:
         """
         self._topic = topic
         self._value = value
+        self._meta = None
         if parent is not None:
             parent = weakref.ref(parent)
         self.parent = parent
@@ -44,14 +55,15 @@ class _Topic:
     def value(self, x):
         self.publish(x)
 
-    def publish(self, x, src_cbk=None):
-        self._value = x
+    def publish(self, x, retain=None, src_cbk=None):
+        if bool(retain):
+            self._value = x
         topic = self
         while topic is not None:
             for subscriber in topic._subscribers:
                 if subscriber == src_cbk:
                     continue
-                subscriber(self._topic, self._value)
+                subscriber(self._topic, x)
             topic = topic.parent
             if topic is not None:
                 topic = topic()  # weakref to parent
@@ -62,12 +74,13 @@ class _Topic:
         if self._value is not None:
             cbk(self._topic, self._value)
 
-    def subscribe(self, cbk):
+    def subscribe(self, cbk, skip_retained=None):
         if not callable(cbk):
             raise ValueError('subscribers must be callable')
         if cbk not in self._subscribers:
             self._subscribers.append(cbk)
-        self._publish_new_subscriber(cbk)
+        if not bool(skip_retained):
+            self._publish_new_subscriber(cbk)
 
     def unsubscribe(self, cbk):
         self._subscribers.remove(cbk)
@@ -102,15 +115,22 @@ class PubSub:
                 t = child
         return t
 
-    def publish(self, topic, value, src_cbk=None):
+    def publish(self, topic, value, retain=None, src_cbk=None):
         """Publish to a topic.
 
         :param topic: The topic name.
         :param value: The value for the topic.
+        :param retain: True to retain (hold on to) value, False publish & discard.
+            None (default) is False.
         :param src_cbk: The subscriber that will not be updated.
+            None (default) updates all applicable subscribers.
         """
         t = self._topic_find(topic, create=True)
-        return t.publish(value, src_cbk)
+        return t.publish(value, retain, src_cbk)
+
+    def meta(self, topic, meta):
+        t = self._topic_find(topic, create=True)
+        t.meta = meta
 
     def get(self, topic):
         """Get the retained value for the topic.
@@ -124,14 +144,16 @@ class PubSub:
             raise KeyError(f'topic {topic} does not exist')
         return t.value
 
-    def subscribe(self, topic, cbk):
+    def subscribe(self, topic, cbk, skip_retained=None):
         """Subscribe to a topic and its children.
 
         :param topic: The topic name.
         :param cbk: The callable(topic, value) called on value changes.
+        :param skip_retained: Skip the update of all retained values
+            that normally occurs when subscribing.
         """
         t = self._topic_find(topic, create=True)
-        t.subscribe(cbk)
+        t.subscribe(cbk, skip_retained)
 
     def unsubscribe(self, topic, cbk):
         """Unsubscribe from a topic.
@@ -141,3 +163,16 @@ class PubSub:
         """
         t = self._topic_find(topic, create=True)
         t.unsubscribe(cbk)
+
+    def create(self, topic, meta=None, subscriber_cbk=None):
+        t = self._topic_find(topic, create=False)
+        if t is not None:
+            raise ValueError(f'Topic {topic} already exists')
+        t = self._topic_find(topic, create=True)
+        t.meta = meta
+        if meta is not None and 'default' in meta:
+            retain = _as_bool(meta.get('retain', 0))
+            x = meta['default']
+            t.publish(x, retain, subscriber_cbk)
+        if subscriber_cbk is not None:
+            t.subscribe(subscriber_cbk)

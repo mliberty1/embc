@@ -209,7 +209,7 @@ static void send_data(struct embc_dl_s * self, uint16_t frame_id) {
     if (f->send_count > SEND_COUNT_MAX) {
         EMBC_LOGW("send_data(%d), count=%d", (int) frame_id, (int) f->send_count);
         tx_reset(self);
-        event_emit(self, EMBC_DL_EV_CONNECTION_LOST);
+        event_emit(self, EMBC_DL_EV_TX_DISCONNECTED);
     } else {
         EMBC_LOGD3("send_data(%d) buf->%d, count=%d, last=%d, next=%d",
                    (int) frame_id, (int) tx_buf_frame_id(f), (int) f->send_count,
@@ -483,12 +483,12 @@ static void handle_reset(struct embc_dl_s * self, uint16_t frame_id) {
         case 0:  // reset request
             rx_reset(self);
             send_link(self, EMBC_FRAMER_FT_RESET, 1);
-            event_emit(self, EMBC_DL_EV_RECEIVED_RESET);
+            event_emit(self, EMBC_DL_EV_RX_RESET_REQUEST);
             break;
         case 1:  // reset response
             if (self->tx_state == TX_ST_DISCONNECTED) {
                 self->tx_state = TX_ST_CONNECTED;
-                event_emit(self, EMBC_DL_EV_CONNECTION_ESTABLISHED);
+                event_emit(self, EMBC_DL_EV_TX_CONNECTED);
             } else {
                 EMBC_LOGW("ignore reset rsp since already connected");
             }

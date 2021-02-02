@@ -13,7 +13,7 @@
 # limitations under the License.
 
 import unittest
-from pyembc.host.pubsub import PubSub
+from pyembc.stream.pubsub import PubSub
 
 
 class PubSubTest(unittest.TestCase):
@@ -34,8 +34,13 @@ class PubSubTest(unittest.TestCase):
         self.p.publish('hello/world', 'there')
         self.assertEqual([('hello/world', 'there')], self.sub1)
 
-    def test_pub_sub(self):  # retained value
+    def test_pub_sub_not_retained(self):
         self.p.publish('hello/world', 'there')
+        self.p.subscribe('hello/world', self.sub1_fn)
+        self.assertEqual([], self.sub1)
+
+    def test_pub_sub_retained(self):  # retained value
+        self.p.publish('hello/world', 'there', retain=True)
         self.p.subscribe('hello/world', self.sub1_fn)
         self.assertEqual([('hello/world', 'there')], self.sub1)
 
@@ -58,7 +63,9 @@ class PubSubTest(unittest.TestCase):
         self.assertEqual([], self.sub1)
 
     def test_get(self):
-        self.p.publish('hello/world', 'there')
+        self.p.publish('hello/world', 'there', retain=True)
         self.assertEqual('there', self.p.get('hello/world'))
-        self.p.publish('hello/world', 'new')
+        self.p.publish('hello/world', 'new', retain=True)
+        self.assertEqual('new', self.p.get('hello/world'))
+        self.p.publish('hello/world', 'newer')  # not retained!
         self.assertEqual('new', self.p.get('hello/world'))

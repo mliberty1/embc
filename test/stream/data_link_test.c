@@ -201,7 +201,7 @@ static void recv_data(struct test_s *self, uint16_t frame_id, uint16_t metadata,
 static void connect(struct test_s *self) {
     expect_send_link(self, EMBC_FRAMER_FT_RESET, 0);
     embc_dl_process(self->dl);
-    expect_event(EMBC_DL_EV_CONNECTION_ESTABLISHED);
+    expect_event(EMBC_DL_EV_TX_CONNECTED);
     recv_link(self, EMBC_FRAMER_FT_RESET, 1);
     embc_dl_status_clear(self->dl);
 }
@@ -367,7 +367,7 @@ static void test_reset_retry(void ** state) {
     embc_dl_process(self->dl);
 
     self->time_ms += 1000;
-    expect_event(EMBC_DL_EV_CONNECTION_ESTABLISHED);
+    expect_event(EMBC_DL_EV_TX_CONNECTED);
     recv_link(self, EMBC_FRAMER_FT_RESET, 1);
 
     embc_dl_process(self->dl);
