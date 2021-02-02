@@ -264,7 +264,9 @@ uint8_t embc_pubsubp_on_update(struct embc_pubsubp_s *self,
     ++topic_len;
 
     uint8_t dtype = value->type & EMBC_PUBSUB_DTYPE_MASK;
-    uint16_t port_data = 0 | (((uint16_t) value->type & 0xff) << 8);
+    uint8_t dflag = value->type & EMBC_PUBSUB_DFLAG_MASK;
+    dflag &= ~EMBC_PUBSUB_DFLAG_CONST;  // remove const, only applicable locally
+    uint16_t port_data = 0 | (((uint16_t) (dflag | dtype)) << 8);
 
     self->msg[0] = ((topic_len - 1) & 0x1f);
     uint8_t payload_sz_max = sizeof(self->msg) - ((uint8_t *) (p + 1) - self->msg);
