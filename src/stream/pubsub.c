@@ -515,7 +515,7 @@ static void metadata_publish(struct topic_s * topic, char * topic_str) {
         topic_str[idx] = '$';
         topic_str[idx + 1] = 0;
     }
-    struct embc_pubsub_value_s meta = *embc_pubsub_cjson_r(topic->meta);
+    struct embc_pubsub_value_s meta = embc_pubsub_cjson_r(topic->meta);
     while (topic) {
         embc_list_foreach(&topic->subscribers, item) {
             subscriber = EMBC_CONTAINER_OF(item, struct subscriber_s, item);
@@ -542,7 +542,7 @@ static void metadata_request(struct topic_s * t, struct message_s * msg) {
             size_t idx = strlen(topic_str);
             topic_str[idx] = '$';
             topic_str[idx + 1] = 0;
-            msg->src_fn(msg->src_user_data, topic_str, embc_pubsub_cjson_r(subtopic->meta));
+            msg->src_fn(msg->src_user_data, topic_str, &embc_pubsub_cjson_r(subtopic->meta));
             topic_str[idx] = 0;
         } else {
             metadata_publish(subtopic, topic_str);

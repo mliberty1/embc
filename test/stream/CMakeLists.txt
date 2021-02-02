@@ -19,7 +19,6 @@ ADD_CMOCKA_TEST(data_link_test)
 ADD_CMOCKA_TEST(framer_test)
 ADD_CMOCKA_TEST(msg_ring_buffer_test)
 ADD_CMOCKA_TEST(port0_test)
-ADD_CMOCKA_TEST(pubsub_port_test)
 ADD_CMOCKA_TEST(pubsub_test)
 ADD_CMOCKA_TEST(ring_buffer_u64_test)
 
@@ -29,6 +28,13 @@ add_executable(transport_test transport_test.c ../../src/stream/transport.c ../.
 add_dependencies(${TARGET} test_objlib cmocka)
 target_link_libraries(transport_test cmocka)
 add_test(transport_test ${CMAKE_CURRENT_BINARY_DIR}/transport_test)
+
+# pubsub_port_test special build to break dependencies
+SET_FILENAME("pubsub_port_test.c")
+add_executable(pubsub_port_test pubsub_port_test.c ../../src/stream/pubsub_port.c ../../src/platform.c ../../src/log.c $<TARGET_OBJECTS:test_objlib>)
+add_dependencies(${TARGET} test_objlib cmocka)
+target_link_libraries(pubsub_port_test cmocka)
+add_test(pubsub_port_test ${CMAKE_CURRENT_BINARY_DIR}/pubsub_port_test)
 
 
 add_executable(stream_tester stream_tester.c $<TARGET_OBJECTS:embc_objlib>)

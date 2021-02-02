@@ -15,8 +15,6 @@
  */
 
 #include "embc/stream/transport.h"
-#include "embc/stream/data_link.h"
-#include "embc/log.h"
 #include "embc/ec.h"
 #include "embc/platform.h"
 
@@ -33,9 +31,18 @@ struct embc_transport_s {
     void * send_user_data;
     /// The defined ports.
     struct port_s ports[EMBC_TRANSPORT_PORT_MAX];
+    enum embc_dl_event_e last_tx_event;
 };
 
 void embc_transport_on_event_cbk(struct embc_transport_s * self, enum embc_dl_event_e event) {
+    switch (event) {
+        case EMBC_DL_EV_CONNECTION_ESTABLISHED:  // intentional fall-through
+        case EMBC_DL_EV_CONNECTION_LOST:
+            self->last_tx_event = event;
+            break;
+        default:
+            break;
+    }
     for (uint32_t i = 0; i < EMBC_TRANSPORT_PORT_MAX; ++i) {
         if (self->ports[i].event_fn) {
             self->ports[i].event_fn(self->ports[i].user_data, event);
@@ -56,6 +63,7 @@ void embc_transport_on_recv_cbk(struct embc_transport_s * self, uint32_t metadat
 struct embc_transport_s * embc_transport_initialize(embc_transport_ll_send send_fn, void * send_user_data) {
     struct embc_transport_s * t = embc_alloc_clr(sizeof(struct embc_transport_s));
     EMBC_ASSERT_ALLOC(t);
+    t->last_tx_event = EMBC_DL_EV_CONNECTION_LOST;
     t->send_fn = send_fn;
     t->send_user_data = send_user_data;
     return t;
@@ -79,6 +87,9 @@ int32_t embc_transport_port_register(struct embc_transport_s * self, uint8_t por
     self->ports[port_id].user_data = user_data;
     self->ports[port_id].event_fn = event_fn;
     self->ports[port_id].recv_fn = recv_fn;
+    if (event_fn) {
+        event_fn(user_data, self->last_tx_event);
+    }
     return 0;
 }
 

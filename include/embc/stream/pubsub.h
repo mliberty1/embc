@@ -92,6 +92,8 @@ extern "C" {
 
 #define EMBC_PUBSUB_TOPIC_LENGTH_MAX (32)
 #define EMBC_PUBSUB_TOPIC_LENGTH_PER_LEVEL (8)
+#define EMBC_PUBSUB_DTYPE_MASK (0x0f)
+#define EMBC_PUBSUB_DFLAG_MASK (0xf0)
 
 
 /// The allowed data types.
@@ -108,8 +110,6 @@ enum embc_pubsub_dflag_e {
     EMBC_PUBSUB_DFLAG_RETAIN = (1 << 4),
     EMBC_PUBSUB_DFLAG_CONST = (1 << 5),
 };
-
-#define EMBC_PUBSUB_DTYPE_MASK (0x0f)
 
 /// The value holder for all types.
 struct embc_pubsub_value_s {
@@ -130,22 +130,22 @@ struct embc_pubsub_value_s {
     uint32_t size;             ///< payload size for pointer types.
 };
 
-#define embc_pubsub_null() &((struct embc_pubsub_value_s){.type=EMBC_PUBSUB_DTYPE_NULL, .value={.u32=0}, .size=0})
-#define embc_pubsub_null_r() &((struct embc_pubsub_value_s){.type=EMBC_PUBSUB_DTYPE_NULL | EMBC_PUBSUB_DFLAG_RETAIN, .value={.u32=0}, .size=0})
-#define embc_pubsub_u32(_value) &((struct embc_pubsub_value_s){.type=EMBC_PUBSUB_DTYPE_U32, .value={.u32=_value}, .size=0})
-#define embc_pubsub_u32_r(_value) &((struct embc_pubsub_value_s){.type=EMBC_PUBSUB_DTYPE_U32 | EMBC_PUBSUB_DFLAG_RETAIN, .value={.u32=_value}, .size=0})
+#define embc_pubsub_null() ((struct embc_pubsub_value_s){.type=EMBC_PUBSUB_DTYPE_NULL, .value={.u32=0}, .size=0})
+#define embc_pubsub_null_r() ((struct embc_pubsub_value_s){.type=EMBC_PUBSUB_DTYPE_NULL | EMBC_PUBSUB_DFLAG_RETAIN, .value={.u32=0}, .size=0})
+#define embc_pubsub_u32(_value) ((struct embc_pubsub_value_s){.type=EMBC_PUBSUB_DTYPE_U32, .value={.u32=_value}, .size=0})
+#define embc_pubsub_u32_r(_value) ((struct embc_pubsub_value_s){.type=EMBC_PUBSUB_DTYPE_U32 | EMBC_PUBSUB_DFLAG_RETAIN, .value={.u32=_value}, .size=0})
 
-#define embc_pubsub_str(_value) &((struct embc_pubsub_value_s){.type=EMBC_PUBSUB_DTYPE_STR, .value={.str=_value}, .size=0})
-#define embc_pubsub_cstr(_value) &((struct embc_pubsub_value_s){.type=EMBC_PUBSUB_DTYPE_STR | EMBC_PUBSUB_DFLAG_CONST, .value={.str=_value}, .size=0})
-#define embc_pubsub_cstr_r(_value) &((struct embc_pubsub_value_s){.type=EMBC_PUBSUB_DTYPE_STR | EMBC_PUBSUB_DFLAG_CONST | EMBC_PUBSUB_DFLAG_RETAIN, .value={.str=_value}, .size=0})
+#define embc_pubsub_str(_value) ((struct embc_pubsub_value_s){.type=EMBC_PUBSUB_DTYPE_STR, .value={.str=_value}, .size=0})
+#define embc_pubsub_cstr(_value) ((struct embc_pubsub_value_s){.type=EMBC_PUBSUB_DTYPE_STR | EMBC_PUBSUB_DFLAG_CONST, .value={.str=_value}, .size=0})
+#define embc_pubsub_cstr_r(_value) ((struct embc_pubsub_value_s){.type=EMBC_PUBSUB_DTYPE_STR | EMBC_PUBSUB_DFLAG_CONST | EMBC_PUBSUB_DFLAG_RETAIN, .value={.str=_value}, .size=0})
 
-#define embc_pubsub_json(_value) &((struct embc_pubsub_value_s){.type=EMBC_PUBSUB_DTYPE_JSON, .value={.str=_value}, .size=0})
-#define embc_pubsub_cjson(_value) &((struct embc_pubsub_value_s){.type=EMBC_PUBSUB_DTYPE_JSON | EMBC_PUBSUB_DFLAG_CONST, .value={.str=_value}, .size=0})
-#define embc_pubsub_cjson_r(_value) &((struct embc_pubsub_value_s){.type=EMBC_PUBSUB_DTYPE_JSON | EMBC_PUBSUB_DFLAG_CONST | EMBC_PUBSUB_DFLAG_RETAIN, .value={.str=_value}, .size=0})
+#define embc_pubsub_json(_value) ((struct embc_pubsub_value_s){.type=EMBC_PUBSUB_DTYPE_JSON, .value={.str=_value}, .size=0})
+#define embc_pubsub_cjson(_value) ((struct embc_pubsub_value_s){.type=EMBC_PUBSUB_DTYPE_JSON | EMBC_PUBSUB_DFLAG_CONST, .value={.str=_value}, .size=0})
+#define embc_pubsub_cjson_r(_value) ((struct embc_pubsub_value_s){.type=EMBC_PUBSUB_DTYPE_JSON | EMBC_PUBSUB_DFLAG_CONST | EMBC_PUBSUB_DFLAG_RETAIN, .value={.str=_value}, .size=0})
 
-#define embc_pubsub_bin(_value, _size) &((struct embc_pubsub_value_s){.type=EMBC_PUBSUB_DTYPE_BIN, .value={.str=_value}, .size=_size})
-#define embc_pubsub_cbin(_value, _size) &((struct embc_pubsub_value_s){.type=EMBC_PUBSUB_DTYPE_BIN | EMBC_PUBSUB_DFLAG_CONST, .value={.str=_value}, .size=_size})
-#define embc_pubsub_cbin_r(_value, _size) &((struct embc_pubsub_value_s){.type=EMBC_PUBSUB_DTYPE_BIN | EMBC_PUBSUB_DFLAG_CONST | EMBC_PUBSUB_DFLAG_RETAIN, .value={.str=_value}, .size=_size})
+#define embc_pubsub_bin(_value, _size) ((struct embc_pubsub_value_s){.type=EMBC_PUBSUB_DTYPE_BIN, .value={.str=_value}, .size=_size})
+#define embc_pubsub_cbin(_value, _size) ((struct embc_pubsub_value_s){.type=EMBC_PUBSUB_DTYPE_BIN | EMBC_PUBSUB_DFLAG_CONST, .value={.str=_value}, .size=_size})
+#define embc_pubsub_cbin_r(_value, _size) ((struct embc_pubsub_value_s){.type=EMBC_PUBSUB_DTYPE_BIN | EMBC_PUBSUB_DFLAG_CONST | EMBC_PUBSUB_DFLAG_RETAIN, .value={.str=_value}, .size=_size})
 
 /// The opaque PubSub instance.
 struct embc_pubsub_s;
@@ -190,6 +190,7 @@ typedef int32_t (*embc_pubsub_publish_fn)(
  *
  * @param buffer_size The buffer size for dynamic pointer messages.
  *      0 prohibits non-CONST pointer types.
+ * // todo add authority topic for general requests like $ (meta) and ? (get retained).
  * @return The new PubSub instance.
  */
 struct embc_pubsub_s * embc_pubsub_initialize(uint32_t buffer_size);

@@ -48,9 +48,13 @@ struct embc_pubsubp_s;
 /**
  * @brief Create and initialize a new PubSub port instance.
  *
+ * @param subscribe_topic The topic to subscribe for forwarding.
+ *      For example "" or "s".
+ * @param publish_topic The topic we publish for data link event updates.
+ *      This prefix should normally end with '/'.  For example "s/c1/".
  * @return The new PubSub port instance.
  */
-struct embc_pubsubp_s * embc_pubsubp_initialize();
+struct embc_pubsubp_s * embc_pubsubp_initialize(const char * subscribe_topic, const char * publish_topic);
 
 /**
  * @brief Finalize the instance and free resources.
@@ -62,11 +66,15 @@ void embc_pubsubp_finalize(struct embc_pubsubp_s * self);
 /**
  * @brief Register the pubsub instance.
  * @param self The PubSub port instance.
- * @param publish_fn Normally embc_pubsub_publish
  * @param pubsub The pubsub instance.
+ *
+ * This instance will call the following pubsub functions:
+ * - embc_pubsub_subscribe
+ * - embc_pubsub_unsubscribe
+ * - embc_pubsub_publish
+ * - embc_pubsub_meta
  */
-void embc_pubsubp_pubsub_register(struct embc_pubsubp_s * self,
-                                  embc_pubsub_publish_fn publish_fn, struct embc_pubsub_s * pubsub);
+int32_t embc_pubsubp_pubsub_register(struct embc_pubsubp_s * self, struct embc_pubsub_s * pubsub);
 
 /**
  * @brief Register the transport instance.
@@ -75,13 +83,18 @@ void embc_pubsubp_pubsub_register(struct embc_pubsubp_s * self,
  * @param port_id The port id.
  * @param send_fn The send function, normally embc_transport_send.
  * @param transport The transport instance.
+ * @return 0 or error.
+ *
+ * This instance uses the following transport functions:
+ * - embc_transport_port_register
+ * - embc_transport_send
  */
-void embc_pubsubp_transport_register(struct embc_pubsubp_s * self,
-                                     uint8_t port_id,
-                                     embc_transport_send_fn send_fn, struct embc_transport_s * transport);
+int32_t embc_pubsubp_transport_register(struct embc_pubsubp_s * self,
+                                        uint8_t port_id,
+                                        struct embc_transport_s * transport);
 
 /**
- * @brief The function called on events.
+ * @brief The function called on events.  [unit test]
  *
  * @param self The pubsub port instance.
  * @param event The signaled event.
@@ -91,7 +104,7 @@ void embc_pubsubp_transport_register(struct embc_pubsubp_s * self,
 void embc_pubsubp_on_event(struct embc_pubsubp_s *self, enum embc_dl_event_e event);
 
 /**
- * @brief The function called upon message receipt.
+ * @brief The function called upon message receipt.  [unit test]
  *
  * @param self The pubsub port instance.
  * @param port_id The port id for this port.
@@ -111,7 +124,7 @@ void embc_pubsubp_on_recv(struct embc_pubsubp_s *self,
                           uint8_t *msg, uint32_t msg_size);
 
 /**
- * @brief Function called on topic updates.
+ * @brief Function called on topic updates. [unit test]
  *
  * @param user_data The arbitrary user data.
  * @param topic The topic for this update.

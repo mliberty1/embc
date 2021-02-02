@@ -261,7 +261,14 @@ enum embc_dl_event_e {
     /// The remote device is no longer responding to transmissions.
     EMBC_DL_EV_CONNECTION_LOST,
 
-    /// The remote device established a connection.
+    /**
+     * @brief The remote device established a transmit connection.
+     *
+     * We issued a reset message, and the remote responded.
+     * We are now clear to transmit data to the host.  The receive
+     * path is working, but we will not receive data until the
+     * remote successfully completes the same process.
+     */
     EMBC_DL_EV_CONNECTION_ESTABLISHED,
 };
 

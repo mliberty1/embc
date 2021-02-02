@@ -144,6 +144,9 @@ void embc_transport_finalize(struct embc_transport_s * self);
  * @param recv_fn The function to call on data received, which may be NULL.
  * @param user_data The arbitrary data for event_fn and recv_fn.
  * @return 0 or error code.
+ *
+ * The event_fn will be called from within this function to update
+ * the current transmit connection status.
  */
 int32_t embc_transport_port_register(struct embc_transport_s * self, uint8_t port_id,
                                      embc_transport_event_fn event_fn,
