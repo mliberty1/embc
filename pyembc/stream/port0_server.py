@@ -13,8 +13,8 @@
 # limitations under the License.
 
 from .data_link import PORTS_COUNT, Event
+from .transport import PayloadType, payload_decode
 from pyembc.time import now
-import json
 import logging
 import numpy as np
 import struct
@@ -37,6 +37,23 @@ def _unpack(port_data):
     cmd_meta = (port_data >> 8) & 0xff
     return op, rsp, cmd_meta
 
+
+TX_META = {
+    'dtype': 'u32',
+    'brief': 'Data link TX state.',
+    'default': 0,
+    'options': [[0, 'disconnected'], [1, 'connected']],
+    'flags': ['read_only'],
+    'retain': 1,
+}
+
+EV_META = {
+    'dtype': 'u32',
+    'brief': 'Data link event',
+    'default': 256,
+    'options': [[0, 'unknown'], [1, 'rx_reset'], [2, 'tx_disconnected'], [3, 'tx_connected']],
+    'flags': ['read_only'],
+}
 
 ECHO_ENABLE_META = {
     'dtype': 'bool',
@@ -74,7 +91,7 @@ class Port0Server:
     ST_DISCONNECTED = 2
     ST_CONNECTED = 3
 
-    def __init__(self, transport, pubsub=None):
+    def __init__(self, transport, pubsub):
         self._state = self.ST_INIT
 
         self._echo_enable = ECHO_ENABLE_META['default']
@@ -88,7 +105,7 @@ class Port0Server:
         self._meta_tx_port_id = 0
         self._meta_rx_port_id = 0
         self._transport = weakref.ref(transport)
-        self._pubsub = weakref.ref(pubsub) if pubsub is not None else None
+        self._pubsub = weakref.ref(pubsub)
         self._recv_op = {
             self.OP_STATUS: self._recv_status,
             self.OP_ECHO: self._recv_echo,
@@ -97,10 +114,11 @@ class Port0Server:
             self.OP_RAW: self._recv_raw,
         }
         transport.register_port(0, self)
-        if pubsub is not None:
-            pubsub.create('h/port/0/echo/enable', ECHO_ENABLE_META, self._on_echo_enable)
-            pubsub.create('h/port/0/echo/outstanding', ECHO_OUTSTANDING_META, self._on_echo_outstanding)
-            pubsub.create('h/port/0/echo/length', ECHO_LENGTH_META, self._on_echo_length)
+        pubsub.meta('h/port/0/conn/tx', TX_META)
+        pubsub.meta('h/port/0/conn/ev', EV_META)
+        pubsub.create('h/port/0/echo/enable', ECHO_ENABLE_META, self._on_echo_enable)
+        pubsub.create('h/port/0/echo/outstanding', ECHO_OUTSTANDING_META, self._on_echo_outstanding)
+        pubsub.create('h/port/0/echo/length', ECHO_LENGTH_META, self._on_echo_length)
 
     def _on_echo_enable(self, topic, value):
         log.info('echo enable %s', value)
@@ -120,29 +138,27 @@ class Port0Server:
         self._echo_send()
 
     def _publish(self, topic, value, retain=None):
-        if self._pubsub is None:
-            log.warning('no pubsub 1')
-            return
         pubsub = self._pubsub()
-        if pubsub is None:
-            log.warning('no pubsub')
-            return
-        return pubsub.publish(topic, value, retain)
+        if pubsub is not None:
+            return pubsub.publish(topic, value, retain)
 
     def on_event(self, event):
         print(f'event {event}')
+        self._publish('h/port/0/conn/ev', event)
         if event != Event.TX_CONNECTED:
             # reset echo
             self._echo_tx_frame_id = 0
             self._echo_rx_frame_id = 0
 
         if event == Event.TX_DISCONNECTED:
+            self._publish('h/port/0/conn/tx', 0)
             if self._state == self.ST_CONNECTED:
                 self._state = self.ST_DISCONNECTED
             elif self._state == self.ST_META:
                 self._meta_tx_port_id = 0
                 self._meta_rx_port_id = 0
         elif event == Event.TX_CONNECTED:
+            self._publish('h/port/0/conn/tx', 1)
             if self._state == self.ST_INIT:
                 self._state = self.ST_META
                 log.info('starting port metadata scan')
@@ -224,16 +240,7 @@ class Port0Server:
             port_id = cmd_meta
             if port_id != self._meta_rx_port_id:
                 log.warning('unexpected port_id %d != %d', port_id, self._meta_rx_port_id)
-            try:
-                if len(msg) <= 1:
-                    meta = None
-                else:
-                    msg_str = msg[:-1].tobytes().decode('utf-8')
-                    meta = json.loads(msg_str)
-                self._meta[port_id] = meta
-            except:
-                log.warning('Invalid metadata port_id=%d : "%s"', port_id, msg_str)
-                self._meta[port_id] = None
+            self._meta[port_id] = payload_decode(PayloadType.JSON, msg)
             self._meta_rx_port_id = min(port_id + 1, self._meta_tx_port_id)
             if self._meta_rx_port_id >= PORTS_COUNT:
                 if self._state == self.ST_META:

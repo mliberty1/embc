@@ -13,11 +13,24 @@
 # limitations under the License.
 
 from .data_link import PORTS_MAX, PAYLOAD_MAX, Event
+import json
 import logging
 import numpy as np
+import struct
 
 
 log = logging.getLogger(__name__)
+
+
+class PayloadType:
+    NULL = 0
+    U32 = 1
+    STR = 4
+    JSON = 5
+    BIN = 6
+
+
+RETAIN = (1 << 4)
 
 
 class PortApi:
@@ -27,6 +40,70 @@ class PortApi:
 
     def on_recv(self, port_data, msg):
         raise NotImplementedError()
+
+
+def _to_null(x):
+    return None
+
+
+def _to_str(x):
+    if len(x) <= 1:
+        return ''
+    try:
+        return x[:-1].tobytes().decode('utf-8')
+    except:
+        log.warning('invalud string: %b', x)
+        return ''
+
+
+def _to_json(x):
+    if len(x) <= 1:
+        return None
+    x = _to_str(x)
+    try:
+        return json.loads(x)
+    except:
+        log.warning('invalid json: %s', x)
+        return None
+
+
+def _to_bin(x):
+    return x
+
+
+def _to_u32(x):
+    if len(x) != 4:
+        raise ValueError('invalid length')
+    return struct.unpack('<I', x)[0]
+
+
+_PAYLOAD_TYPE_FN = {
+    PayloadType.NULL: _to_null,
+    PayloadType.U32: _to_u32,
+    PayloadType.STR: _to_str,
+    PayloadType.JSON: _to_json,
+    PayloadType.BIN: _to_bin,
+}
+
+
+def payload_encode(x):
+    if x is None:
+        return PayloadType.NULL, b''
+    elif isinstance(x, int):
+        if 0 <= x < (1 << 32):
+            return PayloadType.U32, struct.pack('<I', x)
+    elif isinstance(x, str):
+        return PayloadType.STR, x.encode('utf-8') + b'\x00'
+    elif isinstance(x, bytes):
+        return PayloadType.BIN, bytes(x)
+    else:
+        return PayloadType.JSON, json.dumps(x)
+    raise ValueError('Unsupported payload')
+
+
+def payload_decode(dtype, x):
+    payload_fn = _PAYLOAD_TYPE_FN[dtype]
+    return payload_fn(x)
 
 
 class _Port:

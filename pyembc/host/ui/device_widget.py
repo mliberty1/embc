@@ -43,6 +43,9 @@ class DeviceWidget(QtWidgets.QWidget):
         self._echo_widget = EchoWidget(self, device.pubsub)
         self._layout.addWidget(self._echo_widget)
 
+        self._pubsub_widget = PubSubWidget(self, device.pubsub)
+        self._layout.addWidget(self._pubsub_widget)
+
     def status_update(self, status):
         self._status_widget.update(status)
 
@@ -145,7 +148,7 @@ class StatusWidget(QtWidgets.QWidget):
 class EchoWidget(QtWidgets.QWidget):
 
     def __init__(self, parent, pubsub):
-        self.pubsub = weakref.ref(pubsub)
+        self._pubsub = weakref.ref(pubsub)
         super(EchoWidget, self).__init__(parent)
 
         self.setObjectName('echo')
@@ -187,7 +190,40 @@ class EchoWidget(QtWidgets.QWidget):
         log.info('echo button  %s', checked)
         txt = 'Press to stop' if checked else 'Press to start'
         self._button.setText(txt)
-        pubsub = self.pubsub()
+        pubsub = self._pubsub()
         if pubsub:
             value = 1 if checked else 0
             pubsub.publish('h/port/0/echo/enable', value, retain=True, src_cbk=self._on_echo_enabled)
+
+
+class PubSubWidget(QtWidgets.QWidget):
+
+    def __init__(self, parent, pubsub):
+        self._pubsub = weakref.ref(pubsub)
+        super(PubSubWidget, self).__init__(parent)
+        self.setObjectName('pubsub_widget')
+        self.setGeometry(QtCore.QRect(0, 0, 294, 401))
+
+        self._layout = QtWidgets.QGridLayout(self)
+        self._layout.setSpacing(5)
+        self._layout.setContentsMargins(11, 11, 11, 11)
+        self._layout.setObjectName('pubsub_widget_layout')
+
+        self._items = {}
+        pubsub.subscribe('', self._on_update)
+
+    def clear(self):
+        while not self._layout.isEmpty():
+            item = self._layout.takeAt(0)
+            widget = item.widget()
+            if widget is not None:
+                widget.setParent(None)
+        self._items.clear()
+
+    def _on_update(self, topic, value):
+        print(f'{topic} : {value}')
+        if topic == 'h/port/0/conn/tx':
+            if not len(self._items):
+                pubsub = self._pubsub()
+                if pubsub is not None:
+                    pubsub.publish('$', 0)
