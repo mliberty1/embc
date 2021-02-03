@@ -17,6 +17,7 @@
 #include "embc/event_manager.h"
 #include "embc/collections/list.h"
 #include "embc/time.h"
+#include "embc/platform.h"
 #include <stdlib.h>
 
 
@@ -37,7 +38,7 @@ struct embc_evm_s {
 };
 
 struct embc_evm_s * embc_evm_allocate() {
-    struct embc_evm_s * self = calloc(1, sizeof(struct embc_evm_s));
+    struct embc_evm_s * self = embc_alloc_clr(sizeof(struct embc_evm_s));
     if (self) {
         embc_list_initialize(&self->events_pending);
         embc_list_initialize(&self->events_free);
@@ -45,21 +46,35 @@ struct embc_evm_s * embc_evm_allocate() {
     return self;
 }
 
+static void event_list_free(struct embc_list_s * list) {
+    struct embc_list_s * item;
+    struct event_s * ev;
+    embc_list_foreach(list, item) {
+        ev = EVGET(item);
+        embc_free(ev);
+    }
+    embc_list_initialize(list);
+}
+
 void embc_evm_free(struct embc_evm_s * self) {
-    free(self);
+    if (self) {
+        event_list_free(&self->events_pending);
+        event_list_free(&self->events_free);
+        embc_free(self);
+    }
 }
 
 int32_t embc_evm_schedule(struct embc_evm_s * self, int64_t timestamp,
                           embc_evm_callback cbk_fn, void * cbk_user_data) {
-    struct event_s * ev = 0;
+    struct event_s * ev;
     if (embc_list_is_empty(&self->events_free)) {
         ++self->event_counter;
-        ev = calloc(1, sizeof(struct event_s));
+        ev = embc_alloc_clr(sizeof(struct event_s));
         ev->event_id = self->event_counter;
-        embc_list_initialize(&ev->node);
     } else {
         ev = EVGET(embc_list_remove_head(&self->events_free));
     }
+    embc_list_initialize(&ev->node);
     ev->timestamp = timestamp;
     ev->cbk_fn = cbk_fn;
     ev->cbk_user_data = cbk_user_data;
