@@ -30,8 +30,6 @@ class Device:
     def __init__(self):
         self._udl = None
         self._transport = None
-        self._ports = [None] * PORTS_COUNT
-        self._port0_server = None
         self._pubsub = PubSub()
         self._pubsub.subscribe('/h/port/0/meta', self._on_port_meta)
 
@@ -57,9 +55,7 @@ class Device:
         try:
             self._udl = UartDataLink(dev, self._on_event, self._on_recv, baudrate=baud)
             self._transport = Transport(self._udl.send)
-            self._port0_server = Port0Server(self._transport, self._pubsub)
-            self._ports[0] = self._port0_server
-            self._ports[1] = PubSubPort(self._pubsub, self._transport, 1)
+            Port0Server(self._pubsub, self._transport, 0)
             return True
         except:
             log.exception('Could not open device')
@@ -71,10 +67,8 @@ class Device:
             udl, self._udl = self._udl, None
             try:
                 udl.close()
-                for idx in range(len(self._ports)):
+                for idx in range(PORTS_COUNT):
                     self._transport.register_port(idx, None)
-                    self._ports[idx] = None
-                self._port0_server = 0
                 self._transport = None
             except:
                 log.exception('Could not close device')

@@ -222,8 +222,7 @@ class PubSubWidget(QtWidgets.QWidget):
 
     def _on_update(self, topic, value):
         print(f'{topic} : {value}')
-        if topic == 'h/port/0/conn/tx':
-            if not len(self._items):
-                pubsub = self._pubsub()
-                if pubsub is not None:
-                    pubsub.publish('$', 0)
+        if topic == 'h/port/0/meta' and not len(self._items):
+            pubsub = self._pubsub()
+            if pubsub is not None:
+                pubsub.publish('$', 0)

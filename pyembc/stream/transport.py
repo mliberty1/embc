@@ -33,14 +33,6 @@ class PayloadType:
 RETAIN = (1 << 4)
 
 
-class PortApi:
-
-    def on_event(self, event):
-        raise NotImplementedError()
-
-    def on_recv(self, port_data, msg):
-        raise NotImplementedError()
-
 
 def _to_null(x):
     return None

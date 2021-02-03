@@ -1,4 +1,4 @@
-# Copyright 2020 Jetperch LLC
+# Copyright 2021 Jetperch LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,6 +14,7 @@
 
 from .data_link import PORTS_COUNT, Event
 from .transport import PayloadType, payload_decode
+from .ports import PORTS
 from pyembc.time import now
 import logging
 import numpy as np
@@ -91,7 +92,7 @@ class Port0Server:
     ST_DISCONNECTED = 2
     ST_CONNECTED = 3
 
-    def __init__(self, transport, pubsub):
+    def __init__(self, pubsub, transport, port_id=None):
         self._state = self.ST_INIT
 
         self._echo_enable = ECHO_ENABLE_META['default']
@@ -245,11 +246,23 @@ class Port0Server:
             if self._meta_rx_port_id >= PORTS_COUNT:
                 if self._state == self.ST_META:
                     self._state = self.ST_CONNECTED
-                self._publish('h/port/0/meta', self._meta, retain=True)
+                self._meta_done()
             else:
                 self._meta_scan()
         else:
             log.warning('received unexpected meta request')
+
+    def _meta_done(self):
+        transport = self._transport()
+        pubsub = self._pubsub()
+        if transport is not None:
+            for port_id, meta in enumerate(self._meta):
+                if port_id == 0 or meta is None:
+                    continue
+                port_type = meta['type']
+                p = PORTS[port_type]
+                transport.register_port(port_id, p(pubsub, transport, port_id))
+        self._publish('h/port/0/meta', self._meta, retain=True)
 
     def _recv_raw(self, rsp, cmd_meta, msg):
         log.warning('recv_raw(%d, %d, %s)', rsp, cmd_meta, msg)
