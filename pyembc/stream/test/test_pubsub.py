@@ -69,3 +69,12 @@ class PubSubTest(unittest.TestCase):
         self.assertEqual('new', self.p.get('hello/world'))
         self.p.publish('hello/world', 'newer')  # not retained!
         self.assertEqual('new', self.p.get('hello/world'))
+
+    def test_meta(self):
+        meta1 = {'type': 'u32'}
+        self.p.meta('hello/world', meta1)
+        self.p.subscribe('', self.sub1_fn)
+        self.p.publish('$', None, src_cbk=self.sub1_fn)
+        self.assertEqual([('hello/world$', meta1)], self.sub1)
+
+    # def test_query(self):  # todo

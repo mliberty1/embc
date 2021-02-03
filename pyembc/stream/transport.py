@@ -33,7 +33,6 @@ class PayloadType:
 RETAIN = (1 << 4)
 
 
-
 def _to_null(x):
     return None
 
@@ -42,7 +41,10 @@ def _to_str(x):
     if len(x) <= 1:
         return ''
     try:
-        return x[:-1].tobytes().decode('utf-8')
+        x = x[:-1]
+        if isinstance(x, np.ndarray):
+            x = x.tobytes()
+        return x.decode('utf-8')
     except:
         log.warning('invalud string: %b', x)
         return ''
@@ -80,16 +82,18 @@ _PAYLOAD_TYPE_FN = {
 
 def payload_encode(x):
     if x is None:
-        return PayloadType.NULL, b''
+        return PayloadType.NULL, np.array([0], dtype=np.uint8)
     elif isinstance(x, int):
         if 0 <= x < (1 << 32):
-            return PayloadType.U32, struct.pack('<I', x)
+            return PayloadType.U32, np.frombuffer(struct.pack('<I', x), dtype=np.uint8)
     elif isinstance(x, str):
-        return PayloadType.STR, x.encode('utf-8') + b'\x00'
+        return PayloadType.STR, np.frombuffer(x.encode('utf-8') + b'\x00', dtype=np.uint8)
     elif isinstance(x, bytes):
-        return PayloadType.BIN, bytes(x)
+        return PayloadType.BIN, np.frombuffer(x, dtype=np.uint8)
+    elif isinstance(x, np.ndarray):
+        return PayloadType.BIN, np.frombuffer(x, dtype=np.uint8)
     else:
-        return PayloadType.JSON, json.dumps(x)
+        return PayloadType.JSON, np.frombuffer(json.dumps(x).encode('utf-8') + b'\x00', dtype=np.uint8)
     raise ValueError('Unsupported payload')
 
 

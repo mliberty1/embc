@@ -125,6 +125,16 @@ class PubSub:
         :param src_cbk: The subscriber that will not be updated.
             None (default) updates all applicable subscribers.
         """
+        if not len(topic):
+            raise ValueError('Empty topic not allowed')
+        if topic[-1] == '$':
+            s = topic[:-1]
+            if not len(s) or s[-1] == '/':
+                pass  # todo request all metadata
+            else:
+                pass  # todo publish a metadata update
+        elif topic[-1] == '?':
+            pass  # todo, topic query
         t = self._topic_find(topic, create=True)
         return t.publish(value, retain, src_cbk)
 

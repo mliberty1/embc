@@ -52,7 +52,7 @@ struct embc_pubsubp_s * embc_pubsubp_initialize(const char * subscribe_topic, co
     EMBC_ASSERT_ALLOC(self);
     embc_memcpy(self->subscribe_topic, subscribe_topic, subscribe_sz + 1);
     embc_memcpy(self->publish_topic, publish_topic, publish_sz + 1);
-    self->publish_topic_length = publish_sz;
+    self->publish_topic_length = (uint8_t) publish_sz;
     return self;
 }
 
