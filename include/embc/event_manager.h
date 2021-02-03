@@ -119,7 +119,10 @@ EMBC_API int64_t embc_evm_interval_next(struct embc_evm_s * self, int64_t time_c
  *
  * @param self The event manager instance.
  * @param time_current The current time.  Any event schedule at or before this
- *      time will be processed.
+ *      time will be processed.  The definition of the time is left to the caller,
+ *      but must be shared by all clients.  Commonly selected times are:
+ *      - embc_time_rel(): monotonic relative to platform start
+ *      - embc_time_utc(): most accurate to real wall clock time, but may jump.
  * @return The total number of events processed.
  */
 EMBC_API int32_t embc_evm_process(struct embc_evm_s * self, int64_t time_current);

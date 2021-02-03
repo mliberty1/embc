@@ -90,20 +90,25 @@ EMBC_CPP_GUARD_START
  */
 #define EMBC_TIME_SECOND (((int64_t) 1) << EMBC_TIME_Q)
 
+/// The mask for the fractional bits
+#define EMBC_FRACT_MASK (EMBC_TIME_SECOND - 1)
+
 /**
  * @brief The approximate fixed-point representation for 1 millisecond.
  */
-#define EMBC_TIME_MILLISECOND (EMBC_TIME_SECOND / 1000)
+#define EMBC_TIME_MILLISECOND ((EMBC_TIME_SECOND + 500) / 1000)
 
 /**
  * @brief The approximate fixed-point representation for 1 microsecond.
+ *
+ * CAUTION: this value is 0.024% accurate (240 ppm)
  */
-#define EMBC_TIME_MICROSECOND (EMBC_TIME_SECOND / 1000000)
+#define EMBC_TIME_MICROSECOND ((EMBC_TIME_SECOND + 500000) / 1000000)
 
 /**
  * @brief The approximate fixed-point representation for 1 nanosecond.
  *
- * WARNING: this value is imprecise!
+ * WARNING: this value is only 6.7% accurate!
  */
 #define EMBC_TIME_NANOSECOND ((int64_t) 1)
 
@@ -153,7 +158,12 @@ EMBC_CPP_GUARD_START
  * @param x The double-precision floating point time in seconds.
  * @return The time as a 34Q30.
  */
-#define EMBC_F64_TO_TIME(x) ((int64_t) (((double) (x)) * (double) EMBC_TIME_SECOND))
+static inline int64_t EMBC_F64_TO_TIME(double x) {
+    if (x < 0) {
+        return -EMBC_F64_TO_TIME(-x);
+    }
+    return (int64_t) ((x * (double) EMBC_TIME_SECOND) + 0.5);
+}
 
 /**
  * @brief Convert the 64-bit fixed point time to single precision float.
@@ -170,9 +180,12 @@ EMBC_CPP_GUARD_START
  * @param x The single-precision floating point time in seconds.
  * @return The time as a 34Q30.
  */
-#define EMBC_F32_TO_TIME(x) ((int64_t) (((double) (x)) * (double) EMBC_TIME_SECOND))
-
-#define _EMBC_TIME_SIGNUM(x) ((0 < (x) ) - ((x) < 0))
+static inline int64_t EMBC_F32_TO_TIME(float x) {
+    if (x < 0.0f) {
+        return -EMBC_F32_TO_TIME(-x);
+    }
+    return (int64_t) ((x * (float) EMBC_TIME_SECOND) + 0.5f);
+}
 
 /**
  * @brief Convert to counter ticks, rounded to nearest.
@@ -181,34 +194,55 @@ EMBC_CPP_GUARD_START
  * @param z The counter frequency in Hz.
  * @return The 64-bit time in counter ticks.
  */
-#define EMBC_TIME_TO_COUNTER(x, z) \
-    (( ((int64_t) (x)) * z + \
-       _EMBC_TIME_SIGNUM(z) * EMBC_TIME_SECOND / 2) \
-     >> EMBC_TIME_Q)
+static inline int64_t EMBC_TIME_TO_COUNTER(int64_t x, uint64_t z) {
+    if (x < 0) {
+        return -EMBC_TIME_TO_COUNTER(-x, z);
+    }
+    // return (int64_t) ((((x * z) >> (EMBC_TIME_Q - 1)) + 1) >> 1);
+    uint64_t c = (((x & ~EMBC_FRACT_MASK) >> (EMBC_TIME_Q - 1)) * z);
+    uint64_t fract = (x & EMBC_FRACT_MASK) << 1;
+    c += ((fract * z) >> EMBC_TIME_Q) + 1;
+    return (int64_t) (c >> 1);
+}
 
 /**
- * @brief Convert to counter ticks, rounded up.
+ * @brief Convert to counter ticks, rounded towards zero
  *
  * @param x The 64-bit signed fixed point time.
  * @param z The counter frequency in Hz.
  * @return The 64-bit time in counter ticks.
  */
-#define EMBC_TIME_TO_COUNTER_ROUND_UP(x, z) ((((int64_t) (x)) * z + EMBC_TIME_SECOND - 1) >> EMBC_TIME_Q)
+static inline int64_t EMBC_TIME_TO_COUNTER_RZERO(int64_t x, uint64_t z) {
+    if (x < 0) {
+        return -EMBC_TIME_TO_COUNTER_RZERO(-x, z);
+    }
+    uint64_t c = (x >> EMBC_TIME_Q) * z;
+    c += ((x & EMBC_FRACT_MASK) * z) >> EMBC_TIME_Q;
+    return (int64_t) c;
+}
 
 /**
- * @brief Convert to counter ticks, rounded down
+ * @brief Convert to counter ticks, rounded towards infinity.
  *
  * @param x The 64-bit signed fixed point time.
  * @param z The counter frequency in Hz.
  * @return The 64-bit time in counter ticks.
  */
-#define EMBC_TIME_TO_COUNTER_ROUND_DOWN(x, z) ((((int64_t) (x)) * z) >> EMBC_TIME_Q)
+static inline int64_t EMBC_TIME_TO_COUNTER_RINF(int64_t x, uint64_t z) {
+    if (x < 0) {
+        return -EMBC_TIME_TO_COUNTER_RINF(-x, z);
+    }
+    x += EMBC_TIME_SECOND - 1;
+    uint64_t c = (x >> EMBC_TIME_Q) * z;
+    c += ((x & EMBC_FRACT_MASK) * z) >> EMBC_TIME_Q;
+    return (int64_t) c;
+}
 
 /**
  * @brief Convert to 32-bit unsigned seconds.
  *
  * @param x The 64-bit signed fixed point time.
- * @return The 64-bit unsigned time in seconds, rounded up.
+ * @return The 64-bit unsigned time in seconds, rounded to nearest.
  */
 #define EMBC_TIME_TO_SECONDS(x) EMBC_TIME_TO_COUNTER(x, 1)
 
@@ -216,7 +250,7 @@ EMBC_CPP_GUARD_START
  * @brief Convert to milliseconds.
  *
  * @param x The 64-bit signed fixed point time.
- * @return The 64-bit signed time in milliseconds, rounded up.
+ * @return The 64-bit signed time in milliseconds, rounded to nearest.
  */
 #define EMBC_TIME_TO_MILLISECONDS(x) EMBC_TIME_TO_COUNTER(x, 1000)
 
@@ -224,7 +258,7 @@ EMBC_CPP_GUARD_START
  * @brief Convert to microseconds.
  *
  * @param x The 64-bit signed fixed point time.
- * @return The 64-bit signed time in microseconds, rounded up.
+ * @return The 64-bit signed time in microseconds, rounded to nearest.
  */
 #define EMBC_TIME_TO_MICROSECONDS(x) EMBC_TIME_TO_COUNTER(x, 1000000)
 
@@ -232,18 +266,25 @@ EMBC_CPP_GUARD_START
  * @brief Convert to nanoseconds.
  *
  * @param x The 64-bit signed fixed point time.
- * @return The 64-bit signed time in nanoseconds, rounded up.
+ * @return The 64-bit signed time in nanoseconds, rounded to nearest.
  */
 #define EMBC_TIME_TO_NANOSECONDS(x) EMBC_TIME_TO_COUNTER(x, 1000000000ll)
 
 /**
- * @brief Convert to 64-bit signed fixed point time.
+ * @brief Convert a counter to 64-bit signed fixed point time.
  *
  * @param x The counter value in ticks.
  * @param z The counter frequency in Hz.
  * @return The 64-bit signed fixed point time.
  */
-#define EMBC_COUNTER_TO_TIME(x, z) ((((int64_t) (x)) << EMBC_TIME_Q) / ((int64_t) (z)))
+static inline int64_t EMBC_COUNTER_TO_TIME(uint64_t x, uint64_t z) {
+    // compute (x << EMBC_TIME_Q) / z, but without unnecessary saturation
+    uint64_t seconds = x / z;
+    uint64_t remainder = x - (seconds * z);
+    uint64_t fract = (remainder << EMBC_TIME_Q) / z;
+    uint64_t t = (int64_t) ((seconds << EMBC_TIME_Q) + fract);
+    return t;
+}
 
 /**
  * @brief Convert to 64-bit signed fixed point time.
@@ -286,6 +327,113 @@ EMBC_CPP_GUARD_START
 static inline int64_t EMBC_TIME_ABS(int64_t t) {
     return ( (t) < 0 ? -(t) : (t) );
 }
+
+/**
+ * @brief The platform counter structure.
+ */
+struct embc_time_counter_s {
+    /// The counter value.
+    uint64_t value;
+    /// The approximate counter frequency.
+    uint64_t frequency;
+};
+
+/**
+ * @brief Get the monotonic platform counter.
+ *
+ * @return The monotonic platform counter.
+ *
+ * The platform implementation may select an appropriate source and
+ * frequency.  The EMBC library assumes a nominal frequency of
+ * at least 1000 Hz, but we frequencies in the 1 MHz to 100 MHz
+ * range to enable profiling.  The frequency should not exceed 10 GHz
+ * to prevent rollover.
+ *
+ * The counter must be monotonic.  If the underlying hardware is less
+ * than the full 64 bits, then the platform must unwrap and extend
+ * the hardware value to 64-bit.
+ *
+ * The EMBC authors recommend this counter starts at 0 when the
+ * system powers up.
+ */
+EMBC_API struct embc_time_counter_s embc_time_counter();
+
+/**
+ * @brief Get the monotonic platform time as a 34Q30 fixed point number.
+ *
+ * @return The monotonic platform time based upon the embc_counter().
+ *      The platform time has no guaranteed relationship with
+ *      UTC or wall-clock calendar time.  This time has both
+ *      offset and scale errors relative to UTC.
+ */
+static inline int64_t embc_time_rel() {
+    struct embc_time_counter_s counter = embc_time_counter();
+    return EMBC_COUNTER_TO_TIME(counter.value, counter.frequency);
+}
+
+/**
+ * @brief Get the monotonic platform time in milliseconds.
+ *
+ * @return The monotonic platform time based upon the embc_counter().
+ *      The platform time has no guaranteed relationship with
+ *      UTC or wall-clock calendar time.  This time has both
+ *      offset and scale errors relative to UTC.
+ */
+static inline int64_t embc_time_rel_ms() {
+    return EMBC_TIME_TO_MILLISECONDS(embc_time_rel());
+}
+
+/**
+ * @brief Get the monotonic platform time in microseconds.
+ *
+ * @return The monotonic platform time based upon the embc_counter().
+ *      The platform time has no guaranteed relationship with
+ *      UTC or wall-clock calendar time.  This time has both
+ *      offset and scale errors relative to UTC.
+ */
+static inline int64_t embc_time_rel_us() {
+    return EMBC_TIME_TO_MICROSECONDS(embc_time_rel());
+}
+
+/**
+ * @brief Get the UTC time as a 34Q30 fixed point number.
+ *
+ * @return The current time.  This value is not guaranteed to be monotonic.
+ *      The device may synchronize to external clocks which can cause
+ *      discontinuous jumps, both backwards and forwards.
+ *
+ *      At power-on, the time will start from 0 unless the system has
+ *      a real-time clock.  When the current time first synchronizes to
+ *      an external host, it may have a large skip.
+ *
+ * Be sure to verify your time for each platform using python:
+ *
+ *      python
+ *      import datetime
+ *      import dateutil.parser
+ *      epoch = dateutil.parser.parse('2018-01-01T00:00:00Z').timestamp()
+ *      datetime.datetime.fromtimestamp((my_time >> 30) + epoch)
+ */
+EMBC_API int64_t embc_time_utc();
+
+/**
+ * @brief Get the UTC time in milliseconds.
+ *
+ * @return The UTC time in milliseconds.
+ */
+static inline int64_t embc_time_utc_ms() {
+    return EMBC_TIME_TO_MILLISECONDS(embc_time_utc());
+}
+
+/**
+ * @brief Get the UTC time in microseconds.
+ *
+ * @return The UTC time in microseconds.
+ */
+static inline int64_t embc_time_utc_us() {
+    return EMBC_TIME_TO_MICROSECONDS(embc_time_utc());
+}
+
 
 EMBC_CPP_GUARD_END
 

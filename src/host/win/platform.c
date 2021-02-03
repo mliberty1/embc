@@ -15,20 +15,46 @@
  */
 
 #include "embc/platform.h"
+#include "embc/time.h"
 #include <windows.h>
 
-uint32_t embc_time_get_ms() {
+
+struct embc_time_counter_s embc_time_counter() {
+    struct embc_time_counter_s counter;
+    static bool first = true;
+    static uint64_t offset = 0;     // in 34Q30 time
+    static LARGE_INTEGER perf_frequency = {.QuadPart = 0};
+    // millisecond counter
     //SYSTEMTIME time;
     //GetSystemTime(&time);
     //return (time.wSecond * 1000) + time.wMilliseconds;
 
     // https://docs.microsoft.com/en-us/windows/win32/sysinfo/acquiring-high-resolution-time-stamps
-    LARGE_INTEGER counter;
-    LARGE_INTEGER frequency;
+    LARGE_INTEGER perf_counter;
 
-    QueryPerformanceFrequency(&frequency);
-    QueryPerformanceCounter(&counter);
-    counter.QuadPart *= 1000;
-    counter.QuadPart /= frequency.QuadPart;
-    return (uint32_t) counter.QuadPart;
+    QueryPerformanceCounter(&perf_counter);
+
+    if (first) {
+        QueryPerformanceFrequency(&perf_frequency);
+        offset = perf_counter.QuadPart;
+        first = false;
+    }
+
+    counter.value = perf_counter.QuadPart - offset;
+    counter.frequency = perf_frequency.QuadPart;
+    return counter;
+}
+
+EMBC_API int64_t embc_time_utc() {
+    // Contains a 64-bit value representing the number of 100-nanosecond intervals since January 1, 1601 (UTC).
+    // python
+    // import dateutil.parser
+    // dateutil.parser.parse('2018-01-01T00:00:00Z').timestamp() - dateutil.parser.parse('1601-01-01T00:00:00Z').timestamp()
+    static const int64_t offset_s = 131592384000000000LL;  // 100 ns
+    static const uint64_t frequency = 10000000; // 100 ns
+    FILETIME filetime;
+    GetSystemTimePreciseAsFileTime(&filetime);
+    uint64_t t = ((uint64_t) filetime.dwLowDateTime) | (((uint64_t) filetime.dwHighDateTime) << 32);
+    t -= offset_s;
+    return EMBC_COUNTER_TO_TIME(t, frequency);
 }

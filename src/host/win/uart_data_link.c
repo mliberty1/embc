@@ -20,6 +20,7 @@
 #include "embc/ec.h"
 #include "embc/log.h"
 #include "embc/platform.h"
+#include "embc/time.h"
 #include <stdio.h>
 #include <windows.h>
 
@@ -50,7 +51,7 @@ static void unlock(void * user_data) {
 
 static uint32_t ll_time_get_ms(void * user_data) {
     (void) user_data;
-    return embc_time_get_ms();
+    return (uint32_t) (embc_time_rel_ms() & 0xffffffff);
 }
 
 static void ll_send(void * user_data, uint8_t const * buffer, uint32_t buffer_size) {

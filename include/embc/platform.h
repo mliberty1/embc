@@ -175,23 +175,17 @@ static inline void * embc_alloc_clr(embc_size_t size_bytes) {
  */
 EMBC_API void embc_free(void * ptr);
 
-/**
- * @brief Get the monotonic platform time in milliseconds.
- *
- * @return The monotonic platform time in milliseconds.  This
- *      time value rolls over every 49.7 days.  The platform time has
- *      no guaranteed relationship with calendar time.
- */
-EMBC_API uint32_t embc_time_get_ms();
 
 /**
- * @brief Get the time as a 34Q30 fixed point number.
+ * Additional functionals to define:
  *
- * @return The current time.  This value is not guaranteed to be monotonic.
- *      The device may synchronize to external clocks which can cause
- *      discontinuous jumps, both backwards and forwards.
+ * log.h:
+ *  A embc_log_printf implementation, and call embc_log_initialize()
+ *
+ * time.h:
+ * - embc_time_counter;
+ * - embc_time_utc
  */
-EMBC_API int64_t embc_time_get();
 
 
 #if defined(EMBC_PLATFORM_STDLIB)

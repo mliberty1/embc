@@ -21,6 +21,7 @@
 #include "embc/cstr.h"
 #include "embc/ec.h"
 #include "embc/log.h"
+#include "embc/time.h"
 // #include "embc/host/uart.h"
 #include <stdio.h>
 #include <stdarg.h>
@@ -87,7 +88,7 @@ static void hal_free(void * ptr) {
 
 static void app_log_printf_(const char *format, ...) {
     va_list arg;
-    printf("%d ", embc_time_get_ms());
+    printf("%d ", (uint32_t) embc_time_rel_ms());
     va_start(arg, format);
     vprintf(format, arg);
     va_end(arg);
@@ -182,7 +183,7 @@ static void on_process(void * user_data) {
             break;
     }
 
-    uint32_t time_ms = embc_time_get_ms();
+    uint32_t time_ms = (uint32_t) embc_time_rel_ms();
     if ((time_ms - self->time_last_ms) >= 1000) {
         embc_udl_status_get(h_.udl, &dl_status);
         EMBC_LOGI("retry=%lu, resync=%lu, tx=%d, rx=%d",
@@ -272,7 +273,7 @@ int main(int argc, char * argv[]) {
     }
     EMBC_ASSERT(0 == embc_udl_start(h_.udl, &ul, on_process, &h_));
 
-    h_.time_last_ms = embc_time_get_ms();
+    h_.time_last_ms = (uint32_t) embc_time_rel_ms();
     embc_udl_status_get(h_.udl, &h_.dl_status);
 
     WaitForSingleObject(h_.ctrl_event, INFINITE);
