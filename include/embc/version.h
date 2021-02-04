@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2017 Jetperch LLC
+ * Copyright 2014-2021 Jetperch LLC
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,40 +17,34 @@
 /**
  * @file
  *
- * @brief EMBC configuration.
+ * @brief EMBC version.
  */
 
-#ifndef EMBC_CONFIG_H_
-#define EMBC_CONFIG_H_
+#ifndef EMBC_VERSION_H_
+#define EMBC_VERSION_H_
 
 /**
  * @ingroup embc
- * @defgroup embc_config Configuration
+ * @defgroup embc_version Versoin
  *
- * @brief EMBC configuration.
+ * @brief EMBC Version.
  *
  * @{
  */
 
 
-/* Set global log level */
-#define EMBC_LOG_GLOBAL_LEVEL EMBC_LOG_LEVEL_ALL
+#define EMBC_PLATFORM_STDLIB 1
 
-/* Override the log format */
-/*
-#define EMBC_LOG_PRINTF(level, format, ...) \
-   embc_log_printf_("%c %s:%d: " format "\n", embc_log_level_char[level], __FILENAME__, __LINE__, __VA_ARGS__);
-#endif
-*/
-
-#ifdef __linux__
-#include "embc/host/linux/config.h"
-#elif _WIN32
-#include "embc/host/win/config.h"
-#else
-#endif
+#define EMBC_VERSION_MAJOR   0
+#define EMBC_VERSION_MINOR   2
+#define EMBC_VERSION_PATCH   1
+#define EMBC_VERSION_U32     ((uint32_t) ( \
+    ((0 & 0xff) << 24) | \
+    ((2 & 0xff) << 16) | \
+    (1 & 0xffff) ))
+#define EMBC_VERSION_STR     "0.2.1"
 
 /** @} */
 
-#endif /* EMBC_CONFIG_H_ */
+#endif /* EMBC_VERSION_H_ */
 

@@ -60,7 +60,10 @@ set(EMBC_LIBS embc ${THIRD_PARTY_LIBS} CACHE INTERNAL "embc libraries" FORCE)
 set(EMBC_DEPENDS embc CACHE INTERNAL "embc dependencies" FORCE)
 
 include_directories(${EMBC_INCLUDE})
-include_directories(${CMAKE_CURRENT_BINARY_DIR}/src/include)
+if (EMBC_TOPLEVEL)
+    message(STATUS "Configured for EMBC toplevel")
+    include_directories(${CMAKE_SOURCE_DIR}/port/include)
+endif()
 add_subdirectory(src)
 
 if(EMBC_UNIT_TEST AND EMBC_TOPLEVEL AND NOT CMAKE_CROSSCOMPILING)

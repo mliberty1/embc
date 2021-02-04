@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2017 Jetperch LLC
+ * Copyright 2014-2021 Jetperch LLC
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -34,28 +34,31 @@
 
 
 /* Set global log level */
-/* #define EMBC_LOG_GLOBAL_LEVEL EMBC_LOG_LEVEL_ALL */
+#define EMBC_LOG_GLOBAL_LEVEL EMBC_LOG_LEVEL_ALL
 
-/* Override the log format */
-/*
+/* Optionally Override the log format */
+#if 0
 #define EMBC_LOG_PRINTF(level, format, ...) \
    embc_log_printf_("%c %s:%d: " format "\n", embc_log_level_char[level], __FILENAME__, __LINE__, __VA_ARGS__);
 #endif
-*/
 
+// Uncomment for your platform
+//#define EMBC_PLATFORM_STDLIB 1
+// #define EMBC_PLATFORM_ARM 1
 
-#define EMBC_PLATFORM_@EMBC_PLATFORM@ 1
+// remove the following for custom platforms
+#ifdef __linux__
+#include "embc/host/linux/config.h"
+#elif _WIN32
+#include "embc/host/win/config.h"
+#else
+#endif
 
-#define @PROJECT_PREFIX@_VERSION_MAJOR   @PROJECT_VERSION_MAJOR@
-#define @PROJECT_PREFIX@_VERSION_MINOR   @PROJECT_VERSION_MINOR@
-#define @PROJECT_PREFIX@_VERSION_PATCH   @PROJECT_VERSION_PATCH@
-#define @PROJECT_PREFIX@_VERSION_U32     ((uint32_t) ( \
-    ((@PROJECT_VERSION_MAJOR@ & 0xff) << 24) | \
-    ((@PROJECT_VERSION_MINOR@ & 0xff) << 16) | \
-    (@PROJECT_VERSION_PATCH@ & 0xffff) ))
-#define @PROJECT_PREFIX@_VERSION_STR     "@PROJECT_VERSION_MAJOR@.@PROJECT_VERSION_MINOR@.@PROJECT_VERSION_PATCH@"
+// 1 to enable floating point
+// #define EMBC_CSTR_FLOAT_ENABLE 0
 
-#define EMBC_CSTR_FLOAT_ENABLE 0
+// typedef void * embc_os_mutex_t;
+
 
 /** @} */
 

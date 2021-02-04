@@ -17,6 +17,7 @@
 #include "embc/host/uart_data_link.h"
 #include "embc/host/uart.h"
 #include "embc/stream/data_link.h"
+#include "embc/os/mutex.h"
 #include "embc/ec.h"
 #include "embc/log.h"
 #include "embc/platform.h"
@@ -34,24 +35,13 @@ struct embc_udl_s {
     struct uart_s * uart;
 };
 
-static void lock(void * user_data) {
-    struct embc_udl_s * self = (struct embc_udl_s *) user_data;
-    DWORD rc = WaitForSingleObject(self->mutex, 100);
-    if (WAIT_OBJECT_0 != rc) {
-        EMBC_LOGE("mutex lock failed");
-    }
+
+static inline void lock(struct embc_udl_s * self) {
+    embc_os_mutex_lock(self->mutex);
 }
 
-static void unlock(void * user_data) {
-    struct embc_udl_s * self = (struct embc_udl_s *) user_data;
-    if (!ReleaseMutex(self->mutex)) {
-        EMBC_LOGE("mutex unlock failed");
-    }
-}
-
-static uint32_t ll_time_get_ms(void * user_data) {
-    (void) user_data;
-    return (uint32_t) (embc_time_rel_ms() & 0xffffffff);
+static inline void unlock(struct embc_udl_s * self) {
+    embc_os_mutex_unlock(self->mutex);
 }
 
 static void ll_send(void * user_data, uint8_t const * buffer, uint32_t buffer_size) {
@@ -81,11 +71,16 @@ struct embc_udl_s * embc_udl_initialize(struct embc_dl_config_s const * config,
     }
 
     EMBC_LOGI("embc_udl_initialize(%s, %d)", uart_device, (int) baudrate);
+    self->mutex = embc_os_mutex_alloc();
     snprintf(dev_str, sizeof(dev_str), "\\\\.\\%s", uart_device);
+
+    struct embc_evm_s * evm = embc_evm_allocate();
+    embc_evm_register_mutex(evm, self->mutex);
+    struct embc_evm_api_s evm_api;
+    embc_evm_api_config(evm, &evm_api);
 
     struct embc_dl_ll_s ll = {
             .user_data = self,
-            .time_get_ms = ll_time_get_ms,
             .send = ll_send,
             .send_available = ll_send_available,
     };
@@ -110,22 +105,13 @@ struct embc_udl_s * embc_udl_initialize(struct embc_dl_config_s const * config,
         return NULL;
     }
 
-    self->mutex = CreateMutex(
-            NULL,                   // default security attributes
-            FALSE,                  // initially not owned
-            NULL);                  // unnamed mutex
-    if (!self->mutex) {
-        embc_udl_finalize(self);
-        return NULL;
-    }
-
-    self->dl = embc_dl_initialize(config, &ll);
+    self->dl = embc_dl_initialize(config, &evm_api, &ll);
     if (!self->dl) {
         embc_udl_finalize(self);
         return NULL;
     }
 
-    embc_dl_register_lock(self->dl, lock, unlock, self);
+    embc_dl_register_mutex(self->dl, self->mutex);
     return self;
 }
 

@@ -18,8 +18,8 @@ else()
     SET(EMBC_PLATFORM "STDLIB")
 endif()
 
-configure_file(${CMAKE_CURRENT_SOURCE_DIR}/config.h.in
-        ${CMAKE_CURRENT_BINARY_DIR}/include/embc/config.h)
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/version.h.in
+        ${PROJECT_SOURCE_DIR}/include/embc/version.h)
 
 set(SOURCES
         collections/hashmap.c
@@ -53,8 +53,14 @@ set(SOURCES
         ${PLATFORM_SRC}
 )
 
-if (WIN32)
+
+if ("${PLATFORM}" STREQUAL "FREERTOS")
     set(SOURCES_HOST
+            host/freertos/os_mutex.c)
+
+elseif (WIN32)
+    set(SOURCES_HOST
+            host/win/os_mutex.c
             host/win/platform.c
             host/win/uart.c
             host/win/uart_data_link.c)
@@ -62,9 +68,9 @@ else()
     set(SOURCES_HOST "")
 endif()
 
-if (${EMBC_TOPLEVEL})
-    set(SOURCES ${SOURCES} ${SOURCES_HOST})
-endif()
+message(STATUS "SOURCES_HOST = ${SOURCES_HOST}")
+
+set(SOURCES ${SOURCES} ${SOURCES_HOST})
 
 foreach(f IN LISTS SOURCES)
     SET_FILENAME("${f}")

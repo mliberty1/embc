@@ -28,7 +28,7 @@ cdef extern from "embc/stream/data_link.h":
         uint32_t tx_window_size
         uint32_t tx_buffer_size
         uint32_t rx_window_size
-        uint32_t tx_timeout_ms
+        uint32_t tx_timeout
 
     struct embc_dl_tx_status_s:
         uint64_t bytes

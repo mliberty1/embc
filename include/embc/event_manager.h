@@ -26,6 +26,7 @@
 #include <stdint.h>
 #include <stddef.h>
 #include "embc/cmacro_inc.h"
+#include "embc/os/mutex.h"
 
 EMBC_CPP_GUARD_START
 
@@ -37,8 +38,9 @@ EMBC_CPP_GUARD_START
  *
  * This module contains an event manager for scheduling, cancelling and
  * processing events based upon the passage of time.  This module is intended
- * to allow event scheduling within a single thread, and it contains no
- * provisions for multi-threaded safety.
+ * to allow event scheduling within a single thread.  It provides an optional
+ * locking mechanism through embc_evm_register_mutex() to support accesses
+ * from multiple threads.
  *
  * @{
  */
@@ -54,6 +56,56 @@ struct embc_evm_s;
  * @param event_id The event that completed.
  */
 typedef void (*embc_evm_callback)(void * user_data, int32_t event_id);
+
+/**
+ * @brief Get the current time in EMBC 34Q30 format.
+ *
+ * @param hal The HAL instance (user_data).
+ * @return The current time.
+ *      Usually wraps one of:
+ *      - embc_time_rel(): monotonic relative to platform start.
+ *      - embc_time_utc(): most accurate to real wall clock time, but may jump.
+ */
+typedef int64_t (*embc_evm_timestamp_fn)(struct embc_evm_s * evm);
+
+/**
+ * @brief Schedule a new event.
+ *
+ * @param evm The event manager instance.
+ * @param timestamp The timestamp for when the event should occur.  If <= 0,
+ *      then ignore and return 0.
+ * @param cbk_fn The function to call at timestsmp time.
+ * @param cbk_user_data The arbitrary data for cbk_fn.
+ * @return The event_id which is provided to the callback.  The event_id
+ *      can also be used to cancel the event with event_cancel.
+ *      On error, return 0.
+ */
+typedef int32_t (*embc_evm_schedule_fn)(struct embc_evm_s * evm, int64_t timestamp,
+                    embc_evm_callback cbk_fn, void * cbk_user_data);
+
+/**
+ * @brief Cancel a pending event.
+ *
+ * @param evm The event manager instance.
+ * @param event_id The event_id returned by event_schedule().  If 0, ignore.
+ * @return 0 or error code.
+ */
+typedef int32_t (*embc_evm_cancel_fn)(struct embc_evm_s * evm, int32_t event_id);
+
+/**
+ * @brief An abstract scheduler interface.
+ *
+ * This interface allows multiple clients (different modules)
+ * to easily share the same scheduler.  The processing-related functions
+ * are intentionally omitted, since only the main module (thread)
+ * calls them.
+ */
+struct embc_evm_api_s {
+    struct embc_evm_s * evm;
+    embc_evm_timestamp_fn timestamp;
+    embc_evm_schedule_fn schedule;
+    embc_evm_cancel_fn cancel;
+};
 
 /**
  * Allocate a new event manager instance.
@@ -126,6 +178,25 @@ EMBC_API int64_t embc_evm_interval_next(struct embc_evm_s * self, int64_t time_c
  * @return The total number of events processed.
  */
 EMBC_API int32_t embc_evm_process(struct embc_evm_s * self, int64_t time_current);
+
+/**
+ * @brief Register a mutex to support blocking multi-threaded operation.
+ *
+ * @param self The event manager instance.
+ * @param mutex The mutex instance.
+ */
+void embc_evm_register_mutex(struct embc_evm_s * self, embc_os_mutex_t mutex);
+
+/**
+ * @brief Populate the API.
+ *
+ * @param self The event manager instance.
+ * @param api The API instance to populate with the default functions.
+ * @return 0 or error code.
+ *
+ * Use embc_time_rel for api->timestamp by default.
+ */
+EMBC_API int32_t embc_evm_api_config(struct embc_evm_s * self, struct embc_evm_api_s * api);
 
 /** @} */
 

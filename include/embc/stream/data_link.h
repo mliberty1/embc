@@ -29,6 +29,8 @@ extern "C" {
 #endif
 
 #include "embc/stream/framer.h"
+#include "embc/event_manager.h"
+#include "embc/os/mutex.h"
 #include <stdint.h>
 
 /**
@@ -220,7 +222,7 @@ struct embc_dl_config_s {
     uint32_t tx_window_size;  // in frames
     uint32_t tx_buffer_size;  // in bytes
     uint32_t rx_window_size;  // in frames
-    uint32_t tx_timeout_ms;   // transmit timeout in milliseconds
+    int64_t tx_timeout;       // transmit timeout in EMBC time 34Q30.
 };
 
 /// The data link transmit status.
@@ -342,10 +344,10 @@ void embc_dl_ll_recv(struct embc_dl_s * self,
  * @brief The maximum time until the next embc_dl_process() call.
  *
  * @param self The instance.
- * @return The maximum time in milliseconds until the system must call
+ * @return The maximum time in EMBC time until the system must call
  *      embc_dl_process().  The system may call process sooner.
  */
-uint32_t embc_dl_service_interval_ms(struct embc_dl_s * self);
+int64_t embc_dl_service_interval(struct embc_dl_s * self);
 
 /**
  * @brief Process to handle retransmission.
@@ -365,17 +367,6 @@ struct embc_dl_ll_s {
      * low-level driver callback.
      */
     void * user_data;
-
-    /**
-     * @brief Get the current time in milliseconds
-     *
-     * @param hal The HAL instance (user_data).
-     * @return The current time in milliseconds.
-     *      The data link module only uses relative time.  The HAL
-     *      implementation is free to select any definition of 0.
-     *      This value wraps every 49 days.
-     */
-    uint32_t (*time_get_ms)(void * user_data);
 
     /**
      * @brief Write data to the low-level driver instance.
@@ -406,11 +397,13 @@ struct embc_dl_ll_s {
  * @brief Allocate, initialize, and start the data link layer.
  *
  * @param config The data link configuration.
+ * @param evm The event manager instance.
  * @param ll_instance The lower-level driver instance.
  * @return The new data link instance.
  */
 struct embc_dl_s * embc_dl_initialize(
         struct embc_dl_config_s const * config,
+        struct embc_evm_api_s const * evm,
         struct embc_dl_ll_s const * ll_instance);
 
 /**
@@ -477,28 +470,12 @@ void embc_dl_register_on_send(struct embc_dl_s * self,
                               embc_dl_on_send_fn cbk_fn, void * cbk_user_data);
 
 /**
- * @brief The function used to lock the mutex
- *
- * @param user_data The arbitrary data.
- */
-typedef void (*embc_dl_lock)(void * user_data);
-
-/**
- * @brief The function used to unlock the mutex
- *
- * @param user_data The arbitrary data.
- */
-typedef void (*embc_dl_unlock)(void * user_data);
-
-/**
- * @brief Register functions to lock and unlock the send-side mutex.
+ * @brief Register a send-side mutex.
  *
  * @param self The data link instance.
- * @param lock The function called to lock the send-side mutex.
- * @param unlock The function called to unlock the send-side mutex.
- * @param user_data The arbitrary data passed to lock and unlock.
+ * @param mutex The mutex instance.
  */
-void embc_dl_register_lock(struct embc_dl_s * self, embc_dl_lock lock, embc_dl_unlock unlock, void * user_data);
+void embc_dl_register_mutex(struct embc_dl_s * self, embc_os_mutex_t mutex);
 
 
 #ifdef __cplusplus

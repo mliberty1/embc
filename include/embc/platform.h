@@ -177,14 +177,21 @@ EMBC_API void embc_free(void * ptr);
 
 
 /**
- * Additional functionals to define:
+ * Additional functions to define:
  *
  * log.h:
- *  A embc_log_printf implementation, and call embc_log_initialize()
+ *  A embc_log_printf() implementation, and call embc_log_initialize()
  *
  * time.h:
- * - embc_time_counter;
- * - embc_time_utc
+ * - embc_time_counter()
+ * - embc_time_utc()
+ *
+ * os/mutex.h
+ * - embc_os_mutex_t  (in config.h)
+ * - embc_os_mutex_alloc()
+ * - embc_os_mutex_free()
+ * - embc_os_mutex_lock()
+ * - embc_os_mutex_unlock()
  */
 
 

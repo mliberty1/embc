@@ -17,6 +17,7 @@
 #include "embc/stream/data_link.h"
 #include "embc/stream/framer.h"
 #include "embc/collections/list.h"
+#include "embc/time.h"
 #include "embc/log.h"
 #include "embc/ec.h"
 #include <stdio.h>
@@ -35,6 +36,7 @@ struct stream_tester_s;
 struct host_s {
     char name;
     struct embc_dl_s * udl;
+    struct embc_evm_s * evm;
     struct embc_list_s recv_expect;
     struct embc_list_s send_queue;
     struct stream_tester_s * stream_tester;
@@ -47,7 +49,7 @@ struct stream_tester_s {
     uint64_t byte_insert_rate;
     uint64_t bit_error_rate;
     uint64_t timeout_rate;
-    uint32_t time_ms;
+    int64_t now;
     struct embc_list_s msg_free;
     struct host_s a;
     struct host_s b;
@@ -98,9 +100,9 @@ static void app_log_printf_(const char *format, ...) {
     va_end(arg);
 }
 
-static uint32_t ll_time_get_ms(void * user_data) {
-    struct host_s * host = (struct host_s *) user_data;
-    return host->stream_tester->time_ms;
+static int64_t ll_time_get(struct embc_evm_s * evm) {
+    (void) evm;
+    return s_.now;
 }
 
 static struct msg_s * msg_alloc(struct stream_tester_s * self) {
@@ -156,14 +158,17 @@ static void host_initialize(struct host_s *host, struct stream_tester_s * parent
     host->stream_tester = parent;
     host->name = name;
     host->target = target;
+    host->evm = embc_evm_allocate();
+    struct embc_evm_api_s evm_api;
+    embc_evm_api_config(host->evm, &evm_api);
+    evm_api.timestamp = ll_time_get;
     struct embc_dl_ll_s ll = {
             .user_data = host,
-            .time_get_ms = ll_time_get_ms,
             .send = ll_send,
             .send_available = ll_send_available,
     };
 
-    host->udl = embc_dl_initialize(config, &ll);
+    host->udl = embc_dl_initialize(config, &evm_api, &ll);
     EMBC_ASSERT_ALLOC(host->udl);
     embc_list_initialize(&host->recv_expect);
     embc_list_initialize(&host->send_queue);
@@ -201,7 +206,7 @@ static void action(struct stream_tester_s * self) {
     uint8_t action = rand() & 3;
     switch (action) {
         case 0:
-            self->time_ms += rand() & 0x03;
+            self->now += (rand() & 0x03) * EMBC_TIME_MILLISECOND;
             break;
         case 1:
             send(&self->a);
@@ -309,7 +314,7 @@ int main(void) {
         .tx_window_size = 64,
         .tx_buffer_size = (1 << 13),
         .rx_window_size = 64,
-        .tx_timeout_ms = 10,
+        .tx_timeout = 10 * EMBC_TIME_MILLISECOND,
         .tx_link_size = 64,
     };
 

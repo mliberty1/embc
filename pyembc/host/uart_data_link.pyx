@@ -23,6 +23,9 @@ import logging
 log = logging.getLogger(__name__)
 
 
+TX_TIMEOUT_DEFAULT = ((1 << 30) * 15) // 1000  # 15 milliseconds
+
+
 cdef void _process_cbk(void * user_data) nogil:
     return  # do nothing
 
@@ -69,7 +72,7 @@ cdef class UartDataLink:
             tx_window_size=None,
             tx_buffer_size=None,
             rx_window_size=None,
-            tx_timeout_ms=None):
+            tx_timeout=None):
 
         cdef embc_dl_api_s api
         cdef embc_dl_config_s config
@@ -81,7 +84,7 @@ cdef class UartDataLink:
         config.tx_window_size = 8 if tx_window_size is None else int(tx_window_size)
         config.tx_buffer_size = (1 << 12) if tx_buffer_size is None else int(tx_buffer_size)
         config.rx_window_size = 64 if rx_window_size is None else int(rx_window_size)
-        config.tx_timeout_ms = 15 if tx_timeout_ms is None else int(tx_timeout_ms)
+        config.tx_timeout = TX_TIMEOUT_DEFAULT if tx_timeout is None else int(tx_timeout)
         config.tx_link_size = 64 if tx_link_size is None else int(tx_link_size)
         self._udl = embc_udl_initialize(&config, uart_device.encode('utf-8'), baudrate)
         if not self._udl:

@@ -58,6 +58,8 @@ extensions = [
     setuptools.Extension('pyembc.host.uart_data_link',
         sources=[
             'pyembc/host/uart_data_link' + ext,
+            'src/event_manager.c',
+            'src/host/win/os_mutex.c',
             'src/host/win/platform.c',
             'src/host/win/uart.c',
             'src/host/win/uart_data_link.c',

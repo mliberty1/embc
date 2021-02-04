@@ -35,6 +35,7 @@
 #include "embc/ec.h"
 #include "embc/log.h"
 #include "embc/platform.h"
+#include "embc/time.h"
 #include <inttypes.h>
 
 #define SEND_COUNT_MAX (25)
@@ -60,7 +61,7 @@ enum rx_frame_state_e {
 
 struct tx_frame_s {
     uint8_t * buf;
-    uint32_t last_send_time_ms;
+    int64_t last_send_time;
     uint8_t state;
     uint8_t send_count;
 };
@@ -88,19 +89,18 @@ struct embc_dl_s {
 
     struct tx_frame_s * tx_frames;
     uint16_t tx_frame_count;
-    uint32_t tx_timeout_ms;
+    int64_t tx_timeout;
     struct rx_frame_s * rx_frames;
     uint16_t rx_frame_count;
 
     enum tx_state_e tx_state;
-    uint32_t tx_reset_last_ms;
+    int64_t tx_reset_last;
 
     embc_dl_on_send_fn on_send_cbk;
     void * on_send_user_data;
 
-    embc_dl_lock lock;
-    embc_dl_unlock unlock;
-    void * lock_user_data;
+    struct embc_evm_api_s evm;
+    embc_os_mutex_t mutex;
 
     struct embc_framer_s rx_framer;
     struct embc_dl_rx_status_s rx_status;
@@ -109,12 +109,20 @@ struct embc_dl_s {
 
 static void tx_reset(struct embc_dl_s * self);
 
-static void lock_default(void * user_data) {
-    (void) user_data;
+static inline void lock(struct embc_dl_s * self) {
+    if (self->mutex) {
+        embc_os_mutex_lock(self->mutex);
+    }
 }
 
-static void unlock_default(void * user_data) {
-    (void) user_data;
+static inline void unlock(struct embc_dl_s * self) {
+    if (self->mutex) {
+        embc_os_mutex_unlock(self->mutex);
+    }
+}
+
+static inline int64_t time_get(struct embc_dl_s * self) {
+    return self->evm.timestamp(self->evm.evm);
 }
 
 int32_t embc_dl_send(struct embc_dl_s * self,
@@ -124,20 +132,20 @@ int32_t embc_dl_send(struct embc_dl_s * self,
         return EMBC_ERROR_UNAVAILABLE;
     }
 
-    self->lock(self->lock_user_data);
+    lock(self);
     uint16_t frame_id = self->tx_frame_next_id;
     uint16_t idx = frame_id & (self->tx_frame_count - 1);
     struct tx_frame_s * f = &self->tx_frames[idx];
 
     if (embc_framer_frame_id_subtract(frame_id, self->tx_frame_last_id) >= self->tx_frame_count) {
         EMBC_LOGD1("embc_dl_send(0x%02" PRIx32 ") too many frames outstanding", metadata);
-        self->unlock(self->lock_user_data);
+        unlock(self);
         return EMBC_ERROR_NOT_ENOUGH_MEMORY;
     }
 
     if (!embc_framer_validate_data(frame_id, metadata, msg_size)) {
         EMBC_LOGW("embc_framer_send invalid parameters");
-        self->unlock(self->lock_user_data);
+        unlock(self);
         return EMBC_ERROR_PARAMETER_INVALID;
     }
 
@@ -145,14 +153,14 @@ int32_t embc_dl_send(struct embc_dl_s * self,
     uint8_t * b = embc_mrb_alloc(&self->tx_buf, frame_sz);
     if (!b) {
         EMBC_LOGD1("embc_dl_send(0x%06" PRIx32 ") out of buffer space", metadata);
-        self->unlock(self->lock_user_data);
+        unlock(self);
         return EMBC_ERROR_NOT_ENOUGH_MEMORY;
     }
     int32_t rv = embc_framer_construct_data(b, frame_id, metadata, msg, msg_size);
     EMBC_ASSERT(0 == rv);  // embc_framer_validate already checked
 
     // queue transmit frame for send_data()
-    f->last_send_time_ms = self->ll_instance.time_get_ms(self->ll_instance.user_data);
+    f->last_send_time = time_get(self);
     f->send_count = 0;
     f->buf = b;
     f->state = TX_FRAME_ST_SEND;
@@ -161,7 +169,7 @@ int32_t embc_dl_send(struct embc_dl_s * self,
     self->tx_status.bytes += frame_sz;
     self->tx_frame_next_id = (frame_id + 1) & EMBC_FRAMER_FRAME_ID_MAX;
     // frame queued for send_data()
-    self->unlock(self->lock_user_data);
+    unlock(self);
 
     if (self->on_send_cbk) {
         self->on_send_cbk(self->on_send_user_data);
@@ -214,7 +222,7 @@ static void send_data(struct embc_dl_s * self, uint16_t frame_id) {
         EMBC_LOGD3("send_data(%d) buf->%d, count=%d, last=%d, next=%d",
                    (int) frame_id, (int) tx_buf_frame_id(f), (int) f->send_count,
                    (int) self->tx_frame_last_id, (int) self->tx_frame_next_id);
-        f->last_send_time_ms = self->ll_instance.time_get_ms(self->ll_instance.user_data);
+        f->last_send_time = time_get(self);
         self->ll_instance.send(self->ll_instance.user_data, f->buf, frame_sz);
     }
 }
@@ -264,14 +272,13 @@ static void send_link(struct embc_dl_s * self, enum embc_framer_type_e frame_typ
     }
 }
 
-static inline uint32_t reset_timeout_duration_ms(struct embc_dl_s * self) {
-    return self->tx_timeout_ms * 16;
+static inline int64_t reset_timeout_duration(struct embc_dl_s * self) {
+    return self->tx_timeout * 16;
 }
 
 static void send_reset_request(struct embc_dl_s * self) {
     self->tx_state = TX_ST_DISCONNECTED;
-    uint32_t time_ms = self->ll_instance.time_get_ms(self->ll_instance.user_data);
-    self->tx_reset_last_ms = time_ms;
+    self->tx_reset_last = time_get(self);
     send_link(self, EMBC_FRAMER_FT_RESET, 0);
 }
 
@@ -521,10 +528,10 @@ void embc_dl_ll_recv(struct embc_dl_s * self,
     embc_framer_ll_recv(&self->rx_framer, buffer, buffer_size);
 }
 
-uint32_t embc_dl_service_interval_ms(struct embc_dl_s * self) {
-    uint32_t rv = 0xffffffffU;
+int64_t embc_dl_service_interval(struct embc_dl_s * self) {
+    int64_t rv = EMBC_TIME_MAX;
     int32_t frame_count = embc_framer_frame_id_subtract(self->tx_frame_next_id, self->tx_frame_last_id);
-    uint32_t now = self->ll_instance.time_get_ms(self->ll_instance.user_data);
+    int64_t now = time_get(self);
 
     if (self->tx_state == TX_ST_CONNECTED) {
         for (int32_t offset = 0; offset < frame_count; ++offset) {
@@ -532,19 +539,19 @@ uint32_t embc_dl_service_interval_ms(struct embc_dl_s * self) {
             uint16_t idx = (frame_id + offset) & (self->tx_frame_count - 1);
             struct tx_frame_s *f = &self->tx_frames[idx];
             if (f->state == TX_FRAME_ST_SENT) {
-                uint32_t delta = now - f->last_send_time_ms;
-                if (delta >= self->tx_timeout_ms) {
+                int64_t delta = now - f->last_send_time;
+                if (delta >= self->tx_timeout) {
                     return 0;
                 }
-                delta = self->tx_timeout_ms - delta;
+                delta = self->tx_timeout - delta;
                 if (delta < rv) {
                     rv = delta;
                 }
             }
         }
     } else {
-        uint32_t delta = now - self->tx_reset_last_ms;
-        uint32_t duration = reset_timeout_duration_ms(self);
+        int64_t delta = now - self->tx_reset_last;
+        int64_t duration = reset_timeout_duration(self);
         if (delta >= duration) {
             return 0;
         } else {
@@ -555,9 +562,9 @@ uint32_t embc_dl_service_interval_ms(struct embc_dl_s * self) {
 }
 
 static void tx_process_disconnected(struct embc_dl_s * self) {
-    uint32_t now = self->ll_instance.time_get_ms(self->ll_instance.user_data);
-    uint32_t delta = now - self->tx_reset_last_ms;
-    uint32_t duration = reset_timeout_duration_ms(self);
+    int64_t now = time_get(self);
+    int64_t delta = now - self->tx_reset_last;
+    int64_t duration = reset_timeout_duration(self);
     if (delta >= duration) {
         send_reset_request(self);
     }
@@ -566,14 +573,14 @@ static void tx_process_disconnected(struct embc_dl_s * self) {
 static void tx_timeout(struct embc_dl_s * self) {
     struct tx_frame_s * f;
     int32_t frame_count = embc_framer_frame_id_subtract(self->tx_frame_next_id, self->tx_frame_last_id);
-    uint32_t now = self->ll_instance.time_get_ms(self->ll_instance.user_data);
+    int64_t now = time_get(self);
     for (int32_t offset = 0; offset < frame_count; ++offset) {
         uint16_t frame_id = (self->tx_frame_last_id + offset) & EMBC_FRAMER_FRAME_ID_MAX;
         uint16_t idx = frame_id & (self->tx_frame_count - 1);
         f = &self->tx_frames[idx];
         if (f->state == TX_FRAME_ST_SENT) {
-            uint32_t delta = now - f->last_send_time_ms;
-            if (delta >= self->tx_timeout_ms) {
+            int64_t delta = now - f->last_send_time;
+            if (delta >= self->tx_timeout) {
                 EMBC_LOGD1("tx timeout on %d", (int) frame_id);
                 f->state = TX_FRAME_ST_SEND;
             }
@@ -594,7 +601,7 @@ static void tx_transmit(struct embc_dl_s * self) {
 }
 
 void embc_dl_process(struct embc_dl_s * self) {
-    self->lock(self->lock_user_data);
+    lock(self);
     send_link_pending(self);
     if (self->tx_state == TX_ST_DISCONNECTED) {
         tx_process_disconnected(self);
@@ -602,7 +609,7 @@ void embc_dl_process(struct embc_dl_s * self) {
         tx_timeout(self);
         tx_transmit(self);
     }
-    self->unlock(self->lock_user_data);
+    unlock(self);
 }
 
 static uint32_t to_power_of_two(uint32_t v) {
@@ -622,9 +629,10 @@ static uint32_t to_power_of_two(uint32_t v) {
 
 struct embc_dl_s * embc_dl_initialize(
         struct embc_dl_config_s const * config,
+        struct embc_evm_api_s const * evm,
         struct embc_dl_ll_s const * ll_instance) {
     EMBC_ASSERT(EMBC_FRAMER_LINK_SIZE == sizeof(uint64_t)); // assumption for ring_buffer_u64
-    if (!config || !ll_instance) {
+    if (!config || !evm || !ll_instance) {
         EMBC_LOGE("invalid arguments");
         return 0;
     }
@@ -680,9 +688,6 @@ struct embc_dl_s * embc_dl_initialize(
     }
     EMBC_LOGI("initialize");
 
-    self->lock = lock_default;
-    self->unlock = unlock_default;
-
     uint8_t * mem = (uint8_t *) self;
     self->tx_frame_count = tx_window_size;
     self->tx_frames = (struct tx_frame_s *) (mem + tx_frame_buf_offset);
@@ -691,12 +696,13 @@ struct embc_dl_s * embc_dl_initialize(
     embc_rbu64_init(&self->tx_link_buf, (uint64_t *) (mem + tx_link_buffer_offset), tx_link_u64_size);
     embc_mrb_init(&self->tx_buf, (uint8_t *) (mem + tx_buffer_offset), tx_buffer_size);
 
-    self->tx_timeout_ms = config->tx_timeout_ms;
+    self->tx_timeout = config->tx_timeout;
     self->ll_instance = *ll_instance;
     self->rx_framer.api.user_data = self;
     self->rx_framer.api.framing_error_fn = on_framing_error;
     self->rx_framer.api.link_fn = on_recv_link;
     self->rx_framer.api.data_fn = on_recv_data;
+    self->evm = *evm;
     rx_reset(self);
     tx_reset(self);
 
@@ -704,9 +710,9 @@ struct embc_dl_s * embc_dl_initialize(
 }
 
 void embc_dl_register_upper_layer(struct embc_dl_s * self, struct embc_dl_api_s const * ul) {
-    self->lock(self->lock_user_data);
+    lock(self);
     self->ul_instance = *ul;
-    self->unlock(self->lock_user_data);
+    unlock(self);
 }
 
 void embc_dl_reset_tx_from_event(struct embc_dl_s * self) {
@@ -716,11 +722,12 @@ void embc_dl_reset_tx_from_event(struct embc_dl_s * self) {
 int32_t embc_dl_finalize(struct embc_dl_s * self) {
     EMBC_LOGI("finalize");
     if (self) {
-        embc_dl_unlock unlock = self->unlock;
-        void * lock_user_data = self->lock_user_data;
-        self->lock(self->lock_user_data);
+        embc_os_mutex_t mutex = self->mutex;
+        lock(self);
         embc_free(self);
-        unlock(lock_user_data);
+        if (mutex) {
+            embc_os_mutex_unlock(mutex);
+        }
     }
     return 0;
 }
@@ -731,21 +738,21 @@ int32_t embc_dl_status_get(
     if (!status) {
         return EMBC_ERROR_PARAMETER_INVALID;
     }
-    self->lock(self->lock_user_data);
+    lock(self);
     status->version = 1;
     status->rx = self->rx_status;
     status->rx_framer = self->rx_framer.status;
     status->tx = self->tx_status;
-    self->unlock(self->lock_user_data);
+    unlock(self);
     return 0;
 }
 
 void embc_dl_status_clear(struct embc_dl_s * self) {
-    self->lock(self->lock_user_data);
+    lock(self);
     embc_memset(&self->rx_status, 0, sizeof(self->rx_status));
     embc_memset(&self->rx_framer.status, 0, sizeof(self->rx_framer.status));
     embc_memset(&self->tx_status, 0, sizeof(self->tx_status));
-    self->unlock(self->lock_user_data);
+    unlock(self);
 }
 
 void embc_dl_register_on_send(struct embc_dl_s * self,
@@ -754,8 +761,6 @@ void embc_dl_register_on_send(struct embc_dl_s * self,
     self->on_send_user_data = cbk_user_data;
 }
 
-void embc_dl_register_lock(struct embc_dl_s * self, embc_dl_lock lock, embc_dl_unlock unlock, void * user_data) {
-    self->lock = lock ? lock : lock_default;
-    self->unlock = unlock ? unlock : unlock_default;
-    self->lock_user_data = user_data;
+void embc_dl_register_mutex(struct embc_dl_s * self, embc_os_mutex_t mutex) {
+    self->mutex = mutex;
 }

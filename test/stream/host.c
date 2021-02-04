@@ -219,7 +219,7 @@ int main(int argc, char * argv[]) {
             .tx_window_size = 8,
             .tx_buffer_size = 1 << 12,
             .rx_window_size = 64,
-            .tx_timeout_ms = 15,
+            .tx_timeout = 15 * EMBC_TIME_MILLISECOND,
             .tx_link_size = 64,
     };
 

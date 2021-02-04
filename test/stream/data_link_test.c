@@ -22,6 +22,7 @@
 #include <string.h>
 #include "embc/stream/data_link.h"
 #include "embc/stream/ring_buffer_u64.h"
+#include "embc/time.h"
 #include <stdio.h>
 
 #define SEND_BUFFER_SIZE (1 << 13)
@@ -45,15 +46,15 @@ static uint8_t PAYLOAD_MAX[] = {
         0xe0, 0xe1, 0xe2, 0xe3, 0xe4, 0xe5, 0xe6, 0xe7, 0xe8, 0xe9, 0xea, 0xeb, 0xec, 0xed, 0xee, 0xef,
         0xf0, 0xf1, 0xf2, 0xf3, 0xf4, 0xf5, 0xf6, 0xf7, 0xf8, 0xf9, 0xfa, 0xfb, 0xfc, 0xfd, 0xfe, 0xff};
 
-struct test_s {
-    struct embc_dl_s * dl;
-    uint32_t send_available;
-    uint32_t time_ms;
-};
+struct test_s;
+struct embc_dl_s * dl_ = 0;
+uint32_t send_available_ = 0;
+int64_t now_ = 0;
+static struct embc_evm_s * evm_;
 
-static uint32_t ll_time_get_ms(void * user_data) {
-    struct test_s * self = (struct test_s *) user_data;
-    return self->time_ms;
+static int64_t ll_time_get(struct embc_evm_s * evm) {
+    (void) evm;
+    return now_;
 }
 
 static void ll_send(void * user_data, uint8_t const * buffer, uint32_t buffer_size) {
@@ -75,8 +76,8 @@ static void ll_send(void * user_data, uint8_t const * buffer, uint32_t buffer_si
 }
 
 static uint32_t ll_send_available(void * user_data) {
-    struct test_s * self = (struct test_s *) user_data;
-    return self->send_available; // todo
+    (void) user_data;
+    return send_available_; // todo
 }
 
 static void on_event(void *user_data, enum embc_dl_event_e event) {
@@ -103,19 +104,21 @@ static void expect_recv(uint32_t metadata, uint8_t *msg_buffer, uint32_t msg_siz
 
 static int setup(void ** state) {
     struct test_s *self = NULL;
-    self = (struct test_s *) test_calloc(1, sizeof(struct test_s));
+    //self = (struct test_s *) test_calloc(1, sizeof(struct test_s));
+    struct embc_evm_api_s evm_api;
+    embc_evm_api_config(evm_, &evm_api);
+    evm_api.timestamp = ll_time_get;
 
     struct embc_dl_config_s config = {
         .tx_window_size = 64,
         .tx_buffer_size = (1 << 13),
         .rx_window_size = 64,
-        .tx_timeout_ms = 10,
+        .tx_timeout = 10 * EMBC_TIME_MILLISECOND,
         .tx_link_size = 64,
     };
 
     struct embc_dl_ll_s ll = {
         .user_data = self,
-        .time_get_ms = ll_time_get_ms,
         .send = ll_send,
         .send_available = ll_send_available,
     };
@@ -126,10 +129,11 @@ static int setup(void ** state) {
         .recv_fn = on_recv,
     };
 
-    self->send_available = EMBC_FRAMER_MAX_SIZE;
-    self->dl = embc_dl_initialize(&config, &ll);
-    assert_non_null(self->dl);
-    embc_dl_register_upper_layer(self->dl, &ul);
+    now_ = 0;
+    send_available_ = EMBC_FRAMER_MAX_SIZE;
+    dl_ = embc_dl_initialize(&config, &evm_api, &ll);
+    assert_non_null(dl_);
+    embc_dl_register_upper_layer(dl_, &ul);
 
     *state = self;
     return 0;
@@ -137,17 +141,20 @@ static int setup(void ** state) {
 
 static int teardown(void ** state) {
     struct test_s *self = (struct test_s *) *state;
-    embc_dl_finalize(self->dl);
+    embc_dl_finalize(dl_);
     test_free(self);
+
+    embc_evm_process(evm_, EMBC_TIME_YEAR * 100);
+    embc_evm_process(evm_, 0);
+
     return 0;
 }
 
 static void test_initial_state(void ** state) {
-    struct test_s *self = (struct test_s *) *state;
+    (void) state;
     struct embc_dl_status_s status;
 
-    assert_non_null(self->dl);
-    assert_int_equal(0, embc_dl_status_get(self->dl, &status));
+    assert_int_equal(0, embc_dl_status_get(dl_, &status));
     assert_int_equal(1, status.version);
     assert_int_equal(0, status.rx.msg_bytes);
     assert_int_equal(0, status.rx.data_frames);
@@ -173,7 +180,7 @@ static void send_and_expect(struct test_s *self,
                  uint16_t frame_id, uint16_t metadata,
                  uint8_t *msg_buffer, uint32_t msg_size) {
     expect_send_data(self, frame_id, metadata, msg_buffer, msg_size);
-    assert_int_equal(0, embc_dl_send(self->dl, metadata, msg_buffer, msg_size));
+    assert_int_equal(0, embc_dl_send(dl_, metadata, msg_buffer, msg_size));
 }
 
 static void expect_send_link(struct test_s *self, enum embc_framer_type_e frame_type, uint16_t frame_id) {
@@ -185,25 +192,28 @@ static void expect_send_link(struct test_s *self, enum embc_framer_type_e frame_
 }
 
 static void recv_link(struct test_s *self, enum embc_framer_type_e frame_type, uint16_t frame_id) {
+    (void) self;
     uint8_t b[EMBC_FRAMER_LINK_SIZE];
     assert_int_equal(0, embc_framer_construct_link(b, frame_type, frame_id));
-    embc_dl_ll_recv(self->dl, b, sizeof(b));
+    embc_dl_ll_recv(dl_, b, sizeof(b));
 }
 
 static void recv_data(struct test_s *self, uint16_t frame_id, uint16_t metadata,
                       uint8_t *msg_buffer, uint32_t msg_size) {
+    (void) self;
     uint8_t b[EMBC_FRAMER_MAX_SIZE];
     assert_int_equal(0, embc_framer_construct_data(b, frame_id, metadata, msg_buffer, msg_size));
     uint16_t frame_sz = msg_size + EMBC_FRAMER_OVERHEAD_SIZE;
-    embc_dl_ll_recv(self->dl, b, frame_sz);
+    embc_dl_ll_recv(dl_, b, frame_sz);
 }
 
 static void connect(struct test_s *self) {
+    (void) self;
     expect_send_link(self, EMBC_FRAMER_FT_RESET, 0);
-    embc_dl_process(self->dl);
+    embc_dl_process(dl_);
     expect_event(EMBC_DL_EV_TX_CONNECTED);
     recv_link(self, EMBC_FRAMER_FT_RESET, 1);
-    embc_dl_status_clear(self->dl);
+    embc_dl_status_clear(dl_);
 }
 
 void on_send_fn(void * user_data) {
@@ -215,9 +225,9 @@ void on_send_fn(void * user_data) {
 static void test_on_send_cbk(void ** state) {
     struct test_s *self = (struct test_s *) *state;
     connect(self);
-    embc_dl_register_on_send(self->dl, on_send_fn, self);
+    embc_dl_register_on_send(dl_, on_send_fn, self);
     expect_value(on_send_fn, value, 0);
-    assert_int_equal(0, embc_dl_send(self->dl, 1, PAYLOAD1, sizeof(PAYLOAD1)));
+    assert_int_equal(0, embc_dl_send(dl_, 1, PAYLOAD1, sizeof(PAYLOAD1)));
 }
 
 static void test_send_data_with_ack(void ** state) {
@@ -226,14 +236,14 @@ static void test_send_data_with_ack(void ** state) {
 
     connect(self);
     send_and_expect(self, 0, 1, PAYLOAD1, sizeof(PAYLOAD1));
-    embc_dl_process(self->dl);
+    embc_dl_process(dl_);
 
-    assert_int_equal(0, embc_dl_status_get(self->dl, &status));
+    assert_int_equal(0, embc_dl_status_get(dl_, &status));
     assert_int_equal(sizeof(PAYLOAD1) + EMBC_FRAMER_OVERHEAD_SIZE, status.tx.bytes);
     assert_int_equal(0, status.tx.data_frames);
 
     recv_link(self, EMBC_FRAMER_FT_ACK_ALL, 0);
-    assert_int_equal(0, embc_dl_status_get(self->dl, &status));
+    assert_int_equal(0, embc_dl_status_get(dl_, &status));
     assert_int_equal(sizeof(PAYLOAD1) + EMBC_FRAMER_OVERHEAD_SIZE, status.tx.bytes);
     assert_int_equal(1, status.tx.data_frames);
 }
@@ -244,17 +254,17 @@ static void test_send_nack_resend_ack(void ** state) {
 
     connect(self);
     send_and_expect(self, 0, 1, PAYLOAD1, sizeof(PAYLOAD1));
-    embc_dl_process(self->dl);
+    embc_dl_process(dl_);
 
     recv_link(self, EMBC_FRAMER_FT_NACK_FRAMING_ERROR, 0);
-    assert_int_equal(0, embc_dl_status_get(self->dl, &status));
+    assert_int_equal(0, embc_dl_status_get(dl_, &status));
     assert_int_equal(0, status.tx.data_frames);
 
     expect_send_data(self, 0, 1, PAYLOAD1, sizeof(PAYLOAD1));  // due to nack
-    embc_dl_process(self->dl);
+    embc_dl_process(dl_);
 
     recv_link(self, EMBC_FRAMER_FT_ACK_ALL, 0);
-    assert_int_equal(0, embc_dl_status_get(self->dl, &status));
+    assert_int_equal(0, embc_dl_status_get(dl_, &status));
     assert_int_equal(1, status.tx.data_frames);
 }
 
@@ -263,17 +273,17 @@ static void test_send_data_timeout_then_ack(void ** state) {
     struct embc_dl_status_s status;
 
     connect(self);
-    self->time_ms = 5;
+    now_ = 5 * EMBC_TIME_MILLISECOND;
     send_and_expect(self, 0, 1, PAYLOAD1, sizeof(PAYLOAD1));
-    embc_dl_process(self->dl);
-    self->time_ms += 9;
-    embc_dl_process(self->dl);
-    self->time_ms += 1;
+    embc_dl_process(dl_);
+    now_ += 9 * EMBC_TIME_MILLISECOND;
+    embc_dl_process(dl_);
+    now_ += 1 * EMBC_TIME_MILLISECOND;
     expect_send_data(self, 0, 1, PAYLOAD1, sizeof(PAYLOAD1));
-    embc_dl_process(self->dl);
+    embc_dl_process(dl_);
 
     recv_link(self, EMBC_FRAMER_FT_ACK_ALL, 0);
-    assert_int_equal(0, embc_dl_status_get(self->dl, &status));
+    assert_int_equal(0, embc_dl_status_get(dl_, &status));
     assert_int_equal(sizeof(PAYLOAD1) + EMBC_FRAMER_OVERHEAD_SIZE, status.tx.bytes);
     assert_int_equal(1, status.tx.data_frames);
 }
@@ -286,11 +296,11 @@ static void test_send_multiple_with_buffer_wrap(void ** state) {
     connect(self);
     for (uint32_t i = 0; i < count; ++i) {
         send_and_expect(self, i, i + 1, PAYLOAD_MAX, sizeof(PAYLOAD_MAX));
-        embc_dl_process(self->dl);
+        embc_dl_process(dl_);
         recv_link(self, EMBC_FRAMER_FT_ACK_ALL, i);
     }
 
-    assert_int_equal(0, embc_dl_status_get(self->dl, &status));
+    assert_int_equal(0, embc_dl_status_get(dl_, &status));
     assert_int_equal(count * sizeof(PAYLOAD_MAX), status.tx.msg_bytes);
     assert_int_equal(count * (sizeof(PAYLOAD_MAX) + EMBC_FRAMER_OVERHEAD_SIZE), status.tx.bytes);
     assert_int_equal(count, status.tx.data_frames);
@@ -305,9 +315,9 @@ static void test_recv_and_ack(void ** state) {
     recv_data(self, 0, 1, PAYLOAD1, sizeof(PAYLOAD1));
 
     expect_send_link(self, EMBC_FRAMER_FT_ACK_ALL, 0);
-    embc_dl_process(self->dl);
+    embc_dl_process(dl_);
 
-    assert_int_equal(0, embc_dl_status_get(self->dl, &status));
+    assert_int_equal(0, embc_dl_status_get(dl_, &status));
     assert_int_equal(sizeof(PAYLOAD1), status.rx.msg_bytes);
     assert_int_equal(EMBC_FRAMER_LINK_SIZE, status.tx.bytes);
     assert_int_equal(1, status.rx.data_frames);
@@ -324,10 +334,10 @@ static void test_recv_multiple_all_acks(void ** state) {
         expect_recv(1, PAYLOAD_MAX, sizeof(PAYLOAD_MAX));
         recv_data(self, i, 1, PAYLOAD_MAX, sizeof(PAYLOAD_MAX));
         expect_send_link(self, EMBC_FRAMER_FT_ACK_ALL, i);
-        embc_dl_process(self->dl);
+        embc_dl_process(dl_);
     }
 
-    assert_int_equal(0, embc_dl_status_get(self->dl, &status));
+    assert_int_equal(0, embc_dl_status_get(dl_, &status));
     assert_int_equal(count * sizeof(PAYLOAD_MAX), status.rx.msg_bytes);
     assert_int_equal(count * EMBC_FRAMER_LINK_SIZE, status.tx.bytes);
     assert_int_equal(count, status.rx.data_frames);
@@ -340,41 +350,42 @@ static void test_recv_out_of_order(void ** state) {
     expect_recv(0x11, PAYLOAD_MAX, sizeof(PAYLOAD_MAX));
     recv_data(self, 0, 0x11, PAYLOAD_MAX, sizeof(PAYLOAD_MAX));
     expect_send_link(self, EMBC_FRAMER_FT_ACK_ALL, 0);
-    embc_dl_process(self->dl);
+    embc_dl_process(dl_);
 
     recv_data(self, 2, 0x33, PAYLOAD_MAX, sizeof(PAYLOAD_MAX));
     expect_send_link(self, EMBC_FRAMER_FT_NACK_FRAME_ID, 1);
     expect_send_link(self, EMBC_FRAMER_FT_ACK_ONE, 2);
-    embc_dl_process(self->dl);
+    embc_dl_process(dl_);
 
     expect_recv(0x22, PAYLOAD1, sizeof(PAYLOAD1));
     expect_recv(0x33, PAYLOAD_MAX, sizeof(PAYLOAD_MAX));
     recv_data(self, 1, 0x22, PAYLOAD1, sizeof(PAYLOAD1));
 
     expect_send_link(self, EMBC_FRAMER_FT_ACK_ALL, 2);
-    embc_dl_process(self->dl);
+    embc_dl_process(dl_);
 }
 
 static void test_reset_retry(void ** state) {
     struct test_s *self = (struct test_s *) *state;
 
     expect_send_link(self, EMBC_FRAMER_FT_RESET, 0);
-    embc_dl_process(self->dl);
-    self->time_ms += 1;
-    embc_dl_process(self->dl);
-    self->time_ms += 999;
+    embc_dl_process(dl_);
+    now_ += 1 * EMBC_TIME_MILLISECOND;
+    embc_dl_process(dl_);
+    now_ += 999 * EMBC_TIME_MILLISECOND;
     expect_send_link(self, EMBC_FRAMER_FT_RESET, 0);
-    embc_dl_process(self->dl);
+    embc_dl_process(dl_);
 
-    self->time_ms += 1000;
+    now_ += 1000 * EMBC_TIME_MILLISECOND;
     expect_event(EMBC_DL_EV_TX_CONNECTED);
     recv_link(self, EMBC_FRAMER_FT_RESET, 1);
 
-    embc_dl_process(self->dl);
+    embc_dl_process(dl_);
 }
 
 int main(void) {
     hal_test_initialize();
+    evm_ = embc_evm_allocate();
     const struct CMUnitTest tests[] = {
             cmocka_unit_test_setup_teardown(test_initial_state, setup, teardown),
             cmocka_unit_test_setup_teardown(test_on_send_cbk, setup, teardown),
