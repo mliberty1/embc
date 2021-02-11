@@ -45,7 +45,7 @@ def _to_str(x):
         if isinstance(x, np.ndarray):
             x = x.tobytes()
         return x.decode('utf-8')
-    except:
+    except Exception:
         log.warning('invalud string: %b', x)
         return ''
 
@@ -56,7 +56,7 @@ def _to_json(x):
     x = _to_str(x)
     try:
         return json.loads(x)
-    except:
+    except Exception:
         log.warning('invalid json: %s', x)
         return None
 

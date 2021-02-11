@@ -57,7 +57,7 @@ class Device:
             self._transport = Transport(self._udl.send)
             Port0Server(self._pubsub, self._transport, 0)
             return True
-        except:
+        except Exception:
             log.exception('Could not open device')
             return False
 
@@ -70,7 +70,7 @@ class Device:
                 for idx in range(PORTS_COUNT):
                     self._transport.register_port(idx, None)
                 self._transport = None
-            except:
+            except Exception:
                 log.exception('Could not close device')
 
     def status(self):

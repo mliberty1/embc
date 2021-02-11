@@ -139,7 +139,7 @@ class MainWindow(QtWidgets.QMainWindow):
                 log.warning('Could not open device')
             device.widget = DeviceWidget(self, device)
             self._central_layout.addWidget(device.widget)
-        except:
+        except Exception:
             log.exception('Could not open device')
 
     def _device_close(self, dev):
@@ -150,7 +150,7 @@ class MainWindow(QtWidgets.QMainWindow):
             device.widget = None
             try:
                 device.close()
-            except:
+            except Exception:
                 log.exception('Could not close device')
 
     def _device_close_all(self):
