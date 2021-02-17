@@ -20,8 +20,8 @@
  * \brief strmap collection.
  */
 
-#ifndef EMBC_STRMAP_H_
-#define EMBC_STRMAP_H_
+#ifndef EMBC_COLLECTIONS_STRMAP_H_
+#define EMBC_COLLECTIONS_STRMAP_H_
 
 #include "embc/cmacro_inc.h"
 #include "embc/platform.h"
@@ -55,4 +55,4 @@ EMBC_API int embc_strmap_remove(struct embc_strmap_s *self, const char *key, voi
 
 EMBC_CPP_GUARD_END
 
-#endif /* EMBC_STRMAP_H_ */
+#endif /* EMBC_COLLECTIONS_STRMAP_H_ */

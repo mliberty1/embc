@@ -20,8 +20,8 @@
  * \brief hashmap collection.
  */
 
-#ifndef EMBC_EMBC_HASHMAP_H_
-#define EMBC_EMBC_HASHMAP_H_
+#ifndef EMBC_COLLECTIONS_HASHMAP_H_
+#define EMBC_COLLECTIONS_HASHMAP_H_
 
 #include "embc/cmacro_inc.h"
 #include "embc/platform.h"
@@ -81,4 +81,4 @@ EMBC_API void embc_hashmap_iterator_free(struct embc_hashmap_iterator_s * self);
 
 EMBC_CPP_GUARD_END
 
-#endif /* EMBC_EMBC_HASHMAP_H_ */
+#endif /* EMBC_COLLECTIONS_HASHMAP_H_ */

@@ -20,8 +20,8 @@
  * \brief Provide a map from integers to void *.
  */
 
-#ifndef EMBC_EMBC_INTMAP_H_
-#define EMBC_EMBC_INTMAP_H_
+#ifndef EMBC_COLLECTIONS_INTMAP_H_
+#define EMBC_COLLECTIONS_INTMAP_H_
 
 #include "embc/cmacro_inc.h"
 #include "embc/platform.h"
@@ -208,4 +208,4 @@ EMBC_API void embc_intmap_iterator_free(struct embc_intmap_iterator_s * self);
 
 EMBC_CPP_GUARD_END
 
-#endif /* EMBC_EMBC_INTMAP_H_ */
+#endif /* EMBC_COLLECTIONS_INTMAP_H_ */
