@@ -76,12 +76,11 @@ For a history of changes, see the [changelog](CHANGELOG.md).
 
 Several alternative libraries to embc exist that you can consider.
 
-*   [microrl](https://github.com/Helius/microrl)
-*   [Piconomic FW Library](http://piconomic.co.za/fwlib/index.html)
-*   http://mbeddr.com/
+*   [microrl](https://github.com/Helius/microrl) - command line
+*   [Piconomic FW Library](https://github.com/piconomix/piconomix-fwlib)
+*   [MBEDDR](http://mbeddr.com/)
 
 Random number generation:
 
 *   https://en.wikipedia.org/wiki/Xorshift
 *   http://www.pcg-random.org/ [small](http://excamera.com/sphinx/article-xorshift.html)
-
