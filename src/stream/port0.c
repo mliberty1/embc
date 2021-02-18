@@ -22,7 +22,6 @@
 #include "embc/ec.h"
 #include "embc/platform.h"
 #include "embc/time.h"
-#include "tinyprintf.h"
 #include <inttypes.h>
 #include <string.h>
 
@@ -281,12 +280,18 @@ static void op_meta_req(struct embc_port0_s * self, uint8_t cmd_meta, uint8_t *m
 
 static void op_meta_rsp(struct embc_port0_s * self, uint8_t cmd_meta, uint8_t *msg, uint32_t msg_size) {
     (void) msg_size;
-    char topic[EMBC_PUBSUB_TOPIC_LENGTH_MAX];
+    char topic[EMBC_PUBSUB_TOPIC_LENGTH_MAX] = "port/";
+    char * topic_end = topic + EMBC_PUBSUB_TOPIC_LENGTH_MAX;
     uint8_t port_id = cmd_meta;
     if (port_id != self->meta_rx_port_id) {
         EMBC_LOGW("meta_rsp unexpected port_id %d != %d", (int) port_id, (int) self->meta_rx_port_id);
     }
-    tfp_snprintf(topic, sizeof(topic), "port/%d/meta", (int) port_id);
+    char * t = topic + 5;
+    if (port_id > 10) {
+        *t++ = '0' + (port_id / 10);
+    }
+    *t++ = '0' + (port_id % 10);
+    embc_cstr_copy(t, "/meta", topic_end - t);
     publish(self, topic, &embc_pubsub_json((char *) msg));
     self->topic_prefix[self->topic_prefix_length] = 0;
 

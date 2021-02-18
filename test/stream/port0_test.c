@@ -22,11 +22,13 @@
 #include <string.h>
 #include "embc/stream/port0.h"
 #include "embc/stream/transport.h"
+#include "embc/stream/pubsub.h"
 #include "embc/platform.h"
 
 
 struct embc_transport_s {
     struct embc_port0_s * p;
+    struct embc_pubsub_s * pubsub;
 };
 
 static int32_t ll_send(struct embc_transport_s * t,
@@ -53,7 +55,8 @@ static int32_t ll_send(struct embc_transport_s * t,
 static int setup(void ** state) {
     (void) state;
     struct embc_transport_s * self = embc_alloc_clr(sizeof(struct embc_transport_s));
-    self->p = embc_port0_initialize(EMBC_PORT0_MODE_CLIENT, self, ll_send);
+    self->pubsub = embc_pubsub_initialize(10000);
+    self->p = embc_port0_initialize(EMBC_PORT0_MODE_CLIENT, self, ll_send, self->pubsub, "s/");
     assert_non_null(self->p);
     *state = self;
     return 0;
@@ -62,6 +65,7 @@ static int setup(void ** state) {
 static int teardown(void ** state) {
     struct embc_transport_s * self = (struct embc_transport_s *) *state;
     embc_port0_finalize(self->p);
+    embc_pubsub_finalize(self->pubsub);
     embc_free(self);
     return 0;
 }

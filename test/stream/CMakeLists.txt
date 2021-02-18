@@ -44,6 +44,6 @@ include_directories(../../host/include)
 
 SET_FILENAME("host.c")
 add_executable(host host.c $<TARGET_OBJECTS:embc_objlib>)
-target_link_libraries(host tinyprintf)
-add_dependencies(host embc_objlib test_objlib tinyprintf)
+target_link_libraries(host)
+add_dependencies(host embc_objlib test_objlib)
 
