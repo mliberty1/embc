@@ -89,8 +89,6 @@ typedef void (*embc_transport_recv_fn)(void *user_data,
  *      of the function call.
  * @param msg_size The size of msg_buffer in total_bytes.
  * @return 0 or error code.
- *
- * The port send_done_cbk callback will be called when the send completes.
  */
 typedef int32_t (*embc_transport_ll_send)(void * user_data, uint32_t metadata,
                      uint8_t const *msg, uint32_t msg_size);
@@ -108,9 +106,6 @@ typedef int32_t (*embc_transport_ll_send)(void * user_data, uint32_t metadata,
  *      of the function call.
  * @param msg_size The size of msg_buffer in total_bytes.
  * @return 0 or error code.
- *
- * The port send_done_cbk callback will be called when the send completes.
- * Implemented by embc_transport_send().
  */
 typedef int32_t (*embc_transport_send_fn)(struct embc_transport_s * self,
                                           uint8_t port_id,
@@ -166,8 +161,6 @@ int32_t embc_transport_port_register(struct embc_transport_s * self, uint8_t por
  *      of the function call.
  * @param msg_size The size of msg_buffer in total_bytes.
  * @return 0 or error code.
- *
- * The port send_done_cbk callback will be called when the send completes.
  */
 int32_t embc_transport_send(struct embc_transport_s * self,
                             uint8_t port_id,

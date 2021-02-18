@@ -44,6 +44,11 @@ if (EMBC_TOPLEVEL AND CMAKE_COMPILER_IS_GNUCC)
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=gnu99")
 endif()
 remove_definitions(-D__cplusplus)
+if (WIN32 AND CMAKE_COMPILER_IS_GNUCC)
+    # Ugh, mingw
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-format")
+endif()
+
 
 add_subdirectory(third-party)
 

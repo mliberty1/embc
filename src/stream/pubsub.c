@@ -200,6 +200,13 @@ static void topic_free(struct embc_pubsub_s * self, struct topic_s * topic) {
     embc_free(topic);
 }
 
+/**
+ * @brief Parse the next subtopic.
+ * @param topic[inout] The topic, which is advanced to the next subtopic.
+ * @param subtopic[out] The parse subtopic, which must be
+ *      at least EMBC_PUBSUB_TOPIC_LENGTH_PER_LEVEL bytes.
+ * @return true on success, false on failure.
+ */
 static bool subtopic_get_str(const char ** topic, char * subtopic) {
     const char * t = *topic;
     for (int i = 0; i < EMBC_PUBSUB_TOPIC_LENGTH_PER_LEVEL; ++i) {
@@ -216,6 +223,7 @@ static bool subtopic_get_str(const char ** topic, char * subtopic) {
             *subtopic++ = *t++;
         }
     }
+    EMBC_LOGW("subtopic too long: %s", *topic);
     return false;
 }
 

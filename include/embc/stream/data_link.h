@@ -357,6 +357,24 @@ int64_t embc_dl_service_interval(struct embc_dl_s * self);
 void embc_dl_process(struct embc_dl_s * self);
 
 /**
+ * @brief Write data to the low-level driver instance.
+ *
+ * @param user_data The instance.
+ * @param buffer The buffer containing the data to send. The caller retains
+ *      ownership, and the buffer is only valid for the duration of the call.
+ * @param buffer_size The size of buffer in total_bytes.
+ */
+typedef void (*embc_dl_ll_send_fn)(void * user_data, uint8_t const * buffer, uint32_t buffer_size);
+
+/**
+ * @brief The number of bytes currently available to send().
+ *
+ * @param user_data The instance.
+ * @return The non-blocking free space available to send().
+ */
+typedef uint32_t (*embc_dl_ll_send_available_fn)(void * user_data);
+
+/**
  * @brief The low-level abstract driver implementation.
  */
 struct embc_dl_ll_s {
@@ -368,27 +386,11 @@ struct embc_dl_ll_s {
      */
     void * user_data;
 
-    /**
-     * @brief Write data to the low-level driver instance.
-     *
-     * @param user_data The instance.
-     * @param buffer The buffer containing the data to send which must
-     *      remain valid until the send completes.  The low-level driver
-     *      must call uart_ll_cbk_send_done() when complete.
-     * @param buffer_size The size of buffer in total_bytes.
-     *
-     * This function must call ul_instance->send_done() when it no
-     * longer needs buffer.  The send_done() may occur within this function.
-     */
-    void (*send)(void * user_data, uint8_t const * buffer, uint32_t buffer_size);
+    /// Function to send data.
+    embc_dl_ll_send_fn send;
 
-    /**
-     * @brief The number of bytes currently available to send().
-     *
-     * @param user_data The instance.
-     * @return The non-blocking free space available to send().
-     */
-    uint32_t (*send_available)(void * user_data);
+    /// Function to get the number of bytes currently available to send().
+    embc_dl_ll_send_available_fn send_available;
 
     // note: recv is performed through the embc_dl_ll_recv with the dl instance.
 };

@@ -49,6 +49,7 @@ set(SOURCES
         stream/port0.c
         stream/pubsub.c
         stream/pubsub_port.c
+        stream/stack.c
         stream/transport.c
         ${PLATFORM_SRC}
 )
@@ -63,6 +64,7 @@ elseif (WIN32)
             host/win/os_mutex.c
             host/win/platform.c
             host/win/uart.c
+            host/win/uart_thread.c
             host/win/uart_data_link.c)
 else()
     set(SOURCES_HOST "")

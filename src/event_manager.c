@@ -179,7 +179,7 @@ int32_t embc_evm_process(struct embc_evm_s * self, int64_t time_current) {
     return count;
 }
 
-int64_t timestamp_default(struct embc_evm_s * self) {
+static int64_t timestamp_default(struct embc_evm_s * self) {
     (void) self;
     return embc_time_rel();
 }

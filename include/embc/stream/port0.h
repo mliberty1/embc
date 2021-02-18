@@ -114,6 +114,9 @@ struct embc_port0_s;
 // Opaque transport instance, from "transport.h".
 struct embc_transport_s;
 
+// The opaque PubSub instance, from "pubsub.h"
+struct embc_pubsub_s;
+
 /**
  * @brief Allocate and initialize the instance.
  *
@@ -121,11 +124,15 @@ struct embc_transport_s;
  * @param transport The transport instance.
  * @param send_fn The function to call to send data, which should be
  *      embc_transport_send() except during unit testing.
+ * @param pubsub The pubsub instance for event updates.
+ * @param topic_prefix The prefix to use for pubsub.
  * @return 0 or error code.
  */
 struct embc_port0_s * embc_port0_initialize(enum embc_port0_mode_e mode,
         struct embc_transport_s * transport,
-        embc_transport_send_fn send_fn);
+        embc_transport_send_fn send_fn,
+        struct embc_pubsub_s * pubsub,
+        const char * topic_prefix);
 
 /**
  * @brief Finalize and deallocate the instance.

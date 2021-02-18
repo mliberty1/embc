@@ -42,27 +42,38 @@ extern "C" {
  * @{
  */
 
-struct embc_port_s {
+
+/**
+ * @brief Initialize a port instance.
+ *
+ * @param user_data The arbitrary user data (the port instance).
+ * @param pubsub The pubsub instance.
+ * @param topic_prefix The topic prefix, ending with '/', that this
+ *      port should use for all topics.
+ * @param transport The transport instance for sending data.
+ * @param port_id The port's port_id for sending data.
+ * @param evm The event manager, which this port can use to schedule callback
+ *      events.
+ */
+typedef int32_t embc_port_initialize_fn(void * user_data,
+                                        struct embc_pubsub_s * pubsub,
+                                        const char * topic_prefix,
+                                        struct embc_transport_s * transport,
+                                        uint8_t port_id,
+                                        struct embc_evm_api_s * evm);
+
+/**
+ * @brief The port API, used by the transport layer to interact
+ *      with (potentially) dynamically instantiated ports.
+ */
+struct embc_port_api_s {
     void * user_data;
-    int32_t (*initialize)(void * user_data, struct embc_evm_api_s * evm);
+    const char * meta;
+    embc_port_initialize_fn initialize;
     embc_transport_event_fn on_event;
     embc_transport_recv_fn on_recv;
 };
 
-typedef void (*embc_dl_event_callback)(void * user_data, int32_t event_id);
-
-typedef int32_t (*embc_dl_event_schedule(void * user_data, int64_t timestamp,
-                                         embc_dl_event_callback cbk_fn, void * cbk_user_data);
-
-typedef int32_t (*embc_dl_event_cancel)(void * user_data, int32_t event_id);
-
-
-struct embc_port_ll_s {
-    void *user_data;
-    embc_transport_ll_send send;
-    embc_dl_event_schedule event_schedule;
-    embc_dl_event_cancel event_cancel;
-};
 
 #ifdef __cplusplus
 }
