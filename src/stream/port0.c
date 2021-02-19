@@ -293,8 +293,13 @@ static void op_meta_req(struct embc_port0_s * self, uint8_t cmd_meta, uint8_t *m
     (void) msg;  // ignore
     (void) msg_size;
     uint16_t port_data = pack_rsp(META, cmd_meta);
+    size_t meta_sz  = 1;
     const char * meta = embc_transport_meta_get(self->transport, cmd_meta);
-    size_t meta_sz = strlen(meta) + 1;
+    if (!meta) {
+        meta = "";
+    } else {
+        meta_sz = strlen(meta) + 1;
+    }
     if (meta_sz > EMBC_FRAMER_PAYLOAD_MAX_SIZE) {
         EMBC_LOGW("on_meta_req too big");
         return;
