@@ -65,7 +65,7 @@ elseif (WIN32)
             host/win/platform.c
             host/win/uart.c
             host/win/uart_thread.c
-            host/win/uart_data_link.c)
+            host/win/comm.c)
 else()
     set(SOURCES_HOST "")
 endif()

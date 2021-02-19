@@ -29,30 +29,25 @@ enum state_e {
 struct embc_pubsubp_s {
     uint8_t state;
     uint8_t port_id;
-    uint8_t publish_topic_length;
     struct embc_pubsub_s * pubsub;
     struct embc_transport_s * transport;
+    char subscribe[EMBC_PUBSUB_TOPIC_LENGTH_MAX * 2];  // comma-separated list
     uint8_t msg[EMBC_FRAMER_PAYLOAD_MAX_SIZE];
-    char subscribe_topic[EMBC_PUBSUB_TOPIC_LENGTH_MAX];
-    char publish_topic[EMBC_PUBSUB_TOPIC_LENGTH_MAX];
 };
 
-struct embc_pubsubp_s * embc_pubsubp_initialize(const char * subscribe_topic, const char * publish_topic) {
-    size_t subscribe_sz = strlen(subscribe_topic);
-    size_t publish_sz = strlen(publish_topic);
-    if (subscribe_sz > EMBC_PUBSUB_TOPIC_LENGTH_MAX - 1) {
-        EMBC_LOGE("subscribe topic prefix too long: %s", publish_topic);
-        return NULL;
-    }
-    if (publish_sz > EMBC_PUBSUB_TOPIC_LENGTH_MAX - 3) {
-        EMBC_LOGE("publish topic prefix too long: %s", publish_topic);
-        return NULL;
-    }
+const char EMBC_PUBSUBP_META[] = "{\"type\":\"pubsub\"}";
+
+struct embc_pubsubp_s * embc_pubsubp_initialize(struct embc_pubsub_s * pubsub, const char * subscribe) {
     struct embc_pubsubp_s * self = embc_alloc_clr(sizeof(struct embc_pubsubp_s));
     EMBC_ASSERT_ALLOC(self);
-    embc_memcpy(self->subscribe_topic, subscribe_topic, subscribe_sz + 1);
-    embc_memcpy(self->publish_topic, publish_topic, publish_sz + 1);
-    self->publish_topic_length = (uint8_t) publish_sz;
+    self->pubsub = pubsub;
+    size_t subscribe_len = strlen(subscribe);
+    if (subscribe_len > sizeof(self->subscribe)) {
+        EMBC_LOGW("subscribe string too long: %s", subscribe);
+        embc_pubsubp_finalize(self);
+        return NULL;
+    }
+    embc_memcpy(self->subscribe, subscribe, subscribe_len + 1);
     return self;
 }
 
@@ -68,10 +63,26 @@ static int32_t connect(struct embc_pubsubp_s * self) {
         return 0;
     }
     if (self->pubsub && self->transport) {
-        rc = embc_pubsub_subscribe(self->pubsub,
-                                   self->subscribe_topic,
-                                   (embc_pubsub_subscribe_fn) embc_pubsubp_on_update,
-                                   self);
+        // subscribe to all topics in list, separated by 0x1f
+        char * sub_start = self->subscribe;
+        char ch_end;
+        while (*sub_start) {
+            char * sub_end = sub_start;
+            while ((0 != *sub_end) && (0x1f != *sub_end)) {
+                ++sub_end;
+            }
+            ch_end = *sub_end;  // store separator
+            *sub_end = 0;       // null terminate item
+            rc = embc_pubsub_subscribe(self->pubsub,
+                                       sub_start,
+                                       (embc_pubsub_subscribe_fn) embc_pubsubp_on_update,
+                                       self);
+            if (0 == ch_end) {
+                break;  // end of list
+            }
+            *sub_end = ch_end;  // restore separator
+            sub_start = sub_end + 1;
+        }
         if (rc) {
             EMBC_LOGE("pubsub subscribe failed");
             return rc;
@@ -79,43 +90,6 @@ static int32_t connect(struct embc_pubsubp_s * self) {
         self->state = ST_ACTIVE;
     }
     return 0;
-}
-
-static const char * TX_META =
-        "{"
-            "\"dtype\": \"u32\","
-            "\"brief\": \"Host data link TX state.\","
-            "\"default\": 0,"
-            "\"options\": [[0, \"disconnected\"], [1, \"connected\"]]"
-        "}";
-
-static const char * EV_META =
-        "{"  // See embc_dl_event_e
-            "\"dtype\": \"u32\","
-            "\"brief\": \"Host data link event.\","
-            "\"options\": [[0, \"unknown\"], [1, \"rx_reset\"], [2, \"tx_disconnected\"], [3, \"tx_connected\"]]"
-        "}";
-
-static void topic_join(struct embc_pubsubp_s * self, const char * subtopic) {
-    size_t sz = strlen(subtopic);
-    EMBC_ASSERT((sz + 1 + self->publish_topic_length) < EMBC_PUBSUB_TOPIC_LENGTH_MAX);
-    embc_memcpy(self->publish_topic + self->publish_topic_length, subtopic, sz + 1);
-}
-
-int32_t embc_pubsubp_pubsub_register(struct embc_pubsubp_s * self, struct embc_pubsub_s * pubsub) {
-    int32_t rc;
-    self->pubsub = pubsub;
-    topic_join(self, "ev");
-    rc = embc_pubsub_meta(pubsub, self->publish_topic, EV_META);
-    if (rc) {
-        return rc;
-    }
-    topic_join(self, "tx");
-    rc = embc_pubsub_meta(pubsub, self->publish_topic, TX_META);
-    if (rc) {
-        return rc;
-    }
-    return connect(self);
 }
 
 int32_t embc_pubsubp_transport_register(struct embc_pubsubp_s * self,
@@ -126,6 +100,7 @@ int32_t embc_pubsubp_transport_register(struct embc_pubsubp_s * self,
     int32_t rc = embc_transport_port_register(
             transport,
             port_id,
+            EMBC_PUBSUBP_META,
             (embc_transport_event_fn) embc_pubsubp_on_event,
             (embc_transport_recv_fn) embc_pubsubp_on_recv,
             self);
@@ -135,36 +110,9 @@ int32_t embc_pubsubp_transport_register(struct embc_pubsubp_s * self,
     return connect(self);
 }
 
-static void publish_ev(struct embc_pubsubp_s *self, enum embc_dl_event_e event) {
-    topic_join(self, "ev");
-    embc_pubsub_publish(self->pubsub,
-                        self->publish_topic,
-                        &embc_pubsub_u32((uint32_t) event),
-                        (embc_pubsub_subscribe_fn) embc_pubsubp_on_update,
-                        self);
-}
-
-static void publish_tx(struct embc_pubsubp_s *self, uint32_t value) {
-    topic_join(self, "tx");
-    embc_pubsub_publish(self->pubsub,
-                        self->publish_topic,
-                        &embc_pubsub_u32_r(value),
-                        (embc_pubsub_subscribe_fn) embc_pubsubp_on_update,
-                        self);
-}
-
-void embc_pubsubp_on_event(struct embc_pubsubp_s *self, enum embc_dl_event_e event)  {
-    publish_ev(self, event);
-    switch (event) {
-        case EMBC_DL_EV_TX_CONNECTED:
-            publish_tx(self, 1);
-            break;
-        case EMBC_DL_EV_TX_DISCONNECTED:
-            publish_tx(self, 0);
-            break;
-        default:
-            break;
-    }
+void embc_pubsubp_on_event(struct embc_pubsubp_s *self, enum embc_dl_event_e event) {
+    (void) self;
+    (void) event;
 }
 
 void embc_pubsubp_on_recv(struct embc_pubsubp_s *self,
@@ -269,7 +217,7 @@ uint8_t embc_pubsubp_on_update(struct embc_pubsubp_s *self,
     uint16_t port_data = 0 | (((uint16_t) (dflag | dtype)) << 8);
 
     self->msg[0] = ((topic_len - 1) & 0x1f);
-    uint8_t payload_sz_max = sizeof(self->msg) - ((uint8_t *) (p + 1) - self->msg);
+    uint8_t payload_sz_max = (uint8_t) (sizeof(self->msg) - ((uint8_t *) (p + 1) - self->msg));
     uint8_t payload_sz = 0;
     uint8_t * hdr = (uint8_t *) p++;
 

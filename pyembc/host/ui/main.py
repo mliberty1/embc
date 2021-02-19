@@ -13,16 +13,14 @@
 # limitations under the License.
 
 
-from .device import Device
+from pyembc.host.comm import Comm
 from .open import OpenDialog
 from .device_widget import DeviceWidget
-from pyembc.host.uart_data_link import UartDataLink
 from PySide2 import QtCore, QtGui, QtWidgets
 from pyembc import __version__, __url__
+from pyembc.stream.pubsub import PubSub
 import ctypes
-import json
 import logging
-import numpy as np
 import sys
 
 
@@ -36,7 +34,7 @@ ABOUT = """\
 <head>
 </head>
 <body>
-EMBC Delta Link UI<br/> 
+EMBC Comm UI<br/> 
 Version {version}<br/>
 <a href="{url}">{url}</a>
 
@@ -80,13 +78,55 @@ def menu_setup(d, parent=None):
     return k
 
 
+class Device(QtCore.QObject):
+
+    def __init__(self, parent, pubsub, dev, baudrate=None):
+        super(Device, self).__init__(parent)
+        self._parent = parent
+        self._pubsub = pubsub
+        self._dev = dev
+        self.comm = None
+        self.widget = None
+        self._prefix = None
+        self.baudrate = baudrate
+
+    def __str__(self):
+        return f'Device({self._dev})'
+
+    def open(self):
+        self.close()
+        try:
+            self._prefix = 'd/'
+            log.info('comm')
+            self.comm = Comm(self._dev, self._prefix, self._pubsub.publish, baudrate=self.baudrate)
+            log.info('widget')
+            self.widget = DeviceWidget(self._parent, self, self._pubsub, self._prefix)
+            log.info('go')
+        except Exception:
+            log.exception('Could not open device')
+
+    def close(self):
+        if self.comm is not None:
+            self.comm.close()
+            self.comm = None
+        if self.widget is not None:
+            self.widget.close()
+            self.widget = None
+
+    def status_refresh(self):
+        if self.comm is not None and self.widget is not None:
+            status = self.comm.status()
+            self.widget.status_update(status)
+
+
 class MainWindow(QtWidgets.QMainWindow):
 
     def __init__(self, app):
         self._devices = {}
+        self._pubsub = PubSub()
         super(MainWindow, self).__init__()
         self.setObjectName('MainWindow')
-        self.setWindowTitle('EMBC Data Link')
+        self.setWindowTitle('EMBC Comm')
 
         self._central_widget = QtWidgets.QWidget(self)
         self._central_widget.setObjectName('central')
@@ -128,17 +168,18 @@ class MainWindow(QtWidgets.QMainWindow):
         self.show()
         self._on_file_open()
 
-    def _device_open(self, dev, baud):
+    def _on_publish(self, topic, value, retain=None, src_cbk=None):
+        print(f'publish {topic} => {value}')
+        self._pubsub.publish(topic, value, retain=retain, src_cbk=src_cbk)
+
+    def _device_open(self, dev, baudrate):
         self._device_close(dev)
         log.info('_device_open')
         try:
-            device = Device()
-            if device.open(dev, baud):
-                self._devices[dev] = device
-            else:
-                log.warning('Could not open device')
-            device.widget = DeviceWidget(self, device)
+            device = Device(self, self._pubsub, dev, baudrate)
+            device.open()
             self._central_layout.addWidget(device.widget)
+            self._devices[dev] = device
         except Exception:
             log.exception('Could not open device')
 
@@ -147,7 +188,6 @@ class MainWindow(QtWidgets.QMainWindow):
         if dev in self._devices:
             device = self._devices.pop(dev)
             self._central_layout.removeWidget(device.widget)
-            device.widget = None
             try:
                 device.close()
             except Exception:
@@ -164,6 +204,10 @@ class MainWindow(QtWidgets.QMainWindow):
         if params is not None:
             log.info(f'open {params}')
             self._device_open(params['device'], params['baud'])
+
+    def _on_status_update_timer(self):
+        for device in self._devices.values():
+            device.status_refresh()
 
     def closeEvent(self, event):
         log.info('closeEvent()')
@@ -187,11 +231,6 @@ class MainWindow(QtWidgets.QMainWindow):
         txt = ABOUT.format(version=__version__,
                            url=__url__)
         QtWidgets.QMessageBox.about(self, 'Delta Link UI', txt)
-
-    def _on_status_update_timer(self):
-        for device in self._devices.values():
-            status = device.status()
-            device.widget.status_update(status)
 
     @QtCore.Slot(str)
     def status_msg(self, msg, timeout=None, level=None):

@@ -24,9 +24,12 @@ log = logging.getLogger(__name__)
 
 class DeviceWidget(QtWidgets.QWidget):
 
-    def __init__(self, parent, device):
-        self.device = device
+    def __init__(self, parent, device, pubsub, pubsub_prefix):
         super(DeviceWidget, self).__init__(parent)
+
+        self._device = device
+        self._pubsub = pubsub
+        self._pubsub_prefix = pubsub_prefix
 
         self._layout = QtWidgets.QHBoxLayout(self)
         self._layout.setSpacing(6)
@@ -35,16 +38,16 @@ class DeviceWidget(QtWidgets.QWidget):
 
         self._port_widget = PortWidget(self)
         self._layout.addWidget(self._port_widget)
-        self.device.pubsub.subscribe('h/port/0/meta', self._port_widget.on_port_meta)
+        self._pubsub.subscribe(pubsub_prefix + 'h/port/0/meta', self._port_widget.on_port_meta)
 
         self._status_widget = StatusWidget(self)
         self._layout.addWidget(self._status_widget)
 
-        self._echo_widget = EchoWidget(self, device.pubsub)
-        self._layout.addWidget(self._echo_widget)
+        #self._echo_widget = EchoWidget(self, device.pubsub)
+        #self._layout.addWidget(self._echo_widget)
 
-        self._pubsub_widget = PubSubWidget(self, device.pubsub)
-        self._layout.addWidget(self._pubsub_widget)
+        #self._pubsub_widget = PubSubWidget(self, device.pubsub)
+        #self._layout.addWidget(self._pubsub_widget)
 
     def status_update(self, status):
         self._status_widget.update(status)

@@ -21,15 +21,58 @@
 #include <cmocka.h>
 #include <string.h>
 #include "embc/stream/port0.h"
+#include "embc/stream/data_link.h"
 #include "embc/stream/transport.h"
 #include "embc/stream/pubsub.h"
 #include "embc/platform.h"
 
 
+struct embc_dl_s {
+    int32_t hello;
+};
+
 struct embc_transport_s {
     struct embc_port0_s * p;
     struct embc_pubsub_s * pubsub;
+    struct embc_dl_s dl;
 };
+
+static const char META_PORT0[] = "{\"type\":\"oam\"}";
+static const char META_PORT1[] = "{\"type\":\"pubsub\"}";
+
+void embc_dl_reset_tx_from_event(struct embc_dl_s * self) {
+    (void) self;
+}
+
+int32_t embc_dl_status_get(
+        struct embc_dl_s * self,
+        struct embc_dl_status_s * status) {
+    (void) self;
+    memset(status, 0, sizeof(*status));
+    return 0;
+}
+
+int64_t embc_time_utc() {
+    return 0;
+}
+
+const char * embc_transport_meta_get(struct embc_transport_s * self, uint8_t port_id) {
+    (void) self;
+    switch (port_id) {
+        case 0: return META_PORT0;
+        case 1: return META_PORT1;
+        default: return NULL;
+    }
+}
+
+void embc_os_mutex_lock(embc_os_mutex_t mutex) {
+    (void) mutex;
+}
+
+void embc_os_mutex_unlock(embc_os_mutex_t mutex) {
+    (void) mutex;
+}
+
 
 static int32_t ll_send(struct embc_transport_s * t,
                        uint8_t port_id,
@@ -56,7 +99,7 @@ static int setup(void ** state) {
     (void) state;
     struct embc_transport_s * self = embc_alloc_clr(sizeof(struct embc_transport_s));
     self->pubsub = embc_pubsub_initialize(10000);
-    self->p = embc_port0_initialize(EMBC_PORT0_MODE_CLIENT, self, ll_send, self->pubsub, "s/");
+    self->p = embc_port0_initialize(EMBC_PORT0_MODE_CLIENT, &self->dl, self, ll_send, self->pubsub, "s/");
     assert_non_null(self->p);
     *state = self;
     return 0;
@@ -86,17 +129,13 @@ static void test_echo_req(void ** state) {
 static void test_meta(void ** state) {
     struct embc_transport_s * self = (struct embc_transport_s *) *state;
     static uint8_t req_msg[] = {0};
-    static const char * port0 = "{\"type\":\"oam\"}";
-    static const char * meta = "{\"type\":\"pubsub\"}";
-    assert_int_equal(0, embc_port0_meta_set(self->p, 1, meta));
-    assert_ptr_equal(meta, embc_port0_meta_get(self->p, 1));
 
     // port0
-    expect_send(0, EMBC_TRANSPORT_SEQ_SINGLE, pack_rsp(META, 0), port0, strlen(port0) + 1);
+    expect_send(0, EMBC_TRANSPORT_SEQ_SINGLE, pack_rsp(META, 0), META_PORT0, strlen(META_PORT0) + 1);
     embc_port0_on_recv_cbk(self->p, 0, EMBC_TRANSPORT_SEQ_SINGLE, pack_req(META, 0), req_msg, 1);
 
     // registered port
-    expect_send(0, EMBC_TRANSPORT_SEQ_SINGLE, pack_rsp(META, 1), meta, strlen(meta) + 1);
+    expect_send(0, EMBC_TRANSPORT_SEQ_SINGLE, pack_rsp(META, 1), META_PORT1, strlen(META_PORT1) + 1);
     embc_port0_on_recv_cbk(self->p, 0, EMBC_TRANSPORT_SEQ_SINGLE, pack_req(META, 1), req_msg, 1);
 
     // unregistered port

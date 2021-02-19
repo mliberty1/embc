@@ -21,6 +21,7 @@
 
 struct port_s {
     void *user_data;
+    const char * meta;
     embc_transport_event_fn event_fn;
     embc_transport_recv_fn recv_fn;
 };
@@ -75,7 +76,9 @@ void embc_transport_finalize(struct embc_transport_s * self) {
     }
 }
 
-int32_t embc_transport_port_register(struct embc_transport_s * self, uint8_t port_id,
+int32_t embc_transport_port_register(struct embc_transport_s * self,
+                                     uint8_t port_id,
+                                     const char * meta,
                                      embc_transport_event_fn event_fn,
                                      embc_transport_recv_fn recv_fn,
                                      void * user_data) {
@@ -84,6 +87,7 @@ int32_t embc_transport_port_register(struct embc_transport_s * self, uint8_t por
     }
     self->ports[port_id].event_fn = NULL;
     self->ports[port_id].recv_fn = NULL;
+    self->ports[port_id].meta = meta;
     self->ports[port_id].user_data = user_data;
     self->ports[port_id].event_fn = event_fn;
     self->ports[port_id].recv_fn = recv_fn;
@@ -105,4 +109,11 @@ int32_t embc_transport_send(struct embc_transport_s * self,
         | (port_id & EMBC_TRANSPORT_PORT_MAX)
         | (((uint32_t) port_data) << 8);
     return self->send_fn(self->send_user_data, metadata, msg, msg_size);
+}
+
+const char * embc_transport_meta_get(struct embc_transport_s * self, uint8_t port_id) {
+    if (port_id > EMBC_TRANSPORT_PORT_MAX) {
+        return NULL;
+    }
+    return self->ports[port_id].meta;
 }

@@ -353,6 +353,8 @@ int64_t embc_dl_service_interval(struct embc_dl_s * self);
  * @brief Process to handle retransmission.
  *
  * @param self The instance.
+ *
+ * todo eliminate this function, use embc_evm_schedule() and embc_evm_process()
  */
 void embc_dl_process(struct embc_dl_s * self);
 

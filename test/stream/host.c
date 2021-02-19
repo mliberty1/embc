@@ -175,7 +175,7 @@ int main(int argc, char * argv[]) {
             .send_available = (embc_dl_ll_send_available_fn) embc_uartt_send_available,
     };
 
-    h_.stack = embc_stack_initialize(&dl_config, EMBC_PORT0_MODE_SERVER, "h/", &evm_api, &ll, h_.pubsub);
+    h_.stack = embc_stack_initialize(&dl_config, EMBC_PORT0_MODE_SERVER, "h/", &evm_api, &ll, h_.pubsub, "h/");
     if (!h_.stack) {
         EMBC_LOGE("stack_initialize failed");
         return 1;

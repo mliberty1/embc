@@ -21,33 +21,19 @@
 #include <inttypes.h>
 
 
-static void on_event(void *user_data, enum embc_dl_event_e event) {
-    struct embc_stack_s * self = (struct embc_stack_s *) user_data;
-    EMBC_LOGI("event %d", (int) event);
-    if ((EMBC_DL_EV_RX_RESET_REQUEST == event) && (self->port0_mode == EMBC_PORT0_MODE_CLIENT)) {
-        embc_dl_reset_tx_from_event(self->dl);
-    }
-    embc_transport_on_event_cbk(self->transport, event);
-}
-
-static void on_recv(void *user_data, uint32_t metadata, uint8_t *msg, uint32_t msg_size) {
-    struct embc_stack_s * self = (struct embc_stack_s *) user_data;
-    EMBC_LOGI("on_recv(metadata=%" PRIu32 " sz=%" PRIu32 ")", metadata, msg_size);
-    embc_transport_on_recv_cbk(self->transport, metadata, msg, msg_size);
-}
-
 struct embc_stack_s * embc_stack_initialize(
         struct embc_dl_config_s const * config,
         enum embc_port0_mode_e port0_mode,
         const char * port0_topic_prefix,
-        struct embc_evm_api_s const * evm,
+        struct embc_evm_api_s * evm_api,
         struct embc_dl_ll_s const * ll_instance,
-        struct embc_pubsub_s * pubsub) {
+        struct embc_pubsub_s * pubsub,
+        const char * topics)  {
 
     struct embc_stack_s * self = embc_alloc_clr(sizeof(struct embc_stack_s));
     self->pubsub = pubsub;
 
-    self->dl = embc_dl_initialize(config, evm, ll_instance);
+    self->dl = embc_dl_initialize(config, evm_api, ll_instance);
     if (!self->dl) {
         embc_stack_finalize(self);
         return NULL;
@@ -60,21 +46,20 @@ struct embc_stack_s * embc_stack_initialize(
     }
 
     struct embc_dl_api_s dl_api = {
-            .user_data = self,
-            .event_fn = on_event,
-            .recv_fn = on_recv,
+            .user_data = self->transport,
+            .event_fn = (embc_dl_event_fn) embc_transport_on_event_cbk,
+            .recv_fn = (embc_dl_recv_fn) embc_transport_on_recv_cbk,
     };
     embc_dl_register_upper_layer(self->dl, &dl_api);
 
-    self->port0 = embc_port0_initialize(port0_mode, self->transport, embc_transport_send,
+    self->port0 = embc_port0_initialize(port0_mode, self->dl, self->transport, embc_transport_send,
                                         pubsub, port0_topic_prefix);
-    self->port0_mode = port0_mode;
     if (!self->port0) {
         embc_stack_finalize(self);
         return NULL;
     }
-
     if (embc_transport_port_register(self->transport, 0,
+                                     EMBC_PORT0_META,
                                      (embc_transport_event_fn) embc_port0_on_event_cbk,
                                      (embc_transport_recv_fn) embc_port0_on_recv_cbk,
                                       self->port0)) {
@@ -82,7 +67,15 @@ struct embc_stack_s * embc_stack_initialize(
         return NULL;
     }
 
-    // pubsub_port created as needed.
+    self->pubsub_port = embc_pubsubp_initialize(pubsub, topics);
+    if (!self->pubsub_port) {
+        embc_stack_finalize(self);
+        return NULL;
+    }
+    if (embc_pubsubp_transport_register(self->pubsub_port, 1, self->transport)) {
+        embc_stack_finalize(self);
+        return NULL;
+    }
 
     return self;
 }
@@ -112,4 +105,8 @@ int32_t embc_stack_finalize(struct embc_stack_s * self) {
 
 void embc_stack_process(struct embc_stack_s * self) {
     embc_dl_process(self->dl);
+}
+
+void embc_stack_mutex_set(struct embc_stack_s * self, embc_os_mutex_t mutex) {
+    embc_dl_register_mutex(self->dl, mutex);
 }

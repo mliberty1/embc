@@ -48,13 +48,16 @@ struct embc_pubsubp_s;
 /**
  * @brief Create and initialize a new PubSub port instance.
  *
- * @param subscribe_topic The topic to subscribe for forwarding.
- *      For example "" or "s".
- * @param publish_topic The topic we publish for data link event updates.
- *      This prefix should normally end with '/'.  For example "s/c1/".
+ * @param pubsub The pubsub instance.
+ * @param subscribe The list of subscribe topics each separated
+ *      by \x1F (unit separator).
  * @return The new PubSub port instance.
+ *
+ * To ensure appropriate forwarding of subscribed topics,
+ * this module will only on subscribe to the pubsub instance once
+ * it establishes the connection.
  */
-struct embc_pubsubp_s * embc_pubsubp_initialize(const char * subscribe_topic, const char * publish_topic);
+struct embc_pubsubp_s * embc_pubsubp_initialize(struct embc_pubsub_s * pubsub, const char * subscribe);
 
 /**
  * @brief Finalize the instance and free resources.
@@ -62,19 +65,6 @@ struct embc_pubsubp_s * embc_pubsubp_initialize(const char * subscribe_topic, co
  * @param self The PubSub port instance.
  */
 void embc_pubsubp_finalize(struct embc_pubsubp_s * self);
-
-/**
- * @brief Register the pubsub instance.
- * @param self The PubSub port instance.
- * @param pubsub The pubsub instance.
- *
- * This instance will call the following pubsub functions:
- * - embc_pubsub_subscribe
- * - embc_pubsub_unsubscribe
- * - embc_pubsub_publish
- * - embc_pubsub_meta
- */
-int32_t embc_pubsubp_pubsub_register(struct embc_pubsubp_s * self, struct embc_pubsub_s * pubsub);
 
 /**
  * @brief Register the transport instance.
@@ -124,7 +114,7 @@ void embc_pubsubp_on_recv(struct embc_pubsubp_s *self,
                           uint8_t *msg, uint32_t msg_size);
 
 /**
- * @brief Function called on topic updates. [unit test]
+ * @brief Function called on topic updates.
  *
  * @param user_data The arbitrary user data.
  * @param topic The topic for this update.

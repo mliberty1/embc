@@ -50,8 +50,7 @@ struct message_s {
 struct embc_pubsub_s {
     embc_pubsub_on_publish_fn cbk_fn;
     void * cbk_user_data;
-    embc_pubsub_lock lock;
-    embc_pubsub_unlock unlock;
+    embc_os_mutex_t mutex;
     void * lock_user_data;
     struct topic_s * topic;
     struct embc_list_s subscriber_free;
@@ -62,20 +61,16 @@ struct embc_pubsub_s {
     uint8_t buffer[];
 };
 
-static void lock_default(void * user_data) {
-    (void) user_data;
-}
-
-static void unlock_default(void * user_data) {
-    (void) user_data;
-}
-
 static inline void lock(struct embc_pubsub_s * self) {
-    self->lock(self->lock_user_data);
+    if (self->mutex) {
+        embc_os_mutex_lock(self->mutex);
+    }
 }
 
 static inline void unlock(struct embc_pubsub_s * self) {
-    self->unlock(self->lock_user_data);
+    if (self->mutex) {
+        embc_os_mutex_unlock(self->mutex);
+    }
 }
 
 static struct message_s * msg_alloc(struct embc_pubsub_s * self) {
@@ -268,8 +263,6 @@ struct embc_pubsub_s * embc_pubsub_initialize(uint32_t buffer_size) {
     EMBC_LOGI("initialize");
     struct embc_pubsub_s * self = (struct embc_pubsub_s *) embc_alloc_clr(sizeof(struct embc_pubsub_s) + buffer_size);
     EMBC_ASSERT_ALLOC(self);
-    self->lock = lock_default;
-    self->unlock = unlock_default;
     self->topic = topic_alloc(self, "");
     embc_list_initialize(&self->subscriber_free);
     embc_list_initialize(&self->msg_pend);
@@ -302,15 +295,16 @@ void embc_pubsub_finalize(struct embc_pubsub_s * self) {
     EMBC_LOGI("finalize");
 
     if (self) {
-        embc_pubsub_unlock unlock = self->unlock;
-        void * lock_user_data = self->lock_user_data;
-        self->lock(self->lock_user_data);
+        embc_os_mutex_t mutex = self->mutex;
+        lock(self);
         topic_free(self, self->topic);
         subscriber_list_free(&self->subscriber_free);
         msg_list_free(&self->msg_pend);
         msg_list_free(&self->msg_free);
         embc_free(self);
-        unlock(lock_user_data);
+        if (mutex) {
+            embc_os_mutex_unlock(mutex);
+        }
     }
 }
 
@@ -425,7 +419,11 @@ int32_t embc_pubsub_publish(struct embc_pubsub_s * self,
     uint32_t size = value->size;
     if (is_ptr_type(value->type)) {
         if ((!value->size) && is_str_type(value->type)) {
-            size = strlen(value->value.str) + 1;
+            size_t sz = strlen(value->value.str) + 1;
+            if (sz > UINT32_MAX) {
+                return EMBC_ERROR_TOO_BIG;
+            }
+            size = (uint32_t) sz;
         }
         if (0 == (value->type & EMBC_PUBSUB_DFLAG_CONST)) {
             if (value->type & EMBC_PUBSUB_DFLAG_RETAIN) {
@@ -489,7 +487,7 @@ int32_t embc_pubsub_meta(struct embc_pubsub_s * self, const char * topic, const 
     msg->name[sz + 1] = 0;
     msg->value.type = EMBC_PUBSUB_DFLAG_CONST | EMBC_PUBSUB_DFLAG_RETAIN | EMBC_PUBSUB_DTYPE_JSON;
     msg->value.value.str = meta_json;
-    msg->value.size = sz + 2;
+    msg->value.size = (uint32_t) (sz + 2);
     embc_list_add_tail(&self->msg_pend, &msg->item);
     unlock(self);
     return 0;
@@ -581,7 +579,7 @@ void embc_pubsub_process(struct embc_pubsub_s * self) {
                 goto free_item;
         }
 
-        uint32_t name_sz = strlen(msg->name);  // excluding terminator
+        size_t name_sz = strlen(msg->name);  // excluding terminator
         if ((name_sz == 1) && (msg->name[0] == '$')) {
             // metadata request root
             t = self->topic;
@@ -629,8 +627,6 @@ void embc_pubsub_process(struct embc_pubsub_s * self) {
     unlock(self);
 }
 
-void embc_pubsub_register_lock(struct embc_pubsub_s * self, embc_pubsub_lock lock, embc_pubsub_unlock unlock, void * user_data) {
-    self->lock = lock;
-    self->unlock = unlock;
-    self->lock_user_data = user_data;
+void embc_pubsub_register_mutex(struct embc_pubsub_s * self, embc_os_mutex_t mutex) {
+    self->mutex = mutex;
 }

@@ -111,11 +111,10 @@ enum embc_port0_mode_e {
 /// Opaque port0 instance.
 struct embc_port0_s;
 
-// Opaque transport instance, from "transport.h".
-struct embc_transport_s;
-
 // The opaque PubSub instance, from "pubsub.h"
 struct embc_pubsub_s;
+
+extern const char EMBC_PORT0_META[];
 
 /**
  * @brief Allocate and initialize the instance.
@@ -126,9 +125,10 @@ struct embc_pubsub_s;
  *      embc_transport_send() except during unit testing.
  * @param pubsub The pubsub instance for event updates.
  * @param topic_prefix The prefix to use for pubsub.
- * @return 0 or error code.
+ * @return The new instance or NULL on error.
  */
 struct embc_port0_s * embc_port0_initialize(enum embc_port0_mode_e mode,
+        struct embc_dl_s * dl,
         struct embc_transport_s * transport,
         embc_transport_send_fn send_fn,
         struct embc_pubsub_s * pubsub,
@@ -171,29 +171,6 @@ void embc_port0_on_recv_cbk(struct embc_port0_s * self,
                             uint16_t port_data,
                             uint8_t *msg, uint32_t msg_size);
 
-/**
- * @brief Set the port metadata.
- *
- * @param self The port0 instance.
- * @param port_id The port_id for the metadata.
- * @param meta The JSON-formatted port metadata.  This pointer must remain
- *      valid until embc_transport_finalize().  You can remove the metadata
- *      by passing NULL.
- * @return 0 or error code.
- *
- * This function sets the port metadata.  When port 0 receives a META
- * request, then this transport layer will respond with the metadata message.
- */
-int32_t embc_port0_meta_set(struct embc_port0_s * self, uint8_t port_id, const char * meta);
-
-/**
- * @brief Get the port metadata.
- *
- * @param self The port0 instance.
- * @param port_id The port_id for the metadata.
- * @return The metadata.
- */
-const char * embc_port0_meta_get(struct embc_port0_s * self, uint8_t port_id);
 
 #ifdef __cplusplus
 }

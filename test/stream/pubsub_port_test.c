@@ -123,11 +123,14 @@ int32_t embc_transport_send(struct embc_transport_s * self,
     expect_value(embc_transport_send, msg_size, _msg_size);                  \
     expect_memory(embc_transport_send, msg, _msg, _msg_size);
 
-int32_t embc_transport_port_register(struct embc_transport_s * self, uint8_t port_id,
+int32_t embc_transport_port_register(struct embc_transport_s * self,
+                                     uint8_t port_id,
+                                     const char * meta,
                                      embc_transport_event_fn event_fn,
                                      embc_transport_recv_fn recv_fn,
                                      void * user_data) {
     (void) self;
+    (void) meta;
     check_expected_ptr(port_id);
     (void) event_fn;
     (void) recv_fn;
@@ -138,16 +141,11 @@ int32_t embc_transport_port_register(struct embc_transport_s * self, uint8_t por
 static int setup(void ** state) {
     struct test_s * self = embc_alloc_clr(sizeof(struct test_s));
     assert_non_null(self);
-    self->s = embc_pubsubp_initialize("s", "s/c/");
-    expect_meta("s/c/ev");
-    expect_meta("s/c/tx");
-    embc_pubsubp_pubsub_register(self->s, &self->p);
+    self->s = embc_pubsubp_initialize(&self->p, "s/\x1ft/");
     expect_value(embc_transport_port_register, port_id, 2);
-    expect_subscribe("s");
+    expect_subscribe("s/");
+    expect_subscribe("t/");
     embc_pubsubp_transport_register(self->s, 2, &self->t);
-
-    expect_publish_u32("s/c/ev", EMBC_DL_EV_TX_CONNECTED);
-    expect_publish_u32("s/c/tx", 1);
     embc_pubsubp_on_event(self->s, EMBC_DL_EV_TX_CONNECTED);
 
     *state = self;

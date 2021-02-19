@@ -314,7 +314,7 @@ static void process_read(struct uart_s *self) {
         EMBC_LOGD3("read %d", (int) read_count);
     }
 
-    for (uint32_t count = embc_list_length(&self->buf_read); count < self->recv_buffer_count; ++count) {
+    for (uint32_t count = (uint32_t) embc_list_length(&self->buf_read); count < self->recv_buffer_count; ++count) {
         read_pend(self);
     }
 }

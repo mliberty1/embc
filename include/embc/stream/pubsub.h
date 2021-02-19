@@ -24,6 +24,7 @@
 #ifndef EMBC_STREAM_PUBSUB_H__
 #define EMBC_STREAM_PUBSUB_H__
 
+#include "embc/os/mutex.h"
 #include <stdint.h>
 #include <stdbool.h>
 
@@ -111,6 +112,13 @@ enum embc_pubsub_dflag_e {
     EMBC_PUBSUB_DFLAG_CONST = (1 << 5),
 };
 
+/// The actual value holder for embc_pubsub_value_s.
+union embc_pubsub_value_inner_u {
+    const char * str;      ///< EMBC_PUBSUB_TYPE_STR, EMBC_PUBSUB_DTYPE_JSON
+    const uint8_t * bin;   ///< EMBC_PUBSUB_TYPE_BIN
+    uint32_t u32;          ///< EMBC_PUBSUB_TYPE_U32
+};
+
 /// The value holder for all types.
 struct embc_pubsub_value_s {
     /**
@@ -122,11 +130,7 @@ struct embc_pubsub_value_s {
     uint8_t type;
 
     /// The actual value.
-    union {
-        const char * str;      ///< EMBC_PUBSUB_TYPE_STR, EMBC_PUBSUB_DTYPE_JSON
-        const uint8_t * bin;   ///< EMBC_PUBSUB_TYPE_BIN
-        uint32_t u32;          ///< EMBC_PUBSUB_TYPE_U32
-    } value;
+    union embc_pubsub_value_inner_u value;
     uint32_t size;             ///< payload size for pointer types.
 };
 
@@ -143,9 +147,9 @@ struct embc_pubsub_value_s {
 #define embc_pubsub_cjson(_value) ((struct embc_pubsub_value_s){.type=EMBC_PUBSUB_DTYPE_JSON | EMBC_PUBSUB_DFLAG_CONST, .value={.str=_value}, .size=0})
 #define embc_pubsub_cjson_r(_value) ((struct embc_pubsub_value_s){.type=EMBC_PUBSUB_DTYPE_JSON | EMBC_PUBSUB_DFLAG_CONST | EMBC_PUBSUB_DFLAG_RETAIN, .value={.str=_value}, .size=0})
 
-#define embc_pubsub_bin(_value, _size) ((struct embc_pubsub_value_s){.type=EMBC_PUBSUB_DTYPE_BIN, .value={.str=_value}, .size=_size})
-#define embc_pubsub_cbin(_value, _size) ((struct embc_pubsub_value_s){.type=EMBC_PUBSUB_DTYPE_BIN | EMBC_PUBSUB_DFLAG_CONST, .value={.str=_value}, .size=_size})
-#define embc_pubsub_cbin_r(_value, _size) ((struct embc_pubsub_value_s){.type=EMBC_PUBSUB_DTYPE_BIN | EMBC_PUBSUB_DFLAG_CONST | EMBC_PUBSUB_DFLAG_RETAIN, .value={.str=_value}, .size=_size})
+#define embc_pubsub_bin(_value, _size) ((struct embc_pubsub_value_s){.type=EMBC_PUBSUB_DTYPE_BIN, .value={.bin=_value}, .size=_size})
+#define embc_pubsub_cbin(_value, _size) ((struct embc_pubsub_value_s){.type=EMBC_PUBSUB_DTYPE_BIN | EMBC_PUBSUB_DFLAG_CONST, .value={.bin=_value}, .size=_size})
+#define embc_pubsub_cbin_r(_value, _size) ((struct embc_pubsub_value_s){.type=EMBC_PUBSUB_DTYPE_BIN | EMBC_PUBSUB_DFLAG_CONST | EMBC_PUBSUB_DFLAG_RETAIN, .value={.bin=_value}, .size=_size})
 
 /// The opaque PubSub instance.
 struct embc_pubsub_s;
@@ -342,28 +346,12 @@ int32_t embc_pubsub_query(struct embc_pubsub_s * self, const char * topic, struc
 void embc_pubsub_process(struct embc_pubsub_s * self);
 
 /**
- * @brief The function used to lock the mutex
- *
- * @param user_data The arbitrary data.
- */
-typedef void (*embc_pubsub_lock)(void * user_data);
-
-/**
- * @brief The function used to unlock the mutex
- *
- * @param user_data The arbitrary data.
- */
-typedef void (*embc_pubsub_unlock)(void * user_data);
-
-/**
  * @brief Register functions to lock and unlock the send-side mutex.
  *
  * @param self The instance.
- * @param lock The function called to lock the mutex.
- * @param unlock The function called to unlock the mutex.
- * @param user_data The arbitrary data passed to lock and unlock.
+ * @param mutex The mutex instance for accessing self.
  */
-void embc_pubsub_register_lock(struct embc_pubsub_s * self, embc_pubsub_lock lock, embc_pubsub_unlock unlock, void * user_data);
+void embc_pubsub_register_mutex(struct embc_pubsub_s * self, embc_os_mutex_t mutex);
 
 #ifdef __cplusplus
 }

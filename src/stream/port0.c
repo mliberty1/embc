@@ -26,9 +26,10 @@
 #include <string.h>
 
 
-static const char * PORT0_META = "{\"type\":\"oam\"}";
-static const char EV_TOPIC[] = "port/0/conn/ev";
-static const char TX_TOPIC[] = "port/0/conn/tx";
+const char EMBC_PORT0_META[] = "{\"type\":\"oam\"}";
+static const char EV_TOPIC[] = "port/0/ev";
+static const char TX_TOPIC[] = "port/0/tx";
+static const char REMOTE_STATUS_TOPIC[] = "port/0/rstat";
 static const char ECHO_ENABLE_META_TOPIC[] = "port/0/echo/enable";
 static const char ECHO_OUTSTANDING_META_TOPIC[] = "port/0/echo/window";
 static const char ECHO_LENGTH_META_TOPIC[] = "port/0/echo/length";
@@ -90,11 +91,11 @@ enum port0_state_e {
 
 struct embc_port0_s {
     enum embc_port0_mode_e mode;
+    struct embc_dl_s * dl;
     struct embc_transport_s * transport;
     struct embc_pubsub_s * pubsub;
     char topic_prefix[EMBC_PUBSUB_TOPIC_LENGTH_MAX];
     embc_transport_send_fn send_fn;
-    const char * meta[EMBC_TRANSPORT_PORT_MAX + 1];
     uint8_t meta_tx_port_id;
     uint8_t meta_rx_port_id;
     uint8_t state;
@@ -199,7 +200,12 @@ static void meta_scan(struct embc_port0_s * self) {
 }
 
 void embc_port0_on_event_cbk(struct embc_port0_s * self, enum embc_dl_event_e event) {
+    if ((EMBC_DL_EV_RX_RESET_REQUEST == event) && (self->mode == EMBC_PORT0_MODE_CLIENT)) {
+        EMBC_LOGI("port0 rx reset -> tx reset");
+        embc_dl_reset_tx_from_event(self->dl);
+    }
     publish(self, EV_TOPIC, &embc_pubsub_u32(event));
+
     switch (event) {
         case EMBC_DL_EV_RX_RESET_REQUEST:
             break;
@@ -228,6 +234,24 @@ void embc_port0_on_event_cbk(struct embc_port0_s * self, enum embc_dl_event_e ev
 
 
 typedef void (*dispatch_fn)(struct embc_port0_s * self, uint8_t cmd_meta, uint8_t *msg, uint32_t msg_size);
+
+static void op_status_req(struct embc_port0_s * self, uint8_t cmd_meta, uint8_t *msg, uint32_t msg_size) {
+    (void) cmd_meta;
+    (void) msg;
+    (void) msg_size;
+    struct embc_dl_status_s status;
+    int32_t rc = embc_dl_status_get(self->dl, &status);
+    if (!rc) {
+        return;
+    }
+    self->send_fn(self->transport, 0, EMBC_TRANSPORT_SEQ_SINGLE, pack_rsp(STATUS, 0),
+                  (uint8_t *) &status, sizeof(status));
+}
+
+static void op_status_rsp(struct embc_port0_s * self, uint8_t cmd_meta, uint8_t *msg, uint32_t msg_size) {
+    (void) cmd_meta;
+    publish(self, REMOTE_STATUS_TOPIC, &embc_pubsub_bin(msg, msg_size));
+}
 
 static void op_echo_req(struct embc_port0_s * self, uint8_t cmd_meta, uint8_t *msg, uint32_t msg_size) {
     self->send_fn(self->transport, 0, EMBC_TRANSPORT_SEQ_SINGLE, pack_rsp(ECHO, cmd_meta), msg, msg_size);
@@ -269,9 +293,15 @@ static void op_meta_req(struct embc_port0_s * self, uint8_t cmd_meta, uint8_t *m
     (void) msg;  // ignore
     (void) msg_size;
     uint16_t port_data = pack_rsp(META, cmd_meta);
-    if ((cmd_meta <= EMBC_TRANSPORT_PORT_MAX) && (self->meta[cmd_meta])) {
+    const char * meta = embc_transport_meta_get(self->transport, cmd_meta);
+    size_t meta_sz = strlen(meta) + 1;
+    if (meta_sz > EMBC_FRAMER_PAYLOAD_MAX_SIZE) {
+        EMBC_LOGW("on_meta_req too big");
+        return;
+    }
+    if ((cmd_meta <= EMBC_TRANSPORT_PORT_MAX) && meta) {
         self->send_fn(self->transport, 0, EMBC_TRANSPORT_SEQ_SINGLE, port_data,
-                      (uint8_t *) self->meta[cmd_meta], strlen(self->meta[cmd_meta]) + 1);
+                      (uint8_t *) meta, (uint32_t) meta_sz);
     } else {
         uint8_t empty = 0;
         self->send_fn(self->transport, 0, EMBC_TRANSPORT_SEQ_SINGLE, port_data, &empty, 1);
@@ -327,7 +357,7 @@ void embc_port0_on_recv_cbk(struct embc_port0_s * self,
 
     if (req) {
         switch (op) {
-            //case EMBC_PORT0_OP_STATUS:      fn = op_status_req; break;
+            case EMBC_PORT0_OP_STATUS:      fn = op_status_req; break;
             case EMBC_PORT0_OP_ECHO:        fn = op_echo_req; break;
             case EMBC_PORT0_OP_TIMESYNC:    fn = op_timesync_req; break;
             case EMBC_PORT0_OP_META:        fn = op_meta_req; break;
@@ -337,7 +367,7 @@ void embc_port0_on_recv_cbk(struct embc_port0_s * self,
         }
     } else {
         switch (op) {
-            //case EMBC_PORT0_OP_STATUS:      fn = op_status_rsp; break;
+            case EMBC_PORT0_OP_STATUS:      fn = op_status_rsp; break;
             case EMBC_PORT0_OP_ECHO:        fn = op_echo_rsp; break;
             //case EMBC_PORT0_OP_TIMESYNC:    fn = op_timesync_rsp; break;
             case EMBC_PORT0_OP_META:        fn = op_meta_rsp; break;
@@ -360,25 +390,23 @@ static void pubsub_create(struct embc_port0_s * self, const char * subtopic, con
     if (src_fn) {
         embc_pubsub_subscribe(self->pubsub, self->topic_prefix, src_fn, src_user_data);
     }
-    (void) value;
-    //embc_pubsub_publish(self->pubsub, self->topic_prefix, value, src_fn, src_user_data);
+    embc_pubsub_publish(self->pubsub, self->topic_prefix, value, src_fn, src_user_data);
     topic_reset(self);
 }
 
 struct embc_port0_s * embc_port0_initialize(enum embc_port0_mode_e mode,
+        struct embc_dl_s * dl,
         struct embc_transport_s * transport, embc_transport_send_fn send_fn,
         struct embc_pubsub_s * pubsub, const char * topic_prefix) {
     struct embc_port0_s * p = embc_alloc_clr(sizeof(struct embc_port0_s));
     EMBC_ASSERT_ALLOC(p);
     p->mode = mode;
+    p->dl = dl;
     p->transport = transport;
     p->pubsub = pubsub;
     embc_cstr_copy(p->topic_prefix, topic_prefix, sizeof(p->topic_prefix));
     p->topic_prefix_length = (uint8_t) strlen(p->topic_prefix);
     p->send_fn = send_fn;
-    p->meta[0] = PORT0_META;
-
-
     p->echo_enable = 0;
     p->echo_window = 8;
     p->echo_length = 256;
@@ -398,19 +426,4 @@ void embc_port0_finalize(struct embc_port0_s * self) {
     if (self) {
         embc_free(self);
     }
-}
-
-int32_t embc_port0_meta_set(struct embc_port0_s * self, uint8_t port_id, const char * meta) {
-    if ((port_id < 1) || port_id > EMBC_TRANSPORT_PORT_MAX) {
-        return EMBC_ERROR_PARAMETER_INVALID;
-    }
-    self->meta[port_id] = meta;
-    return 0;
-}
-
-const char * embc_port0_meta_get(struct embc_port0_s * self, uint8_t port_id) {
-    if (port_id > EMBC_TRANSPORT_PORT_MAX) {
-        return NULL;
-    }
-    return self->meta[port_id];
 }

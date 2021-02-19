@@ -135,6 +135,10 @@ void embc_transport_finalize(struct embc_transport_s * self);
  *
  * @param self The transport instance.
  * @param port_id The port_id to register.
+ * @param meta The JSON metadata string describing this port function.
+ *      This caller retains ownership, but this string must remain valid
+ *      until embc_transport_finalize().
+ *      See the function details for the format.
  * @param event_fn The function to call on events, which may be NULL.
  * @param recv_fn The function to call on data received, which may be NULL.
  * @param user_data The arbitrary data for event_fn and recv_fn.
@@ -142,8 +146,22 @@ void embc_transport_finalize(struct embc_transport_s * self);
  *
  * The event_fn will be called from within this function to update
  * the current transmit connection status.
+ *
+ * The meta JSON string describes the functions of this port.
+ * Clients MUST provide this string.  Servers may provide NULL if
+ * the port is fully defined by the client.  The JSON string is
+ * an object and must contain a "type" key.  The well-known port
+ * types are:
+ *
+ * - oam: The operations, administration, & management port (port 0).
+ *   See "port0.h".
+ * - pubsub: The pubsub port (port 1).  See "pubsub_port.h".
+ * - terminal: UTF-8 text terminal.
+ * - waveform: Binary sample data.  See "waveform_port.h".
  */
-int32_t embc_transport_port_register(struct embc_transport_s * self, uint8_t port_id,
+int32_t embc_transport_port_register(struct embc_transport_s * self,
+                                     uint8_t port_id,
+                                     const char * meta,
                                      embc_transport_event_fn event_fn,
                                      embc_transport_recv_fn recv_fn,
                                      void * user_data);
@@ -194,6 +212,15 @@ void embc_transport_on_event_cbk(struct embc_transport_s * self, enum embc_dl_ev
  */
 void embc_transport_on_recv_cbk(struct embc_transport_s * self, uint32_t metadata,
                                 uint8_t *msg, uint32_t msg_size);
+
+/**
+ * @brief Get the port metadata.
+ *
+ * @param self The instance.
+ * @param port_id The port_id for the metadata.
+ * @return The metadata, or NULL if not present.
+ */
+const char * embc_transport_meta_get(struct embc_transport_s * self, uint8_t port_id);
 
 /** @} */
 
