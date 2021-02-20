@@ -37,6 +37,7 @@ struct embc_comm_s {
     struct embc_uartt_s * uart;
     struct embc_pubsub_s * pubsub;
     embc_os_mutex_t pubsub_mutex;
+    struct embc_evm_api_s evm_api;
     embc_pubsub_subscribe_fn subscriber_fn;
     void * subscriber_user_data;
 };
@@ -56,6 +57,18 @@ static uint32_t ll_send_available(void * user_data) {
 static void on_uart_recv(void *user_data, uint8_t *buffer, uint32_t buffer_size) {
     struct embc_comm_s * self = (struct embc_comm_s *) user_data;
     embc_dl_ll_recv(self->stack->dl, buffer, buffer_size);
+}
+
+
+static void on_pubsub_process(void * user_data, int32_t event_id) {
+    (void) event_id;
+    struct embc_comm_s * self = (struct embc_comm_s *) user_data;
+    embc_pubsub_process(self->pubsub);
+}
+
+static void on_publish_fn(void * user_data) {
+    struct embc_comm_s * self = (struct embc_comm_s *) user_data;
+    self->evm_api.schedule(self->evm_api.evm, 0, on_pubsub_process, self);
 }
 
 struct embc_comm_s * embc_comm_initialize(struct embc_dl_config_s const * config,
@@ -86,6 +99,7 @@ struct embc_comm_s * embc_comm_initialize(struct embc_dl_config_s const * config
         goto on_error;
     }
     embc_pubsub_register_mutex(self->pubsub, self->pubsub_mutex);
+    embc_pubsub_subscribe(self->pubsub, "", self->subscriber_fn, self->subscriber_user_data);
 
     struct embc_dl_ll_s ll = {
             .user_data = self,
@@ -107,10 +121,11 @@ struct embc_comm_s * embc_comm_initialize(struct embc_dl_config_s const * config
         goto on_error;
     }
 
-    struct embc_evm_api_s evm_api;
-    embc_uartt_evm_api(self->uart, &evm_api);
+    embc_uartt_evm_api(self->uart, &self->evm_api);
+    embc_pubsub_register_on_publish(self->pubsub, on_publish_fn, self);
 
-    self->stack = embc_stack_initialize(config, EMBC_PORT0_MODE_SERVER, "h/c/", &evm_api, &ll,
+
+    self->stack = embc_stack_initialize(config, EMBC_PORT0_MODE_SERVER, "h/c/", &self->evm_api, &ll,
             self->pubsub, topics);
     if (!self->stack) {
         goto on_error;

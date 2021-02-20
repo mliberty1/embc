@@ -38,7 +38,7 @@ class DeviceWidget(QtWidgets.QWidget):
 
         self._port_widget = PortWidget(self)
         self._layout.addWidget(self._port_widget)
-        self._pubsub.subscribe(pubsub_prefix + 'h/port/0/meta', self._port_widget.on_port_meta)
+        self._pubsub.subscribe(pubsub_prefix + 'h/c/port', self._port_widget.on_port_meta)
 
         self._status_widget = StatusWidget(self)
         self._layout.addWidget(self._status_widget)
@@ -82,12 +82,17 @@ class PortWidget(QtWidgets.QWidget):
             self._items.append([name_label, type_label])
 
     def on_port_meta(self, topic, value):
-        for meta, (_, type_label) in zip(value, self._items):
-            if meta is None:
-                txt = '-'
-            else:
-                txt = meta.get('type', 'unknown')
-            type_label.setText(txt)
+        if not topic.endswith('/meta'):
+            return
+        topic_parts = topic.split('/')
+        port_id = int(topic_parts[-2])
+        type_label = self._items[port_id][-1]
+        if value is None:
+            txt = '-'
+        else:
+            txt = value.get('type', 'unknown')
+        log.info("%d, %s : %s => %s", port_id, topic, value, txt)
+        type_label.setText(txt)
 
 
 class StatusWidget(QtWidgets.QWidget):

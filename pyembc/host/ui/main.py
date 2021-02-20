@@ -97,11 +97,8 @@ class Device(QtCore.QObject):
         self.close()
         try:
             self._prefix = 'd/'
-            log.info('comm')
             self.comm = Comm(self._dev, self._prefix, self._pubsub.publish, baudrate=self.baudrate)
-            log.info('widget')
             self.widget = DeviceWidget(self._parent, self, self._pubsub, self._prefix)
-            log.info('go')
         except Exception:
             log.exception('Could not open device')
 

@@ -221,7 +221,10 @@ void embc_port0_on_event_cbk(struct embc_port0_s * self, enum embc_dl_event_e ev
         case EMBC_DL_EV_TX_CONNECTED:
             if (self->state == ST_INIT) {
                 self->state = ST_META;
-                meta_scan(self);
+                if (self->mode == EMBC_PORT0_MODE_SERVER) {
+                    EMBC_LOGI("port0 meta_scan");
+                    meta_scan(self);
+                }
             } else {
                 self->state = ST_CONNECTED;
                 publish(self, TX_TOPIC, &embc_pubsub_u32_r(1));
@@ -322,7 +325,7 @@ static void op_meta_rsp(struct embc_port0_s * self, uint8_t cmd_meta, uint8_t *m
         EMBC_LOGW("meta_rsp unexpected port_id %d != %d", (int) port_id, (int) self->meta_rx_port_id);
     }
     char * t = topic + 5;
-    if (port_id > 10) {
+    if (port_id >= 10) {
         *t++ = '0' + (port_id / 10);
     }
     *t++ = '0' + (port_id % 10);
@@ -334,9 +337,10 @@ static void op_meta_rsp(struct embc_port0_s * self, uint8_t cmd_meta, uint8_t *m
     if (self->meta_rx_port_id > EMBC_TRANSPORT_PORT_MAX) {
         if (self->state == ST_META) {
             self->state = ST_CONNECTED;
+            EMBC_LOGI("port0: scan completed, connected");
             publish(self, TX_TOPIC, &embc_pubsub_u32_r(1));
         }
-    } else {
+    } else if (self->mode == EMBC_PORT0_MODE_SERVER) {
         meta_scan(self);
     }
 }

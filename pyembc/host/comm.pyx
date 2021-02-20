@@ -66,12 +66,18 @@ cdef _value_unpack(embc_pubsub_value_s * value):
     elif dtype == EMBC_PUBSUB_DTYPE_U32:
         v = value[0].value.u32
     elif dtype == EMBC_PUBSUB_DTYPE_STR:
-        v = value[0].value.str[value[0].size - 1].decode('utf-8')
+        if value[0].size <= 1:
+            v = None
+        else:
+            v = value[0].value.str[:(value[0].size - 1)].decode('utf-8')
     elif dtype == EMBC_PUBSUB_DTYPE_BIN:
         v = value[0].value.bin[value[0].size]
     elif dtype == EMBC_PUBSUB_DTYPE_JSON:
-        s = value[0].value.str[value[0].size]
-        v = json.loads(s)
+        if value[0].size <= 1:
+            v = None
+        else:
+            s = value[0].value.str[:(value[0].size - 1)].decode('utf-8')
+            v = json.loads(s)
     else:
         raise RuntimeError(f'Unsupported value type: {dtype}')
     return v, retain
@@ -140,13 +146,16 @@ cdef class Comm:
             raise RuntimeError('Could not allocate instance')
 
     @staticmethod
-    cdef uint8_t _subscriber_cbk(void * user_data, const char * topic, const embc_pubsub_value_s * value):
+    cdef uint8_t _subscriber_cbk(void * user_data, const char * topic, const embc_pubsub_value_s * value) with gil:
         cdef Comm self = <object> user_data
         v, retain = _value_unpack(value)
-        topic_str = topic;
+        topic_str = topic.decode('utf-8')
         if self.topic_prefix is not None:
             topic_str = self.topic_prefix + topic_str
-        self._subscriber(topic_str, v, retain, self.publish)
+        try:
+            self._subscriber(topic_str, v, retain, self.publish)
+        except Exception:
+            log.exception(f'_subscriber_cbk({topic})')
 
     def close(self):
         embc_comm_finalize(self._comm)
