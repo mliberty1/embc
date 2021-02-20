@@ -14,8 +14,8 @@ py/embc.egg-info/**
 py/embc/libembc.dll
 
 pyembc/crc.c
-pyembc/stream.framer.c
-pyembc/host/uart_data_link.c
+pyembc/stream/framer.c
+pyembc/host/comm.c
 
 # Compiled Object files
 *.slo
