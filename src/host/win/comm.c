@@ -133,13 +133,14 @@ on_error:
 
 void embc_comm_finalize(struct embc_comm_s * self) {
     if (self) {
-        if (self->uart) {
-            embc_free(self->uart);
-            self->uart = NULL;
-        }
+        embc_uartt_stop(self->uart);
         if (self->stack) {
             embc_stack_finalize(self->stack);
             self->stack = NULL;
+        }
+        if (self->uart) {
+            embc_uartt_finalize(self->uart);
+            self->uart = NULL;
         }
         if (self->pubsub) {
             embc_pubsub_finalize(self->pubsub);

@@ -21,8 +21,13 @@ import json
 import logging
 
 
+# From embc/time.h
+EMBC_TIME_Q = 30
+EMBC_TIME_SECOND = (1 << EMBC_TIME_Q)
+EMBC_TIME_MILLISECOND = ((EMBC_TIME_SECOND + 500) // 1000)
+
 log = logging.getLogger(__name__)
-TX_TIMEOUT_DEFAULT = 16  # milliseconds
+TX_TIMEOUT_DEFAULT = 16 * EMBC_TIME_MILLISECOND
 
 
 cdef _value_pack(embc_pubsub_value_s * value, data, retain=None):

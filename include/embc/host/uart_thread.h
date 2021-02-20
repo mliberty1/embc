@@ -69,6 +69,8 @@ void embc_uartt_finalize(struct embc_uartt_s *self);
 int32_t embc_uartt_start(struct embc_uartt_s * self,
                          embc_uartt_process_fn process_fn, void * process_user_data);
 
+int32_t embc_uartt_stop(struct embc_uartt_s * self);
+
 /**
  * @brief Populate the EVM API.
  *

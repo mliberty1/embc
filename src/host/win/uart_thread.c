@@ -69,13 +69,7 @@ struct embc_uartt_s * embc_uartt_initialize(const char *device_path, struct uart
 
 void embc_uartt_finalize(struct embc_uartt_s *self) {
     if (self) {
-        self->process_fn = NULL;
-        self->quit = 1;
-        if (self->thread) {
-            WaitForSingleObject(self->thread, 1000);
-            CloseHandle(self->thread);
-            self->thread = NULL;
-        }
+        embc_uartt_stop(self);
         if (self->uart) {
             uart_close(self->uart);
             embc_free(self->uart);
@@ -143,6 +137,23 @@ int32_t embc_uartt_start(struct embc_uartt_s * self,
         EMBC_LOGE("Could not elevate thread priority: %d", (int) GetLastError());
     }
     return 0;
+}
+
+int32_t embc_uartt_stop(struct embc_uartt_s * self) {
+    int rc = 0;
+    if (self) {
+        self->process_fn = NULL;
+        self->quit = 1;
+        if (self->thread) {
+            if (WAIT_OBJECT_0 != WaitForSingleObject(self->thread, 1000)) {
+                EMBC_LOGW("UART thread failed to shut down gracefully");
+                rc = EMBC_ERROR_TIMED_OUT;
+            }
+            CloseHandle(self->thread);
+            self->thread = NULL;
+        }
+    }
+    return rc;
 }
 
 int32_t embc_uartt_evm_api(struct embc_uartt_s * self, struct embc_evm_api_s * api) {
