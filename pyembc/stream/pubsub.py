@@ -158,7 +158,7 @@ class PubSub:
         """Subscribe to a topic and its children.
 
         :param topic: The topic name.
-        :param cbk: The callable(topic, value) called on value changes.
+        :param cbk: The callable(topic, value, retain) called on value changes.
         :param skip_retained: Skip the update of all retained values
             that normally occurs when subscribing.
         """

@@ -84,27 +84,56 @@ class Device(QtCore.QObject):
     def __init__(self, parent, pubsub, dev, baudrate=None):
         super(Device, self).__init__(parent)
         self._parent = parent
-        self._pubsub = pubsub
         self._dev = dev
+        self._topic_prefix = dev
+        self._pubsub = pubsub
         self._resync = Resync(self)
+        self._on_device_publish = self._resync.wrap(self._subscribe_device)
         self.comm = None
         self.widget = None
-        self._prefix = None
         self.baudrate = baudrate
+
+        if pubsub is not None:
+            pubsub.subscribe(self._topic_prefix, self._subscribe_parent)
 
     def __str__(self):
         return f'Device({self._dev})'
 
-    def _on_device_publish(self, topic, value, retain=None, src_cbk=None):
-        self._pubsub.publish(topic, value, retain=retain, src_cbk=src_cbk)
+    @property
+    def topic_prefix(self):
+        return self._topic_prefix
+
+    def _subscribe_parent(self, topic: str, value, retain=None, src_cbk=None):
+        # forward from application pubsub to device's C pubsub
+        if topic.startswith(self._topic_prefix):
+            topic = topic[len(self._topic_prefix):]
+            if self.comm is not None:
+                self.comm.publish(self, topic, value, retain=retain, src_cbk=self._on_device_publish)
+
+    def _subscribe_device(self, topic: str, value, retain=None, src_cbk=None):
+        # forward from device's C pubsub to application pubsub
+        topic = self._topic_prefix + topic
+        self._pubsub.publish(topic, value, retain=retain, src_cbk=self._subscribe_parent)
+
+    def publish(self, topic: str, value, retain=None, src_cbk=None):
+        self._pubsub(topic, value, retain=retain, src_cbk=src_cbk)
+
+    def subscribe(self, topic, cbk, skip_retained=None):
+        def src_cbk_fn(topic: str, value, retain=None, src_cbk=None):
+            if topic.startswith(self._topic_prefix):
+                topic = topic[len(self._topic_prefix):]
+                cbk(topic, value, retain=retain)
+        self._pubsub.subscribe(self._topic_prefix + topic, src_cbk_fn, skip_retained=skip_retained)
+        return src_cbk_fn
+
+    def unsubscribe(self, topic, cbk):
+        self._pubsub.unsubscribe(self._topic_prefix + topic, cbk)
 
     def open(self):
         self.close()
         try:
-            self._prefix = 'd/'
-            on_publish = self._resync.wrap(self._on_device_publish)
-            self.comm = Comm(self._dev, self._prefix, on_publish, baudrate=self.baudrate)
-            self.widget = DeviceWidget(self._parent, self, self._pubsub, self._prefix)
+            self.comm = Comm(self._dev, self._on_device_publish, baudrate=self.baudrate)
+            self.widget = DeviceWidget(self._parent, self)
         except Exception:
             log.exception('Could not open device')
 

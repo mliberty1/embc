@@ -24,13 +24,9 @@ log = logging.getLogger(__name__)
 
 class DeviceWidget(QtWidgets.QWidget):
 
-    def __init__(self, parent, device, pubsub, pubsub_prefix):
+    def __init__(self, parent, device):
         super(DeviceWidget, self).__init__(parent)
-
         self._device = device
-        self._pubsub = pubsub
-        self._pubsub_prefix = pubsub_prefix
-
         self._layout = QtWidgets.QHBoxLayout(self)
         self._layout.setSpacing(6)
         self._layout.setContentsMargins(11, 11, 11, 11)
@@ -38,12 +34,12 @@ class DeviceWidget(QtWidgets.QWidget):
 
         self._port_widget = PortWidget(self)
         self._layout.addWidget(self._port_widget)
-        self._pubsub.subscribe(pubsub_prefix + 'h/c/port', self._port_widget.on_port_meta)
+        device.subscribe('h/c/port', self._port_widget.on_port_meta)
 
         self._status_widget = StatusWidget(self)
         self._layout.addWidget(self._status_widget)
 
-        self._echo_widget = EchoWidget(self, pubsub)
+        self._echo_widget = EchoWidget(self, device)
         self._layout.addWidget(self._echo_widget)
 
         #self._pubsub_widget = PubSubWidget(self, device.pubsub)
@@ -81,7 +77,7 @@ class PortWidget(QtWidgets.QWidget):
             self._layout.addWidget(type_label, idx, 2, 1, 1)
             self._items.append([name_label, type_label])
 
-    def on_port_meta(self, topic, value):
+    def on_port_meta(self, topic, value, **kwargs):
         if not topic.endswith('/meta'):
             return
         topic_parts = topic.split('/')

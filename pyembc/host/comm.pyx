@@ -108,8 +108,6 @@ cdef class Comm:
     """A Communication Device using the EMBC stack.
 
     :param device: The device string.
-    :param topic_prefix: The prefix to prepend/remove from the main
-        pubsub tree.
     :param subscriber: The subscriber callback(topic, value, retain, src_cbk)
         for topic updates.  This function is called from the comm thread
         and must return quickly.  The authors recommend posting to a queue
@@ -120,10 +118,9 @@ cdef class Comm:
     """
 
     cdef embc_comm_s * _comm
-    cdef object topic_prefix
     cdef object _subscriber
 
-    def __init__(self, device, topic_prefix, subscriber,
+    def __init__(self, device, subscriber,
             baudrate=None,
             tx_link_size=None,
             tx_window_size=None,
@@ -133,7 +130,6 @@ cdef class Comm:
 
         cdef embc_dl_config_s config
         log.info('Comm.__init__ start')
-        self.topic_prefix = topic_prefix
         self._subscriber = subscriber
 
         baudrate = 3000000 if baudrate is None else int(baudrate)
@@ -154,8 +150,6 @@ cdef class Comm:
         cdef Comm self = <object> user_data
         v, retain = _value_unpack(value)
         topic_str = topic.decode('utf-8')
-        if self.topic_prefix is not None:
-            topic_str = self.topic_prefix + topic_str
         try:
             self._subscriber(topic_str, v, retain, self.publish)
         except Exception:
@@ -168,10 +162,6 @@ cdef class Comm:
         # ignore src_cbk since already implemented in comm
         cdef int32_t rc
         cdef embc_pubsub_value_s v
-        if self.topic_prefix is not None:
-            if not topic.startswith(self.topic_prefix):
-                return
-            topic = topic[len(self.topic_prefix):]
         s = _value_pack(&v, value, retain)
         rc = embc_comm_publish(self._comm, topic, &v)
         if rc:
