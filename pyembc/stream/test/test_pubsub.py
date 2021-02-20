@@ -23,10 +23,10 @@ class PubSubTest(unittest.TestCase):
         self.sub1 = []
         self.sub2 = []
 
-    def sub1_fn(self, topic, value):
+    def sub1_fn(self, topic, value, retain=None):
         self.sub1.append((topic, value))
 
-    def sub2_fn(self, topic, value):
+    def sub2_fn(self, topic, value, retain=None):
         self.sub2.append((topic, value))
 
     def test_sub_pub(self):
@@ -42,6 +42,12 @@ class PubSubTest(unittest.TestCase):
     def test_pub_sub_retained(self):  # retained value
         self.p.publish('hello/world', 'there', retain=True)
         self.p.subscribe('hello/world', self.sub1_fn)
+        self.assertEqual([('hello/world', 'there')], self.sub1)
+
+    def test_retained_dedup(self):
+        self.p.publish('hello/world', 'there', retain=True)
+        self.p.subscribe('hello/world', self.sub1_fn)
+        self.p.publish('hello/world', 'there', retain=True)
         self.assertEqual([('hello/world', 'there')], self.sub1)
 
     def test_pub_src(self):

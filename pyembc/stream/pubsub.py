@@ -57,13 +57,15 @@ class _Topic:
 
     def publish(self, x, retain=None, src_cbk=None):
         if bool(retain):
+            if self._value == x:  # deduplicate
+                return
             self._value = x
         topic = self
         while topic is not None:
             for subscriber in topic._subscribers:
                 if subscriber == src_cbk:
                     continue
-                subscriber(self._topic, x)
+                subscriber(self._topic, x, retain)
             topic = topic.parent
             if topic is not None:
                 topic = topic()  # weakref to parent
@@ -87,14 +89,21 @@ class _Topic:
 
 
 class PubSub:
+    """A trivial, local publish/subscribe implementation.
 
+    This PubSub implementation features:
+    * retained values
+    * de-duplication for retained values
+    * Support for cascaded distributed instances
+    * Omit publisher on publish
+
+    Topic names are hierarchical using '/' separators.
+    Request topic metadata using '$' or 'my/path/$'.
+    Metadata is returned as 'my/path/var$'
+    Query the current value using '?' or 'my/path/?'.
+    The query values are returned as 'my/path/var?'
+    """
     def __init__(self):
-        """A trivial, local publish/subscribe implementation.
-
-        This implementation uses retained values for EVERYTHING.
-        Subscribing to a topic will automatically publish the
-        retained values to the new subscriber.
-        """
         self._root = _Topic(None, '')
 
     def _topic_find(self, topic, create=False):
@@ -154,13 +163,15 @@ class PubSub:
             raise KeyError(f'topic {topic} does not exist')
         return t.value
 
-    def subscribe(self, topic, cbk, skip_retained=None):
+    def subscribe(self, topic, cbk, skip_retained=None, forward=None):
         """Subscribe to a topic and its children.
 
         :param topic: The topic name.
         :param cbk: The callable(topic, value, retain) called on value changes.
         :param skip_retained: Skip the update of all retained values
             that normally occurs when subscribing.
+        :param forward: When true, forward $ and ? requests to this subscriber.
+            Use True for distributed PubSub instances.
         """
         t = self._topic_find(topic, create=True)
         t.subscribe(cbk, skip_retained)
