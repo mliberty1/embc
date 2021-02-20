@@ -14,6 +14,7 @@
 
 
 from pyembc.host.comm import Comm
+from .resync import Resync
 from .open import OpenDialog
 from .device_widget import DeviceWidget
 from PySide2 import QtCore, QtGui, QtWidgets
@@ -85,6 +86,7 @@ class Device(QtCore.QObject):
         self._parent = parent
         self._pubsub = pubsub
         self._dev = dev
+        self._resync = Resync(self)
         self.comm = None
         self.widget = None
         self._prefix = None
@@ -93,11 +95,15 @@ class Device(QtCore.QObject):
     def __str__(self):
         return f'Device({self._dev})'
 
+    def _on_device_publish(self, topic, value, retain=None, src_cbk=None):
+        self._pubsub.publish(topic, value, retain=retain, src_cbk=src_cbk)
+
     def open(self):
         self.close()
         try:
             self._prefix = 'd/'
-            self.comm = Comm(self._dev, self._prefix, self._pubsub.publish, baudrate=self.baudrate)
+            on_publish = self._resync.wrap(self._on_device_publish)
+            self.comm = Comm(self._dev, self._prefix, on_publish, baudrate=self.baudrate)
             self.widget = DeviceWidget(self._parent, self, self._pubsub, self._prefix)
         except Exception:
             log.exception('Could not open device')

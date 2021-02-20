@@ -43,8 +43,8 @@ class DeviceWidget(QtWidgets.QWidget):
         self._status_widget = StatusWidget(self)
         self._layout.addWidget(self._status_widget)
 
-        #self._echo_widget = EchoWidget(self, device.pubsub)
-        #self._layout.addWidget(self._echo_widget)
+        self._echo_widget = EchoWidget(self, pubsub)
+        self._layout.addWidget(self._echo_widget)
 
         #self._pubsub_widget = PubSubWidget(self, device.pubsub)
         #self._layout.addWidget(self._pubsub_widget)

@@ -111,7 +111,11 @@ cdef class Comm:
     :param topic_prefix: The prefix to prepend/remove from the main
         pubsub tree.
     :param subscriber: The subscriber callback(topic, value, retain, src_cbk)
-        for topic updates.
+        for topic updates.  This function is called from the comm thread
+        and must return quickly.  The authors recommend posting to a queue
+        and then handling the update in a separate thread.  Be aware that
+        Qt has some series issues with resynchronization from non-Qt threads.
+        See ui.resync for an example of how to resynchronize safely.
     :param baudrate: The baud rate for COM / UART ports.
     """
 
