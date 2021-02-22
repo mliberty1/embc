@@ -43,20 +43,33 @@ extern "C" {
  * - Multiple data types including u32, str, json, binary
  * - Constant pointers for more efficient memory usage
  * - Retained messages
- * - Topic metadata for validation and automatically populating user interfaces
- * - Designed to easily support distributed instances in star topology
+ * - Topic metadata for automatically populating user interfaces.
+ * - Designed to easily support distributed instances in
+ *   [polytree](https://en.wikipedia.org/wiki/Polytree) topology.
+ *   - Concept of topic prefix ownership.
+ *   - Query retained messages
+ *   - Asynchronous error reporting
+ *   - State recovery in the event that any pubsub instance resets.
+ *   - Automatic topic routing using pubsub_port.h.
+ * - Thread-safe, in-order operation.  All updates queued and processed from
+ *   the pubsub context.  Subscribers can safely publish topic updates from
+ *   the subscriber callback.
  *
  *
  * ## Topics
  *
  * Topic names are any valid UTF-8.  However, we highly recommend sticking
- * to standard letters and numbers.  The following symbols are reserved
- * and may have special meaning: /?#$'"`&
+ * to standard letters and numbers.  The following symbols are reserved:
+ * /?#$'"`&
  *
  * Topics are hierarchical, and each level of the hierarchy is separated by
  * '/'.  The topic should NOT start with '/'.  We recommend using short
  * names or abbreviations, including single letters, to keep the topic
- * string to 31 characters plus the null terminator.
+ * string short.  Topics should be 30 bytes or less.  Topic storages is
+ * limited to 32 bytes by default which includes the operation suffix
+ * character and the null termination.  This small topic size supports
+ * memory-constrained devices.  Topics can have metadata to provide
+ * user-meaningful names and descriptions.
  *
  * Topics that end in '$' are the JSON metadata for the associated topic
  * without the $.  Most microcontrollers should use both CONST and RETAIN
@@ -78,11 +91,20 @@ extern "C" {
  *    - hidden: This topic should not appear in the user interface.
  *    - dev: Developer option that should not be used in production.
  *
- * To re-enumerate all metadata, publish NULL to $ or topic/hierarchy/$.
+ * To re-enumerate all metadata, publish NULL to "$" or "t/h/$".
  * This implementation recognizes this request, and will publish
- * all metadata instances.  Note that only the primary instance needs
- * to retain the metadata topics, and all other instances can safely
- * discard the metadata.
+ * all metadata instances to "topic/hierarchy/name$".  Each pubsub instance
+ * will respond to the matching topics it owns.
+ *
+ * To query a value, publish NULL to "?", "t/h/?", or "t/h/n?".
+ * The implementation recognizes this request,
+ * and will publish all matching "t/h/n?" retained values.  Each pubsub
+ * instance will respond to the matching topics it owns.  This mechanism
+ * provides state recovery in the event that a host pubsub instance resets.
+ *
+ * If publishing to a topic owned by a pubsub instance fails, then that
+ * instance will publish to "t/h/n#".  The value is a string containing
+ * the error code, a space, then the error message.
  *
  * Alternatives include:
  * - [pubsub-c](https://github.com/jaracil/pubsub-c) but uses dynamic memory.
@@ -107,10 +129,22 @@ enum embc_pubsub_dtype_e {
 };
 
 enum embc_pubsub_dflag_e {
+    /// No flags specified.
     EMBC_PUBSUB_DFLAG_NONE = 0,
+
+    /// The PubSub instance should retain this value.
     EMBC_PUBSUB_DFLAG_RETAIN = (1 << 4),
+
+    /// The value points to a const that will remain valid indefinitely.
     EMBC_PUBSUB_DFLAG_CONST = (1 << 5),
+
+    /// The value is a response to a direct "?" query.
+    EMBC_PUBSUB_DFLAG_QUERY = (1 << 6),
 };
+
+#define EMBC_PUBSUB_DTYPE_MASK (0x0f)
+#define EMBC_PUBSUB_DFLAG_MASK (0xf0)
+
 
 /// The actual value holder for embc_pubsub_value_s.
 union embc_pubsub_value_inner_u {
@@ -196,12 +230,15 @@ typedef int32_t (*embc_pubsub_publish_fn)(
 /**
  * @brief Create and initialize a new PubSub instance.
  *
+ * @param topic_prefix The topic prefix that is owned by this
+ *      pubsub instance.  This instance will reply to metadata and
+ *      query requests for all topics starting with this prefix.
  * @param buffer_size The buffer size for dynamic pointer messages.
  *      0 prohibits non-CONST pointer types.
  * // todo add authority topic for general requests like $ (meta) and ? (get retained).
  * @return The new PubSub instance.
  */
-struct embc_pubsub_s * embc_pubsub_initialize(uint32_t buffer_size);
+struct embc_pubsub_s * embc_pubsub_initialize(const char * topic_prefix, uint32_t buffer_size);
 
 /**
  * @brief Finalize the instance and free resources.
@@ -209,6 +246,14 @@ struct embc_pubsub_s * embc_pubsub_initialize(uint32_t buffer_size);
  * @param self The PubSub instance.
  */
 void embc_pubsub_finalize(struct embc_pubsub_s * self);
+
+/**
+ * @brief Get the topic prefix that is owned by this instance.
+ *
+ * @param self The PubSub instance.
+ * @return The topic prefix provided to embc_pubsub_initialize().
+ */
+const char * embc_pubsub_topic_prefix(struct embc_pubsub_s * self);
 
 /**
  * @brief Register the function called for each call to embc_pubsub_publish().
@@ -231,14 +276,21 @@ void embc_pubsub_register_on_publish(struct embc_pubsub_s * self,
  * @param topic The topic to subscribe.
  * @param cbk_fn The function to call on topic updates.
  *      This function may be initially called from
- *      within embc_pubsub_subscribe().  Future invocations
- *      are from embc_pubsub_process().  The cbk_fn is responsible
- *      for any thread resynchronization.
+ *      within embc_pubsub_subscribe() with any retained values.
+ *      Future invocations are from embc_pubsub_process().
+ *      The cbk_fn is responsible for any thread resynchronization.
  * @param cbk_user_data The arbitrary data for cbk_fn.
  * @return 0 or error code.
+ * @see embc_pubsub_unsubscribe()
+ * @see embc_pubsub_subscribe_link()
  *
  * If the topic does not already exist, this function will
  * automatically create it.
+ *
+ * Normal subscribers on receive topic publish values.  They do not receive
+ * metadata and topic get requests or responses.
+ * Use embc_pubsub_subscribe_link() for a subscriber that wants
+ * to also receive these extra messages.
  */
 int32_t embc_pubsub_subscribe(struct embc_pubsub_s * self, const char * topic,
         embc_pubsub_subscribe_fn cbk_fn, void * cbk_user_data);
@@ -251,9 +303,36 @@ int32_t embc_pubsub_subscribe(struct embc_pubsub_s * self, const char * topic,
  * @param cbk_fn The function provided to embc_pubsub_subscribe().
  * @param cbk_user_data The arbitrary data provided to embc_pubsub_subscribe().
  * @return 0 or error code.
+ * @see embc_pubsub_subscribe()
  */
 int32_t embc_pubsub_unsubscribe(struct embc_pubsub_s * self, const char * topic,
                                 embc_pubsub_subscribe_fn cbk_fn, void * cbk_user_data);
+
+/**
+ * @brief Subscribe to provide a link to a distributed pubsub instance.
+ *
+ * @param self This PubSub instance.
+ * @param cbk_fn The function to call on topic updates.
+ *      Unlike with embc_pubsub_subscribe(), cbk_fn is not initially called
+ *      with retained values.  Use "?" to get retained values as needed.
+ *      This function will be called from embc_pubsub_process().
+ *      The cbk_fn is responsible for any thread resynchronization.
+ * @param cbk_user_data The arbitrary data for cbk_fn.
+ * @return 0 or error code.
+ * @see embc_pubsub_unsubscribe
+ *
+ * Link subscribers function just like normal subscribers.  However, this
+ * PubSub instance will pass metadata and get requests to link subscribers.
+ * Normal subscribers do not receive these requests.
+ *
+ * The distributed PubSub tree hierarchy is formed by the topic subscriptions.
+ * The server PubSub instance subscribes to all topics in client PubSub
+ * instances.  Client PubSub instances subscribe to their topic_prefix along
+ * with all topic_prefix for any PubSub instances for which they are a server.
+ * The pubsub_port implementation provides hooks for this feature.
+ */
+int32_t embc_pubsub_subscribe_link(struct embc_pubsub_s * self, const char * topic,
+                                   embc_pubsub_subscribe_fn cbk_fn, void * cbk_user_data);
 
 /**
  * @brief Publish to a topic.
@@ -324,7 +403,7 @@ int32_t embc_pubsub_publish(struct embc_pubsub_s * self,
 int32_t embc_pubsub_meta(struct embc_pubsub_s * self, const char * topic, const char * meta_json);
 
 /**
- * @brief Get the retained value for a topic.
+ * @brief Get the local, retained value for a topic.
  *
  * @param self The PubSub instance.
  * @param topic The topic name.
@@ -332,6 +411,9 @@ int32_t embc_pubsub_meta(struct embc_pubsub_s * self, const char * topic, const 
  *      handled in the caller's thread, it does not account
  *      for any updates queued for embc_pubsub_process().
  * @return 0 or error code.
+ *
+ * For a distributed PubSub implementation, use topic? to get the retained
+ * value directly from the owning PubSub instance.
  */
 int32_t embc_pubsub_query(struct embc_pubsub_s * self, const char * topic, struct embc_pubsub_value_s * value);
 

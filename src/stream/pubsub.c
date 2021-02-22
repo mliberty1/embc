@@ -23,9 +23,17 @@
 #include "embc/collections/list.h"
 #include "embc/cstr.h"
 
+
+enum subscriber_flag_e {
+    SFLAG_NORMAL = 0,
+    SFLAG_LINK = (1 << 0)
+};
+
+
 struct subscriber_s {
     embc_pubsub_subscribe_fn cbk_fn;
     void * cbk_user_data;
+    uint8_t flags;
     struct embc_list_s item;
 };
 
@@ -48,6 +56,7 @@ struct message_s {
 };
 
 struct embc_pubsub_s {
+    char topic_prefix[EMBC_PUBSUB_TOPIC_LENGTH_MAX];
     embc_pubsub_on_publish_fn cbk_fn;
     void * cbk_user_data;
     embc_os_mutex_t mutex;
@@ -100,6 +109,7 @@ static struct subscriber_s * subscriber_alloc(struct embc_pubsub_s * self) {
         EMBC_LOGD3("subscriber alloc: %p", (void *) sub);
     }
     embc_list_initialize(&sub->item);
+    sub->flags = 0;
     sub->cbk_fn = NULL;
     sub->cbk_user_data = NULL;
     return sub;
@@ -107,6 +117,28 @@ static struct subscriber_s * subscriber_alloc(struct embc_pubsub_s * self) {
 
 static void subscriber_free(struct embc_pubsub_s * self, struct subscriber_s * sub) {
     embc_list_add_tail(&self->subscriber_free, &sub->item);
+}
+
+static bool is_value_eq(const struct embc_pubsub_value_s * v1, const struct embc_pubsub_value_s * v2) {
+    if ((v1->type & 0x0f) != (v2->type & 0x0f)) {
+        return false;
+    }
+    if ((v1->type & EMBC_PUBSUB_DFLAG_RETAIN) != (v2->type & EMBC_PUBSUB_DFLAG_RETAIN)) {
+        return false;
+    }
+    switch (v1->type & 0x0f) {
+        case EMBC_PUBSUB_DTYPE_NULL: return true;
+        case EMBC_PUBSUB_DTYPE_U32: return v1->value.u32 == v2->value.u32;
+        case EMBC_PUBSUB_DTYPE_STR: return 0 == strcmp(v1->value.str, v2->value.str);
+        case EMBC_PUBSUB_DTYPE_JSON: return 0 == strcmp(v1->value.str, v2->value.str);
+        case EMBC_PUBSUB_DTYPE_BIN:
+            if (v1->size != v2->size) {
+                return false;
+            }
+            return 0 == memcmp(v1->value.bin, v2->value.bin, v1->size);
+        default:
+            return false;
+    }
 }
 
 static bool topic_name_set(struct topic_s * topic, const char * name) {
@@ -259,10 +291,11 @@ static struct topic_s * topic_find(struct embc_pubsub_s * self, const char * top
     return t;
 }
 
-struct embc_pubsub_s * embc_pubsub_initialize(uint32_t buffer_size) {
+struct embc_pubsub_s * embc_pubsub_initialize(const char * topic_prefix, uint32_t buffer_size) {
     EMBC_LOGI("initialize");
     struct embc_pubsub_s * self = (struct embc_pubsub_s *) embc_alloc_clr(sizeof(struct embc_pubsub_s) + buffer_size);
     EMBC_ASSERT_ALLOC(self);
+    embc_cstr_copy(self->topic_prefix, topic_prefix, embc_sizeof(self->topic_prefix));
     self->topic = topic_alloc(self, "");
     embc_list_initialize(&self->subscriber_free);
     embc_list_initialize(&self->msg_pend);
@@ -308,6 +341,10 @@ void embc_pubsub_finalize(struct embc_pubsub_s * self) {
     }
 }
 
+const char * embc_pubsub_topic_prefix(struct embc_pubsub_s * self) {
+    return self->topic_prefix;
+}
+
 void embc_pubsub_register_on_publish(struct embc_pubsub_s * self,
                                      embc_pubsub_on_publish_fn cbk_fn, void * cbk_user_data) {
     self->cbk_fn = cbk_fn;
@@ -335,6 +372,7 @@ int32_t embc_pubsub_subscribe(struct embc_pubsub_s * self, const char * topic, e
     if (!self || !cbk_fn) {
         return EMBC_ERROR_PARAMETER_INVALID;
     }
+    EMBC_LOGI("subscribe %s", topic);
     struct topic_s * t;
     lock(self);
     t = topic_find(self, topic, true);
@@ -345,6 +383,23 @@ int32_t embc_pubsub_subscribe(struct embc_pubsub_s * self, const char * topic, e
 
     topic_str_append(topic_str, topic);
     subscribe_traverse(t, topic_str, cbk_fn, cbk_user_data);
+    unlock(self);
+    return 0;
+}
+
+int32_t embc_pubsub_subscribe_link(struct embc_pubsub_s * self, const char * topic,
+                                   embc_pubsub_subscribe_fn cbk_fn, void * cbk_user_data) {
+    if (!self || !cbk_fn) {
+        return EMBC_ERROR_PARAMETER_INVALID;
+    }
+    struct topic_s * t;
+    lock(self);
+    t = topic_find(self, topic, true);
+    struct subscriber_s * sub = subscriber_alloc(self);
+    sub->flags = SFLAG_LINK;
+    sub->cbk_fn = cbk_fn;
+    sub->cbk_user_data = cbk_user_data;
+    embc_list_add_tail(&t->subscribers, &sub->item);
     unlock(self);
     return 0;
 }
@@ -473,7 +528,7 @@ int32_t embc_pubsub_publish(struct embc_pubsub_s * self,
 
 int32_t embc_pubsub_meta(struct embc_pubsub_s * self, const char * topic, const char * meta_json) {
     size_t sz = strlen(topic);
-    if (sz > 30) {
+    if ((sz + 1) > EMBC_PUBSUB_TOPIC_LENGTH_MAX) {
         return EMBC_ERROR_PARAMETER_INVALID;
     }
     lock(self);
@@ -483,11 +538,22 @@ int32_t embc_pubsub_meta(struct embc_pubsub_s * self, const char * topic, const 
         return EMBC_ERROR_PARAMETER_INVALID;
     }
     embc_memcpy(msg->name, topic, sz);
-    msg->name[sz] = '$';
-    msg->name[sz + 1] = 0;
-    msg->value.type = EMBC_PUBSUB_DFLAG_CONST | EMBC_PUBSUB_DFLAG_RETAIN | EMBC_PUBSUB_DTYPE_JSON;
-    msg->value.value.str = meta_json;
-    msg->value.size = (uint32_t) (sz + 2);
+    if (sz && (msg->name[sz - 1] != '$')) {
+        // Add '$'
+        if ((sz + 2) > EMBC_PUBSUB_TOPIC_LENGTH_MAX) {
+            return EMBC_ERROR_PARAMETER_INVALID;
+        }
+        msg->name[sz] = '$';
+        msg->name[sz + 1] = 0;
+    }
+    if (meta_json) {
+        msg->value.type = EMBC_PUBSUB_DFLAG_CONST | EMBC_PUBSUB_DFLAG_RETAIN | EMBC_PUBSUB_DTYPE_JSON;
+        msg->value.value.str = meta_json;
+        msg->value.size = (uint32_t) (sz + 2);
+    } else {
+        msg->value.type = EMBC_PUBSUB_DTYPE_NULL;
+        msg->value.size = 0;
+    }
     embc_list_add_tail(&self->msg_pend, &msg->item);
     unlock(self);
     return 0;
@@ -506,6 +572,48 @@ int32_t embc_pubsub_query(struct embc_pubsub_s * self, const char * topic, struc
     return 0;
 }
 
+static void metadata_forward(struct embc_pubsub_s * self, const char * topic_str) {
+    char str_start[EMBC_PUBSUB_TOPIC_LENGTH_MAX];
+    struct embc_list_s * item;
+    struct subscriber_s * subscriber;
+    size_t name_sz = strlen(topic_str);
+    char * str_end = str_start + name_sz - 1;
+    struct topic_s * t = NULL;
+    char ch;
+    while (str_end >= str_start) {
+        if (!t) {
+            if (*str_end == '$') {
+                *str_end-- = 0;
+                if (name_sz && (str_start[name_sz - 1] == '/')) {
+                    *str_end-- = 0;
+                }
+            }
+            t = topic_find(self, str_start, false);
+            if (!t) {
+                ch = 'a';
+                while ((str_end >= str_start) && (ch != '/')) {
+                    ch = *str_end;
+                    *str_end-- = 0;
+                }
+                ++str_end;
+                *str_end = '$';
+            }
+        }
+        if (t) {
+            embc_list_foreach(&t->subscribers, item) {
+                subscriber = EMBC_CONTAINER_OF(item, struct subscriber_s, item);
+                if (subscriber->flags & SFLAG_LINK) {
+                    subscriber->cbk_fn(subscriber->cbk_user_data, topic_str, &embc_pubsub_null());
+                }
+            }
+            t = t->parent;
+            if (!t) {
+                break;
+            }
+        }
+    };
+}
+
 static void metadata_publish(struct topic_s * topic, char * topic_str) {
     struct embc_list_s * item;
     struct subscriber_s * subscriber;
@@ -514,10 +622,7 @@ static void metadata_publish(struct topic_s * topic, char * topic_str) {
         return;
     }
     size_t idx = strlen(topic_str);
-    if (idx == 0) {
-        return;  // no metadata for root
-    }
-    if (topic_str[idx - 1] != '$') {
+    if ((idx == 0) || (topic_str[idx - 1] != '$')) {
         topic_str[idx] = '$';
         topic_str[idx + 1] = 0;
     }
@@ -525,7 +630,9 @@ static void metadata_publish(struct topic_s * topic, char * topic_str) {
     while (topic) {
         embc_list_foreach(&topic->subscribers, item) {
             subscriber = EMBC_CONTAINER_OF(item, struct subscriber_s, item);
-            subscriber->cbk_fn(subscriber->cbk_user_data, topic_str, &meta);
+            if (subscriber->flags & SFLAG_LINK) {
+                subscriber->cbk_fn(subscriber->cbk_user_data, topic_str, &meta);
+            }
         }
         topic = topic->parent;
     }
@@ -581,38 +688,60 @@ void embc_pubsub_process(struct embc_pubsub_s * self) {
 
         size_t name_sz = strlen(msg->name);  // excluding terminator
         if ((name_sz == 1) && (msg->name[0] == '$')) {
-            // metadata request root
-            t = self->topic;
-            msg->name[0] = 0;
+            // metadata request root, respond with our owned topics
+            t = topic_find(self, self->topic_prefix, false);
+            embc_cstr_copy(msg->name, self->topic_prefix, sizeof(msg->name));
             metadata_request(t, msg);
-        } else if ((name_sz > 1) && (msg->name[name_sz - 1] == '$') && (msg->name[name_sz - 2] == '/')) {
-            // metadata request topic
+
+            // forward request to all other link subscribers
+            msg->name[0] = '$';
+            msg->name[1] = 0;
+            metadata_forward(self, msg->name);
+        } else if ((name_sz > 2) && (msg->name[name_sz - 1] == '$') && (msg->name[name_sz - 2] == '/')) {
             msg->name[name_sz - 2] = 0;
             t = topic_find(self, msg->name, false);
-            metadata_request(t, msg);
+            if (!t) {
+                // do nothing
+            } else if (embc_cstr_starts_with(msg->name, self->topic_prefix)) {
+                // metadata request topic for us
+                metadata_request(t, msg);
+            } else {
+                // not for us, forward request to link subscribers
+                msg->name[name_sz - 2] = '/';
+                metadata_forward(self, msg->name);
+            }
         } else if (msg->name[name_sz - 1] == '$') {
             // metadata publish
             msg->name[name_sz - 1] = 0;
-            t = topic_find(self, msg->name, true);
-            if (t) {
-                if ((dtype == EMBC_PUBSUB_DTYPE_JSON)
-                        && (msg->value.type & EMBC_PUBSUB_DFLAG_RETAIN)
-                        && (msg->value.type & EMBC_PUBSUB_DFLAG_CONST)) {
-                    t->meta = msg->value.value.str;
-                } else if (dtype == EMBC_PUBSUB_DTYPE_NULL) {
-                    t->meta = NULL;
+            if (embc_cstr_starts_with(msg->name, self->topic_prefix)) {
+                // for us, retain as needed
+                t = topic_find(self, msg->name, true);
+                if (t) {
+                    if ((dtype == EMBC_PUBSUB_DTYPE_JSON)
+                            && (msg->value.type & EMBC_PUBSUB_DFLAG_RETAIN)
+                            && (msg->value.type & EMBC_PUBSUB_DFLAG_CONST)) {
+                        t->meta = msg->value.value.str;
+                    } else if (dtype == EMBC_PUBSUB_DTYPE_NULL) {
+                        // query (cannot clear metadata)
+                    }
+                    metadata_publish(t, msg->name);
                 }
-                metadata_publish(t, msg->name);
+            } else {
+                msg->name[name_sz - 1] = '$';
+                metadata_forward(self, msg->name);
             }
         } else {
             t = topic_find(self, msg->name, true);
             if (t) {
                 // todo map alternate values to actual value using metadata
-                t->value = msg->value;
-                publish(t, msg);
+                if (is_value_eq(&t->value, &msg->value) && (t->value.type & EMBC_PUBSUB_DFLAG_RETAIN)) {
+                    // same value, skip to de-duplicate.
+                } else {
+                    t->value = msg->value;
+                    publish(t, msg);
+                }
             }
         }
-
 
         free_item:
         if (is_ptr_type(msg->value.type) && (0 == (msg->value.type & EMBC_PUBSUB_DFLAG_CONST))) {

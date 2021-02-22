@@ -44,18 +44,13 @@ struct embc_comm_s;
  * @param cbk_fn The function to call on topic updates.  This function
  *      must remain valid until embc_comm_finalize().
  * @param cbk_user_data The arbitrary data for cbk_fn().
- * @param topics The list of topic prefixes to forward
- *      from pubsub out the communication interface.  Each topic
- *      must be separated by \x1F (unit separator).  The stack
- *      subscribes upon connection.
  * @return The new instance or NULL.
  */
 struct embc_comm_s * embc_comm_initialize(struct embc_dl_config_s const * config,
                                           const char * device,
                                           uint32_t baudrate,
                                           embc_pubsub_subscribe_fn cbk_fn,
-                                          void * cbk_user_data,
-                                          const char * topics);
+                                          void * cbk_user_data);
 
 /**
  * @brief Finalize the comm instance and free all resources.

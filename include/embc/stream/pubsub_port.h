@@ -45,19 +45,24 @@ extern "C" {
 /// The opaque PubSub port instance.
 struct embc_pubsubp_s;
 
+/// The port directional mode.
+enum embc_pubsubp_mode_e {
+    EMBC_PUBSUBP_MODE_UPSTREAM,     // client
+    EMBC_PUBSUBP_MODE_DOWNSTREAM,   // server
+};
+
 /**
  * @brief Create and initialize a new PubSub port instance.
  *
  * @param pubsub The pubsub instance.
- * @param subscribe The list of subscribe topics each separated
- *      by \x1F (unit separator).
+ * @param mode The port mode.
  * @return The new PubSub port instance.
  *
  * To ensure appropriate forwarding of subscribed topics,
  * this module will only on subscribe to the pubsub instance once
  * it establishes the connection.
  */
-struct embc_pubsubp_s * embc_pubsubp_initialize(struct embc_pubsub_s * pubsub, const char * subscribe);
+struct embc_pubsubp_s * embc_pubsubp_initialize(struct embc_pubsub_s * pubsub, enum embc_pubsubp_mode_e mode);
 
 /**
  * @brief Finalize the instance and free resources.

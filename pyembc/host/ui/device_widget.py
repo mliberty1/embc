@@ -151,8 +151,8 @@ class StatusWidget(QtWidgets.QWidget):
 
 class EchoWidget(QtWidgets.QWidget):
 
-    def __init__(self, parent, pubsub):
-        self._pubsub = weakref.ref(pubsub)
+    def __init__(self, parent, device):
+        self._device = weakref.ref(device)
         super(EchoWidget, self).__init__(parent)
 
         self.setObjectName('echo')
@@ -194,10 +194,10 @@ class EchoWidget(QtWidgets.QWidget):
         log.info('echo button  %s', checked)
         txt = 'Press to stop' if checked else 'Press to start'
         self._button.setText(txt)
-        pubsub = self._pubsub()
-        if pubsub:
+        device = self._device()
+        if device is not None:
             value = 1 if checked else 0
-            pubsub.publish('h/port/0/echo/enable', value, retain=True, src_cbk=self._on_echo_enabled)
+            device.publish('h/c/port/0/echo/enable', value, retain=True, src_cbk=self._on_echo_enabled)
 
 
 class PubSubWidget(QtWidgets.QWidget):

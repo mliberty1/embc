@@ -70,10 +70,6 @@ struct embc_stack_s {
  * @param ll_instance The lower-level communication implementation.
  * @param evm_api The event manager API.
  * @param pubsub The pubsub instance for this device.
- * @param topics The list of topic prefixes to forward
- *      from pubsub out the communication interface.  Each topic
- *      must be separated by \x1F (unit separator).  The stack
- *      subscribes upon connection.
  * @return The stack instance or NULL on error.
  */
 struct embc_stack_s * embc_stack_initialize(
@@ -82,8 +78,7 @@ struct embc_stack_s * embc_stack_initialize(
         const char * port0_topic_prefix,
         struct embc_evm_api_s * evm_api,
         struct embc_dl_ll_s const * ll_instance,
-        struct embc_pubsub_s * pubsub,
-        const char * topics
+        struct embc_pubsub_s * pubsub
 );
 
 /**

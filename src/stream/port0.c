@@ -139,13 +139,16 @@ static void echo_send(struct embc_port0_s * self) {
 static uint8_t on_echo_enable(void * user_data, const char * topic, const struct embc_pubsub_value_s * value) {
     (void) topic;
     struct embc_port0_s * self = (struct embc_port0_s *) user_data;
-    if (value->type != EMBC_PUBSUB_DTYPE_U32) {
+    if ((value->type & EMBC_PUBSUB_DTYPE_MASK) != EMBC_PUBSUB_DTYPE_U32) {
+        EMBC_LOGW("echo enable, bad type");
         return EMBC_ERROR_PARAMETER_INVALID;
     }
     self->echo_enable = value->value.u32 ? 1 : 0;
     if (self->echo_enable) {
+        EMBC_LOGW("echo on");
         echo_send(self);
     } else {
+        EMBC_LOGW("echo off");
         self->echo_rx_frame_id = 0;
         self->echo_tx_frame_id = 0;
     }
@@ -420,10 +423,8 @@ struct embc_port0_s * embc_port0_initialize(enum embc_port0_mode_e mode,
     p->echo_window = 8;
     p->echo_length = 256;
 
-    topic_append(p, EV_TOPIC);
-    embc_pubsub_meta(p->pubsub, p->topic_prefix, EV_META);
+    pubsub_create(p, EV_TOPIC, EV_META, &embc_pubsub_u32_r(0), NULL, NULL);
     pubsub_create(p, TX_TOPIC, TX_META, &embc_pubsub_u32_r(0), NULL, NULL);
-
     pubsub_create(p, ECHO_ENABLE_META_TOPIC, ECHO_ENABLE_META, &embc_pubsub_u32_r(p->echo_enable), on_echo_enable, p);
     pubsub_create(p, ECHO_OUTSTANDING_META_TOPIC, ECHO_WINDOW_META, &embc_pubsub_u32_r(p->echo_window), on_echo_window, p);
     pubsub_create(p, ECHO_LENGTH_META_TOPIC, ECHO_LENGTH_META, &embc_pubsub_u32_r(p->echo_length), on_echo_length, p);

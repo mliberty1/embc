@@ -136,7 +136,7 @@ int main(int argc, char * argv[]) {
     embc_log_initialize(app_log_printf_);
     // srand(2);
 
-    h_.pubsub = embc_pubsub_initialize(pubsub_buffer_size);
+    h_.pubsub = embc_pubsub_initialize("h", pubsub_buffer_size);
     if (!h_.pubsub) {
         EMBC_LOGE("pubsub initialized failed");
         return 1;
@@ -175,7 +175,7 @@ int main(int argc, char * argv[]) {
             .send_available = (embc_dl_ll_send_available_fn) embc_uartt_send_available,
     };
 
-    h_.stack = embc_stack_initialize(&dl_config, EMBC_PORT0_MODE_SERVER, "h/", &evm_api, &ll, h_.pubsub, "h/");
+    h_.stack = embc_stack_initialize(&dl_config, EMBC_PORT0_MODE_SERVER, "h/c0/", &evm_api, &ll, h_.pubsub);
     if (!h_.stack) {
         EMBC_LOGE("stack_initialize failed");
         return 1;

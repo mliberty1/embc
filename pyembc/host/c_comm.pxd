@@ -93,8 +93,7 @@ cdef extern from "embc/host/comm.h":
                                        const char * device,
                                        uint32_t baudrate,
                                        embc_pubsub_subscribe_fn cbk_fn,
-                                       void * cbk_user_data,
-                                       const char * topics)
+                                       void * cbk_user_data)
     void embc_comm_finalize(embc_comm_s * self)
     int32_t embc_comm_publish(embc_comm_s * self,
                               const char * topic, const embc_pubsub_value_s * value)

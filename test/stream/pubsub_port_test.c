@@ -37,8 +37,13 @@ struct test_s {
     struct embc_pubsub_s p;
 };
 
-int32_t embc_pubsub_subscribe(struct embc_pubsub_s * self, const char * topic,
-                              embc_pubsub_subscribe_fn cbk_fn, void * cbk_user_data) {
+const char * embc_pubsub_topic_prefix(struct embc_pubsub_s * self) {
+    (void) self;
+    return "s";
+}
+
+int32_t embc_pubsub_subscribe_link(struct embc_pubsub_s * self, const char * topic,
+                                   embc_pubsub_subscribe_fn cbk_fn, void * cbk_user_data) {
     (void) self;
     check_expected_ptr(topic);
     (void) cbk_fn;
@@ -47,7 +52,7 @@ int32_t embc_pubsub_subscribe(struct embc_pubsub_s * self, const char * topic,
 }
 
 #define expect_subscribe(_topic)                            \
-    expect_string(embc_pubsub_subscribe, topic, _topic);
+    expect_string(embc_pubsub_subscribe_link, topic, _topic);
 
 int32_t embc_pubsub_unsubscribe(struct embc_pubsub_s * self, const char * topic,
                                 embc_pubsub_subscribe_fn cbk_fn, void * cbk_user_data) {
@@ -141,10 +146,9 @@ int32_t embc_transport_port_register(struct embc_transport_s * self,
 static int setup(void ** state) {
     struct test_s * self = embc_alloc_clr(sizeof(struct test_s));
     assert_non_null(self);
-    self->s = embc_pubsubp_initialize(&self->p, "s/\x1ft/");
+    self->s = embc_pubsubp_initialize(&self->p, EMBC_PUBSUBP_MODE_UPSTREAM);
     expect_value(embc_transport_port_register, port_id, 2);
-    expect_subscribe("s/");
-    expect_subscribe("t/");
+    expect_subscribe("");
     embc_pubsubp_transport_register(self->s, 2, &self->t);
     embc_pubsubp_on_event(self->s, EMBC_DL_EV_TX_CONNECTED);
 

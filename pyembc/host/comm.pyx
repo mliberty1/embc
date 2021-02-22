@@ -53,6 +53,7 @@ cdef _value_pack(embc_pubsub_value_s * value, data, retain=None):
         value[0].type = EMBC_PUBSUB_DTYPE_JSON
         value[0].value.str = s
         value[0].size = len(s) + 1
+    log.info("_value_pack(type=%d, size=%d)", value[0].type, value[0].size)
     if bool(retain):
         value[0].type |= EMBC_PUBSUB_DFLAG_RETAIN
     return s  # so that caller can keep valid until used.
@@ -141,7 +142,7 @@ cdef class Comm:
         config.tx_link_size = 64 if tx_link_size is None else int(tx_link_size)
         device_str = device.encode('utf-8')
         log.info('comm_initialize(%s, %s)', device_str, baudrate)
-        self._comm = embc_comm_initialize(&config, device_str, baudrate, Comm._subscriber_cbk, <void *> self, '')
+        self._comm = embc_comm_initialize(&config, device_str, baudrate, Comm._subscriber_cbk, <void *> self)
         if not self._comm:
             raise RuntimeError('Could not allocate instance')
 
@@ -163,7 +164,8 @@ cdef class Comm:
         cdef int32_t rc
         cdef embc_pubsub_value_s v
         s = _value_pack(&v, value, retain)
-        rc = embc_comm_publish(self._comm, topic, &v)
+        topic_str = topic.encode('utf-8')
+        rc = embc_comm_publish(self._comm, topic_str, &v)
         if rc:
             raise RuntimeError(f'publish({topic}) failed with {rc}')
 

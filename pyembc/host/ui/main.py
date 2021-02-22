@@ -85,7 +85,7 @@ class Device(QtCore.QObject):
         super(Device, self).__init__(parent)
         self._parent = parent
         self._dev = dev
-        self._topic_prefix = dev
+        self._topic_prefix = dev + '/'
         self._pubsub = pubsub
         self._resync = Resync(self)
         self._on_device_publish = self._resync.wrap(self._subscribe_device)
@@ -94,7 +94,7 @@ class Device(QtCore.QObject):
         self.baudrate = baudrate
 
         if pubsub is not None:
-            pubsub.subscribe(self._topic_prefix, self._subscribe_parent)
+            pubsub.subscribe(self._topic_prefix, self._subscribe_parent, forward=True)
 
     def __str__(self):
         return f'Device({self._dev})'
@@ -105,18 +105,21 @@ class Device(QtCore.QObject):
 
     def _subscribe_parent(self, topic: str, value, retain=None, src_cbk=None):
         # forward from application pubsub to device's C pubsub
+        log.info('ui → device: %s = %s', topic, value)
         if topic.startswith(self._topic_prefix):
             topic = topic[len(self._topic_prefix):]
             if self.comm is not None:
-                self.comm.publish(self, topic, value, retain=retain, src_cbk=self._on_device_publish)
+                self.comm.publish(topic, value, retain=retain, src_cbk=self._on_device_publish)
 
     def _subscribe_device(self, topic: str, value, retain=None, src_cbk=None):
         # forward from device's C pubsub to application pubsub
+        log.info("device → ui: %s = %s", topic, value)
         topic = self._topic_prefix + topic
         self._pubsub.publish(topic, value, retain=retain, src_cbk=self._subscribe_parent)
 
     def publish(self, topic: str, value, retain=None, src_cbk=None):
-        self._pubsub(topic, value, retain=retain, src_cbk=src_cbk)
+        topic = self._topic_prefix + topic
+        self._pubsub.publish(topic, value, retain=retain, src_cbk=src_cbk)
 
     def subscribe(self, topic, cbk, skip_retained=None):
         def src_cbk_fn(topic: str, value, retain=None, src_cbk=None):

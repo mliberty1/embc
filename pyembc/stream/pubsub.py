@@ -37,15 +37,19 @@ class _Topic:
         """
         self._topic = topic
         self._value = value
-        self._meta = None
+        self.meta = None
         if parent is not None:
             parent = weakref.ref(parent)
         self.parent = parent
         self.children: Mapping[str, _Topic] = {}
-        self._subscribers = []
+        self._subscribers = []  # list of tuples of callback, forward
 
     def __str__(self):
         return f'Topic({self._topic}, value={self._value})'
+
+    @property
+    def name(self):
+        return self._topic
 
     @property
     def value(self):
@@ -60,9 +64,11 @@ class _Topic:
             if self._value == x:  # deduplicate
                 return
             self._value = x
+        else:
+            self._value = None
         topic = self
         while topic is not None:
-            for subscriber in topic._subscribers:
+            for subscriber, forward in topic._subscribers:
                 if subscriber == src_cbk:
                     continue
                 subscriber(self._topic, x, retain)
@@ -70,26 +76,45 @@ class _Topic:
             if topic is not None:
                 topic = topic()  # weakref to parent
 
+    def forward(self, topic, value, retain=None, src_cbk=None, traverse_parent=False):
+        for subscriber, forward in self._subscribers:
+            if subscriber == src_cbk or not forward:
+                continue
+            subscriber(topic, value, retain)
+        if traverse_parent and self.parent is not None:
+            parent = self.parent()
+            if parent is not None:
+                parent.forward(topic, value, retain, src_cbk, traverse_parent)
+
     def _publish_new_subscriber(self, cbk):
         for child in self.children.values():
             child._publish_new_subscriber(cbk)
         if self._value is not None:
             cbk(self._topic, self._value)
 
-    def subscribe(self, cbk, skip_retained=None):
+    def subscribe(self, cbk, skip_retained=None, forward=None):
         if not callable(cbk):
             raise ValueError('subscribers must be callable')
         if cbk not in self._subscribers:
-            self._subscribers.append(cbk)
+            self._subscribers.append((cbk, forward))
         if not bool(skip_retained):
             self._publish_new_subscriber(cbk)
 
     def unsubscribe(self, cbk):
-        self._subscribers.remove(cbk)
+        unsub = []
+        for idx, (cbk_fn, _) in enumerate(self._subscribers):
+            if cbk == cbk_fn:
+                unsub.append(idx)
+        for idx in reversed(unsub):
+            self._subscribers.pop(idx)
 
 
 class PubSub:
     """A trivial, local publish/subscribe implementation.
+
+    :param topic_prefix: The topic prefix string owned by this
+        implementation, which is used for distributed pubsub.
+        Provide '' or None if you are using a single instance.
 
     This PubSub implementation features:
     * retained values
@@ -103,11 +128,14 @@ class PubSub:
     Query the current value using '?' or 'my/path/?'.
     The query values are returned as 'my/path/var?'
     """
-    def __init__(self):
+    def __init__(self, topic_prefix: str = None):
+        self._topic_prefix = '' if topic_prefix is None else str(topic_prefix)
         self._root = _Topic(None, '')
 
     def _topic_find(self, topic, create=False):
         t = self._root
+        while len(topic) and topic[-1] in '/$?':
+            topic = topic[:-1]
         if len(topic):
             parts_so_far = []
             parts = topic.split('/')
@@ -124,6 +152,14 @@ class PubSub:
                 t = child
         return t
 
+    def _meta_send_all(self, topic: _Topic, src_cbk=None):
+        if topic is None:
+            return
+        if topic.meta is not None:
+            topic.forward(topic.name + '$', topic.meta, retain=False, src_cbk=src_cbk, traverse_parent=True)
+        for child in topic.children.values():
+            self._meta_send_all(child, src_cbk)
+
     def publish(self, topic, value, retain=None, src_cbk=None):
         """Publish to a topic.
 
@@ -136,20 +172,35 @@ class PubSub:
         """
         if not len(topic):
             raise ValueError('Empty topic not allowed')
-        if topic[-1] == '$':
-            s = topic[:-1]
-            if not len(s) or s[-1] == '/':
-                pass  # todo request all metadata
+        if topic == '$':
+            self._meta_send_all(self._topic_find(self._topic_prefix, create=True), src_cbk)
+            self._root.forward(topic, None, retain=retain, src_cbk=src_cbk)
+        elif topic.endswith('/$'):
+            if topic.startswith(self._topic_prefix):  # for us
+                self._meta_send_all(self._topic_find(topic, create=True), src_cbk)
             else:
-                pass  # todo publish a metadata update
+                self._root.forward(topic, None, retain=retain, src_cbk=src_cbk, traverse_parent=True)
+        elif topic[-1] == '$':  # endswith
+            t = self._topic_find(topic[:-1], create=True)
+            if topic.startswith(self._topic_prefix):  # for use
+                if value is None:  # request for us
+                    if t.value is not None:
+                        t.forward(topic, t.value, retain=True, src_cbk=src_cbk, traverse_parent=True)
+                else:  # set for us
+                    t.meta = value
+                    t.forward(topic, value, retain=True, src_cbk=src_cbk, traverse_parent=True)
+            else:  # get or set for another pubsub instance relay
+                t.forward(topic, value, retain=True, src_cbk=src_cbk, traverse_parent=True)
         elif topic[-1] == '?':
             pass  # todo, topic query
-        t = self._topic_find(topic, create=True)
-        return t.publish(value, retain, src_cbk)
+        else:
+            t = self._topic_find(topic, create=True)
+            t.publish(value, retain, src_cbk)
 
     def meta(self, topic, meta):
-        t = self._topic_find(topic, create=True)
-        t.meta = meta
+        if topic[-1] != '$':
+            topic = topic + '$'
+        self.publish(topic, meta)
 
     def get(self, topic):
         """Get the retained value for the topic.
@@ -171,10 +222,10 @@ class PubSub:
         :param skip_retained: Skip the update of all retained values
             that normally occurs when subscribing.
         :param forward: When true, forward $ and ? requests to this subscriber.
-            Use True for distributed PubSub instances.
+            Use True for distributed PubSub instances and user interfaces.
         """
         t = self._topic_find(topic, create=True)
-        t.subscribe(cbk, skip_retained)
+        t.subscribe(cbk, skip_retained=skip_retained, forward=forward)
 
     def unsubscribe(self, topic, cbk):
         """Unsubscribe from a topic.
@@ -185,7 +236,7 @@ class PubSub:
         t = self._topic_find(topic, create=True)
         t.unsubscribe(cbk)
 
-    def create(self, topic, meta=None, subscriber_cbk=None):
+    def create(self, topic, meta=None, subscriber_cbk=None, skip_retained=None, forward=None):
         t = self._topic_find(topic, create=False)
         if t is not None:
             raise ValueError(f'Topic {topic} already exists')
@@ -196,4 +247,4 @@ class PubSub:
             x = meta['default']
             t.publish(x, retain, subscriber_cbk)
         if subscriber_cbk is not None:
-            t.subscribe(subscriber_cbk)
+            t.subscribe(subscriber_cbk, skip_retained=skip_retained, forward=forward)

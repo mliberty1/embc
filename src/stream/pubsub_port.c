@@ -29,25 +29,19 @@ enum state_e {
 struct embc_pubsubp_s {
     uint8_t state;
     uint8_t port_id;
+    uint8_t mode;
     struct embc_pubsub_s * pubsub;
     struct embc_transport_s * transport;
-    char subscribe[EMBC_PUBSUB_TOPIC_LENGTH_MAX * 2];  // comma-separated list
     uint8_t msg[EMBC_FRAMER_PAYLOAD_MAX_SIZE];
 };
 
 const char EMBC_PUBSUBP_META[] = "{\"type\":\"pubsub\"}";
 
-struct embc_pubsubp_s * embc_pubsubp_initialize(struct embc_pubsub_s * pubsub, const char * subscribe) {
+struct embc_pubsubp_s * embc_pubsubp_initialize(struct embc_pubsub_s * pubsub, enum embc_pubsubp_mode_e mode) {
     struct embc_pubsubp_s * self = embc_alloc_clr(sizeof(struct embc_pubsubp_s));
     EMBC_ASSERT_ALLOC(self);
+    self->mode = mode;
     self->pubsub = pubsub;
-    size_t subscribe_len = strlen(subscribe);
-    if (subscribe_len > sizeof(self->subscribe)) {
-        EMBC_LOGW("subscribe string too long: %s", subscribe);
-        embc_pubsubp_finalize(self);
-        return NULL;
-    }
-    embc_memcpy(self->subscribe, subscribe, subscribe_len + 1);
     return self;
 }
 
@@ -62,33 +56,18 @@ static int32_t connect(struct embc_pubsubp_s * self) {
     if (self->state != ST_INIT) {
         return 0;
     }
-    if (self->pubsub && self->transport) {
-        // subscribe to all topics in list, separated by 0x1f
-        char * sub_start = self->subscribe;
-        char ch_end;
-        while (*sub_start) {
-            char * sub_end = sub_start;
-            while ((0 != *sub_end) && (0x1f != *sub_end)) {
-                ++sub_end;
-            }
-            ch_end = *sub_end;  // store separator
-            *sub_end = 0;       // null terminate item
-            rc = embc_pubsub_subscribe(self->pubsub,
-                                       sub_start,
-                                       (embc_pubsub_subscribe_fn) embc_pubsubp_on_update,
-                                       self);
-            if (0 == ch_end) {
-                break;  // end of list
-            }
-            *sub_end = ch_end;  // restore separator
-            sub_start = sub_end + 1;
-        }
+
+    if (self->mode == EMBC_PUBSUBP_MODE_UPSTREAM) {
+        rc = embc_pubsub_subscribe_link(self->pubsub, "",
+                                        (embc_pubsub_subscribe_fn) embc_pubsubp_on_update,
+                                        self);
         if (rc) {
             EMBC_LOGE("pubsub subscribe failed");
             return rc;
         }
-        self->state = ST_ACTIVE;
     }
+    self->state = ST_ACTIVE;
+
     return 0;
 }
 

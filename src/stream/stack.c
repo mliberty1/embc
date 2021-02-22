@@ -27,8 +27,7 @@ struct embc_stack_s * embc_stack_initialize(
         const char * port0_topic_prefix,
         struct embc_evm_api_s * evm_api,
         struct embc_dl_ll_s const * ll_instance,
-        struct embc_pubsub_s * pubsub,
-        const char * topics)  {
+        struct embc_pubsub_s * pubsub)  {
 
     struct embc_stack_s * self = embc_alloc_clr(sizeof(struct embc_stack_s));
     self->pubsub = pubsub;
@@ -67,7 +66,15 @@ struct embc_stack_s * embc_stack_initialize(
         return NULL;
     }
 
-    self->pubsub_port = embc_pubsubp_initialize(pubsub, topics);
+    enum embc_pubsubp_mode_e pmode;
+    switch (port0_mode) {
+        case EMBC_PORT0_MODE_CLIENT: pmode = EMBC_PUBSUBP_MODE_UPSTREAM; break;
+        case EMBC_PORT0_MODE_SERVER: pmode = EMBC_PUBSUBP_MODE_DOWNSTREAM; break;
+        default:
+            embc_stack_finalize(self);
+            return NULL;
+    }
+    self->pubsub_port = embc_pubsubp_initialize(pubsub, pmode);
     if (!self->pubsub_port) {
         embc_stack_finalize(self);
         return NULL;

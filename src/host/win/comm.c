@@ -75,8 +75,7 @@ struct embc_comm_s * embc_comm_initialize(struct embc_dl_config_s const * config
                                           const char * device,
                                           uint32_t baudrate,
                                           embc_pubsub_subscribe_fn cbk_fn,
-                                          void * cbk_user_data,
-                                          const char * topics) {
+                                          void * cbk_user_data) {
     if (!cbk_fn) {
         EMBC_LOGW("Must provide cbk_fn");
         return NULL;
@@ -89,7 +88,7 @@ struct embc_comm_s * embc_comm_initialize(struct embc_dl_config_s const * config
     EMBC_LOGI("embc_comm_initialize(%s, %d)", device, (int) baudrate);
     self->subscriber_fn = cbk_fn;
     self->subscriber_user_data = cbk_user_data;
-    self->pubsub = embc_pubsub_initialize(PUBSUB_BUFFER_SIZE);
+    self->pubsub = embc_pubsub_initialize("h/", PUBSUB_BUFFER_SIZE);
     if (!self->pubsub) {
         goto on_error;
     }
@@ -124,9 +123,7 @@ struct embc_comm_s * embc_comm_initialize(struct embc_dl_config_s const * config
     embc_uartt_evm_api(self->uart, &self->evm_api);
     embc_pubsub_register_on_publish(self->pubsub, on_publish_fn, self);
 
-
-    self->stack = embc_stack_initialize(config, EMBC_PORT0_MODE_SERVER, "h/c/", &self->evm_api, &ll,
-            self->pubsub, topics);
+    self->stack = embc_stack_initialize(config, EMBC_PORT0_MODE_SERVER, "h/c/", &self->evm_api, &ll, self->pubsub);
     if (!self->stack) {
         goto on_error;
     }
@@ -171,6 +168,8 @@ void embc_comm_finalize(struct embc_comm_s * self) {
 
 int32_t embc_comm_publish(struct embc_comm_s * self,
                           const char * topic, const struct embc_pubsub_value_s * value) {
+    EMBC_LOGI("publish(topic=%s, value.type=%d, value.size=%d",
+              topic, (int) value->type, (int) value->size);
     return embc_pubsub_publish(self->pubsub, topic, value, self->subscriber_fn, self->subscriber_user_data);
 }
 

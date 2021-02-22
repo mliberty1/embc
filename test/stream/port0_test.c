@@ -98,8 +98,8 @@ static int32_t ll_send(struct embc_transport_s * t,
 static int setup(void ** state) {
     (void) state;
     struct embc_transport_s * self = embc_alloc_clr(sizeof(struct embc_transport_s));
-    self->pubsub = embc_pubsub_initialize(10000);
-    self->p = embc_port0_initialize(EMBC_PORT0_MODE_CLIENT, &self->dl, self, ll_send, self->pubsub, "s/");
+    self->pubsub = embc_pubsub_initialize("s", 10000);
+    self->p = embc_port0_initialize(EMBC_PORT0_MODE_CLIENT, &self->dl, self, ll_send, self->pubsub, "s/c0/");
     assert_non_null(self->p);
     *state = self;
     return 0;
